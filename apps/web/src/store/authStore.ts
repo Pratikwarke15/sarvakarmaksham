@@ -72,13 +72,12 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
     }
   },
 
-  // Server-validates the stored session on app load so a stale, forged or
-  // cross-role session can never be used. Called once from SessionBootstrap.
+  // Server-validates the stored session in background on app load.
   validateToken: async () => {
     if (typeof window === "undefined") return;
     const token = localStorage.getItem("coopgig_token");
     if (!token) {
-      set({ isAuthenticated: false, isLoading: false, sessionValidated: true });
+      set({ user: null, token: null, isAuthenticated: false, isLoading: false, sessionValidated: true });
       return;
     }
     try {
@@ -92,25 +91,27 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
         const storedUser = useAuthStore.getState().user;
         localStorage.setItem("coopgig_user", JSON.stringify(serverUser));
         set({ user: serverUser, token, isAuthenticated: true, isLoading: false, sessionValidated: true });
-        // Role served by the API is the only truth. If it disagrees with a
-        // previously stored one, tear the session down entirely.
+        // If role changed on server, handle gracefully
         if (storedUser && storedUser.role !== serverUser.role) {
           clearSessionStorage();
           set({ user: null, token: null, isAuthenticated: false, isLoading: false, sessionValidated: true });
-          window.location.href = "/unauthorized";
+          if (typeof window !== "undefined") {
+            window.location.replace("/unauthorized");
+          }
         }
       } else {
         clearSessionStorage();
         set({ user: null, token: null, isAuthenticated: false, isLoading: false, sessionValidated: true });
-        const p = new URLSearchParams(window.location.search);
-        if (!p.get("from") && window.location.pathname !== "/login") {
-          window.location.href = "/login";
-        }
       }
-    } catch {
-      clearSessionStorage();
-      set({ user: null, token: null, isAuthenticated: false, isLoading: false, sessionValidated: true });
-      window.location.href = "/login";
+    } catch (err: any) {
+      // Only clear storage if explicitly unauthorized (401)
+      if (err?.response?.status === 401) {
+        clearSessionStorage();
+        set({ user: null, token: null, isAuthenticated: false, isLoading: false, sessionValidated: true });
+      } else {
+        // Retain optimistic session on network/server hiccups
+        set({ isLoading: false, sessionValidated: true });
+      }
     }
   },
 }));

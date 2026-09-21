@@ -13,7 +13,7 @@ def _optional(name: str, fallback: str) -> str:
 
 
 def _ensure_ssl_mode(url: str) -> str:
-    if "sslmode=" in url:
+    if "sslmode=" in url or "localhost" in url or "127.0.0.1" in url:
         return url
     sep = "&" if "?" in url else "?"
     return f"{url}{sep}sslmode=require"

@@ -40,6 +40,13 @@ class RegisterRequest(BaseModel):
     email: str | None = None
     password: str = Field(min_length=6, max_length=128)
     role: str
+    aadhaarNumber: str | None = None
+    aadhaarName: str | None = None
+    aadhaarDob: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    defaultAddress: str | None = None
+    skillTags: list[str] | None = None
 
     @field_validator("phone")
     @classmethod

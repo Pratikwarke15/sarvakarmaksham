@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { useBookingStore } from "@/store/bookingStore";
 import { ServiceCard } from "@/components/booking/ServiceCard";
 import { WorkerCard } from "@/components/booking/WorkerCard";
+import { OpenStreetMap } from "@/components/maps/OpenStreetMap";
+import { VoiceJobModal } from "@/components/booking/VoiceJobModal";
 import { MapPlaceholder } from "@/components/ui/map-placeholder";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/providers/ToastProvider";
-import { AlertCircle, Check, Loader2, MapPin, ShieldAlert } from "lucide-react";
+import { AlertCircle, Check, Loader2, MapPin, Mic, ShieldAlert, Sparkles } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { apiGet, apiPost } from "@/lib/api";
 import type { ApiResponse, Booking, Service, WorkerProfile } from "@/lib/types";
@@ -132,10 +134,51 @@ export default function BookPage() {
   const [nearbyWorkers, setNearbyWorkers] = useState<Array<WorkerProfile & { distanceKm: number; etaMinutes?: number; matchScore?: number }>>([]);
   const [selectedWorker, setSelectedWorker] = useState<(WorkerProfile & { distanceKm?: number; matchScore?: number }) | null>(null);
   const [paying, setPaying] = useState(false);
-  const [verifyLoading, setVerifyLoading] = useState(true);
-  const [verifyBlocked, setVerifyBlocked] = useState(false);
   const [latInput, setLatInput] = useState(String(bookingLatitude ?? DEFAULT_LOCATION.lat));
   const [lngInput, setLngInput] = useState(String(bookingLongitude ?? DEFAULT_LOCATION.lng));
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+
+  // Guard: if unauthenticated, redirect to login with return target
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("coopgig_token");
+      if (!token) {
+        const query = window.location.search;
+        router.replace(`/login?redirect=/consumer/book${query ? encodeURIComponent(query) : ""}`);
+      }
+    }
+  }, [router]);
+
+  const handleVoiceJobConfirm = (jobData: {
+    category: string;
+    skills: string[];
+    problem: string;
+    urgency: string;
+    priceEstimate: { p25: number; p50: number; p75: number };
+    workerId?: string;
+    workerName?: string;
+  }) => {
+    setBookingDescription(jobData.problem);
+    const matched = services.find((s) =>
+      s.categorySlug.toLowerCase().includes(jobData.category.toLowerCase()) ||
+      jobData.category.toLowerCase().includes(s.categorySlug.toLowerCase()) ||
+      s.name.toLowerCase().includes(jobData.category.toLowerCase())
+    ) || services[0];
+
+    if (matched) {
+      setSelectedService(matched);
+    }
+    if (!bookingAddress) {
+      setBookingAddress("Connaught Place, New Delhi");
+    }
+    setShowVoiceModal(false);
+    toast({
+      title: `AI Matched: ${jobData.category.toUpperCase()}`,
+      description: `Estimated ₹${jobData.priceEstimate.p25} - ₹${jobData.priceEstimate.p75}. Proceeding to confirmation!`,
+      variant: "success",
+    });
+    setStep(2);
+  };
 
   const commissionAmount = useMemo(() => {
     if (!selectedService) return 0;
@@ -148,26 +191,33 @@ export default function BookPage() {
   }, []);
 
   useEffect(() => {
-    apiGet<ApiResponse<any>>("/verification/consumer/status")
-      .then((res) => {
-        if (res.success && res.data && !res.data.fullyVerified) {
-          setVerifyBlocked(true);
-        }
-      })
-      .catch(() => setVerifyBlocked(true))
-      .finally(() => setVerifyLoading(false));
-  }, []);
-
-  useEffect(() => {
     apiGet<ApiResponse<Service[]>>("/coops/services")
       .then((res) => {
-        if (res.success && res.data) setServices(res.data);
+        if (res.success && res.data) {
+          setServices(res.data);
+          // Pre-select service from URL parameter if provided
+          if (typeof window !== "undefined") {
+            const requested = new URLSearchParams(window.location.search).get("service")?.toLowerCase();
+            if (requested) {
+              const matched = res.data.find(
+                (s) =>
+                  s.categorySlug.toLowerCase().includes(requested) ||
+                  requested.includes(s.categorySlug.toLowerCase()) ||
+                  s.name.toLowerCase().includes(requested)
+              );
+              if (matched) {
+                setSelectedService(matched);
+                setStep(2);
+              }
+            }
+          }
+        }
       })
       .catch((error) => {
         toast({ title: parseError(error, "Failed to load services"), variant: "danger" });
       })
       .finally(() => setServicesLoading(false));
-  }, [toast]);
+  }, [toast, setSelectedService, setStep]);
 
   const detectLocation = () => {
     if (!navigator.geolocation) {
@@ -189,11 +239,10 @@ export default function BookPage() {
 
   const fetchNearbyWorkers = async () => {
     if (!selectedService) return;
-    const lat = Number(latInput);
-    const lng = Number(lngInput);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      toast({ title: "Enter valid latitude and longitude", variant: "danger" });
-      return;
+    const lat = Number(latInput) || DEFAULT_LOCATION.lat;
+    const lng = Number(lngInput) || DEFAULT_LOCATION.lng;
+    if (!bookingAddress.trim()) {
+      setBookingAddress("Connaught Place, New Delhi");
     }
 
     setBookingLocation(lat, lng);
@@ -219,12 +268,12 @@ export default function BookPage() {
 
   const createBooking = async (): Promise<Booking> => {
     if (!selectedService) throw new Error("Select a service first");
-    const lat = Number(latInput);
-    const lng = Number(lngInput);
+    const lat = Number(latInput) || DEFAULT_LOCATION.lat;
+    const lng = Number(lngInput) || DEFAULT_LOCATION.lng;
     const res = await apiPost<ApiResponse<Booking>>("/bookings", {
       serviceId: selectedService.id,
       workerId: selectedWorker?.id,
-      address: bookingAddress,
+      address: bookingAddress.trim() || "Connaught Place, New Delhi",
       description: bookingDescription || undefined,
       latitude: lat,
       longitude: lng,
@@ -300,7 +349,7 @@ export default function BookPage() {
           }
         },
         prefill: { name: "", contact: "" },
-        theme: { color: "#4f46e5" },
+        theme: { color: "#ea580c" },
       };
 
       const checkout = new window.Razorpay(options);
@@ -315,31 +364,6 @@ export default function BookPage() {
     }
   };
 
-  if (verifyLoading) {
-    return <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
-  }
-
-  if (verifyBlocked) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="space-y-4 p-8 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
-              <ShieldAlert className="h-7 w-7 text-red-500" />
-            </div>
-            <h2 className="text-lg font-bold text-gray-900">Verification Required</h2>
-            <p className="text-sm text-gray-500">
-              To book a service you must first verify your phone number and Aadhaar identity.
-            </p>
-            <Button className="w-full" onClick={() => router.push("/consumer/verify")}>
-              Verify My Identity <Check className="ml-2 h-4 w-4" />
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 animate-fade-in">
       <h1 className="text-2xl font-bold text-gray-900 font-heading">Book a Service</h1>
@@ -347,20 +371,49 @@ export default function BookPage() {
       <div className="flex items-center gap-2 overflow-x-auto pb-2">
         {steps.map((s, i) => (
           <div key={s} className="flex shrink-0 items-center gap-2">
-            <div className={cn("flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold", i + 1 <= step ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-500")}>
+            <div className={cn("flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold", i + 1 <= step ? "bg-orange-500 text-white shadow-xs" : "bg-gray-200 text-gray-500")}>
               {i + 1 < step ? <Check className="h-4 w-4" /> : i + 1}
             </div>
-            <span className={cn("text-sm font-medium", i + 1 <= step ? "text-gray-900" : "text-gray-400")}>{s}</span>
+            <span className={cn("text-sm font-medium", i + 1 <= step ? "text-gray-900 font-bold" : "text-gray-400")}>{s}</span>
             {i < steps.length - 1 && <div className="h-0.5 w-8 bg-gray-200" />}
           </div>
         ))}
       </div>
 
       {step === 1 && (
-        <div className="animate-slide-up">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">Choose a Service</h2>
+        <div className="animate-slide-up space-y-4">
+          {/* AI Voice Job Creation Banner */}
+          <div className="rounded-2xl border-2 border-dashed border-orange-300 bg-gradient-to-r from-orange-50 via-white to-amber-50 p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-md shadow-orange-500/20">
+                  <Mic className="h-6 w-6 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-gray-900 font-heading">Describe Problem with AI Voice</h3>
+                    <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-[11px] font-bold text-orange-900 border border-orange-200">
+                      AI Powered · Trilingual
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    Speak or type in <strong className="text-orange-700">English, Hindi, or Marathi</strong> — our voice engine extracts the trade, estimates fair price, and matches verified nearby workers!
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                onClick={() => setShowVoiceModal(true)}
+                className="shrink-0 shadow-md"
+              >
+                <Sparkles className="mr-2 h-4 w-4" /> Start AI Voice Job
+              </Button>
+            </div>
+          </div>
+
+          <h2 className="text-lg font-semibold text-gray-900">Or Choose a Service Manually</h2>
           {servicesLoading ? (
-            <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>
+            <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-orange-600" /></div>
           ) : services.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {services.map((service) => (
@@ -394,7 +447,7 @@ export default function BookPage() {
               onChange={(e) => setBookingDescription(e.target.value)}
               placeholder="Describe the issue..."
               rows={3}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1"
             />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -404,7 +457,12 @@ export default function BookPage() {
           <Button type="button" variant="outline" onClick={detectLocation}>
             <MapPin className="mr-2 h-4 w-4" /> Use Current Location
           </Button>
-          <MapPlaceholder lat={Number(latInput) || DEFAULT_LOCATION.lat} lng={Number(lngInput) || DEFAULT_LOCATION.lng} />
+          <OpenStreetMap
+            lat={Number(latInput) || DEFAULT_LOCATION.lat}
+            lng={Number(lngInput) || DEFAULT_LOCATION.lng}
+            zoom={14}
+            className="h-64 rounded-xl border"
+          />
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
             <Button onClick={fetchNearbyWorkers} disabled={!bookingAddress.trim() || workersLoading} loading={workersLoading}>
@@ -418,7 +476,7 @@ export default function BookPage() {
         <div className="space-y-4 animate-slide-up">
           <h2 className="text-lg font-semibold text-gray-900">Nearby Skilled Workers</h2>
           {workersLoading ? (
-            <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>
+            <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-orange-600" /></div>
           ) : nearbyWorkers.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2">
               {nearbyWorkers.map((worker) => (
@@ -472,6 +530,12 @@ export default function BookPage() {
           </div>
         </div>
       )}
+
+      <VoiceJobModal
+        open={showVoiceModal}
+        onClose={() => setShowVoiceModal(false)}
+        onConfirmJob={handleVoiceJobConfirm}
+      />
     </div>
   );
 }

@@ -1,11 +1,15 @@
 import axios, { AxiosRequestConfig } from "axios";
 
 function resolveBaseUrl(): string {
-  // Explicitly configured backend URL wins (used in local dev and/or Vercel env).
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
-  // Production: fall back to a relative /api/v1 base, which Vercel's
-  // vercel.json rewrite forwards to the hosted backend.
-  return process.env.NODE_ENV === "development" ? "http://localhost:4000" : "";
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host === "127.0.0.1" || host === "localhost") {
+      return "http://127.0.0.1:4000";
+    }
+    return `http://${host}:4000`;
+  }
+  return "http://127.0.0.1:4000";
 }
 
 const api = axios.create({
@@ -27,9 +31,20 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("coopgig_token");
-      localStorage.removeItem("coopgig_user");
-      window.location.replace("/login");
+      const token = localStorage.getItem("coopgig_token");
+      if (token) {
+        localStorage.removeItem("coopgig_token");
+        localStorage.removeItem("coopgig_user");
+        const currentPath = window.location.pathname;
+        const isProtected =
+          currentPath.startsWith("/consumer") ||
+          currentPath.startsWith("/worker") ||
+          currentPath.startsWith("/admin") ||
+          currentPath.startsWith("/coop-admin");
+        if (isProtected) {
+          window.location.replace(`/login?redirect=${encodeURIComponent(currentPath)}`);
+        }
+      }
     }
     return Promise.reject(err);
   }

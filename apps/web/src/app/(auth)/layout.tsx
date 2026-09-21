@@ -5,12 +5,15 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LanguageSelector } from "@/components/i18n/LanguageSelector";
+import { useI18n } from "@/i18n/I18nProvider";
 import { useAuthStore } from "@/store/authStore";
 import { getRoleDashboardPath } from "@/lib/utils";
+import { VoiceAccessModal } from "@/components/auth/VoiceAccessModal";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isAuthenticated, sessionValidated, user } = useAuthStore();
+  const { t } = useI18n();
 
   useEffect(() => {
     if (sessionValidated && isAuthenticated && user) {
@@ -21,31 +24,73 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   if (sessionValidated && isAuthenticated && user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#800020] border-t-transparent" />
       </div>
     );
   }
 
   return (
     <div className="flex min-h-screen">
-      <div className="hidden w-1/2 bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 lg:flex lg:flex-col lg:items-center lg:justify-center lg:p-12">
-        <Link href="/" className="flex items-center gap-3 text-white">
-          <Handshake className="h-12 w-12" />
-          <span className="text-3xl font-bold font-heading">Shramik Co</span>
-        </Link>
-        <p className="mt-6 max-w-md text-center text-lg text-indigo-100">
-          Empowering local workers through cooperative gig services with fair commissions and social security.
-        </p>
-        <div className="mt-12 grid grid-cols-2 gap-6 text-center text-white/80 text-sm">
-          <div><p className="text-2xl font-bold text-white">500+</p><p>Workers</p></div>
-          <div><p className="text-2xl font-bold text-white">10K+</p><p>Jobs Done</p></div>
-          <div><p className="text-2xl font-bold text-white">50+</p><p>Co-ops</p></div>
-          <div><p className="text-2xl font-bold text-white">&lt;5%</p><p>Commission</p></div>
+      {/* Voice Access Prompt Modal */}
+      <VoiceAccessModal />
+
+      {/* Left Showcase */}
+      <div className="relative hidden w-1/2 bg-slate-900 border-r border-slate-800 lg:flex lg:flex-col lg:items-center lg:justify-center lg:p-12 text-white">
+        <div className="relative z-10 max-w-md text-center">
+          {/* Brand Logo */}
+          <Link href="/" className="inline-flex items-center gap-3.5 group">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white p-1 shadow-md group-hover:scale-105 transition-transform overflow-hidden border border-slate-700">
+              <img
+                src="/images/logo.png"
+                alt="Shramik Co"
+                className="h-full w-full object-contain"
+              />
+            </div>
+            <div className="text-left">
+              <div className="flex items-center gap-1.5">
+                <span className="text-3xl font-black text-white font-heading tracking-tight">
+                  Shramik Co<span className="text-[#800020]">.</span>
+                </span>
+                <span className="rounded-sm bg-emerald-900/60 border border-emerald-500/40 text-[10px] font-extrabold text-emerald-300 px-1.5 py-0.5 uppercase tracking-wide">
+                  {t("nav.verified")}
+                </span>
+              </div>
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                People Work Together
+              </p>
+            </div>
+          </Link>
+
+          <p className="mt-8 text-base text-slate-300 leading-relaxed font-medium">
+            {t("landing.heroDesc")}
+          </p>
+
+          {/* Stats Bar */}
+          <div className="mt-10 grid grid-cols-3 gap-3 border-t border-slate-800 pt-6 text-center">
+            <div>
+              <p className="text-2xl font-black text-rose-400 font-heading">12+</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{t("landing.trustVerified")}</p>
+            </div>
+            <div>
+              <p className="text-2xl font-black text-white font-heading">15m</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{t("landing.trustEta")}</p>
+            </div>
+            <div>
+              <p className="text-2xl font-black text-emerald-400 font-heading">≤5%</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{t("landing.trustCommission")}</p>
+            </div>
+          </div>
         </div>
       </div>
-      <div className="flex flex-1 items-center justify-center p-8">
-        <div className="absolute right-4 top-4"><LanguageSelector /></div>
-        <div className="w-full max-w-md">{children}</div>
+
+      {/* Right Form Area */}
+      <div className="relative flex flex-1 items-center justify-center p-6 sm:p-12 bg-slate-50/50">
+        <div className="absolute right-6 top-6">
+          <LanguageSelector />
+        </div>
+        <div className="w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-8 shadow-xl">
+          {children}
+        </div>
       </div>
     </div>
   );

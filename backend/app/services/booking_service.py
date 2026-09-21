@@ -283,8 +283,11 @@ async def rate_booking(booking_id: str, user_id: str, rating: int, comment: str 
         raise AppError("Booking not found", 404)
     if booking["status"] != "COMPLETED":
         raise AppError("Can only rate completed bookings", 400)
-    if booking["consumerId"] != user_id:
-        raise AppError("Only the consumer can rate this booking", 403)
+    worker_user = await db.fetchrow('SELECT "userId" FROM "WorkerProfile" WHERE id=$1', booking["workerId"])
+    is_consumer = booking["consumerId"] == user_id
+    is_worker = worker_user and worker_user["userId"] == user_id
+    if not (is_consumer or is_worker):
+        raise AppError("Only the consumer or assigned technician can rate this booking", 403)
     if not booking["workerId"]:
         raise AppError("Cannot rate a booking without an assigned worker", 400)
     existing = await db.fetchrow(
@@ -302,12 +305,14 @@ async def rate_booking(booking_id: str, user_id: str, rating: int, comment: str 
         """,
         review_id, booking_id, user_id, booking["workerId"], rating, comment, now,
     )
-    reviews = await db.fetch('SELECT rating FROM "Review" WHERE "workerId"=$1', booking["workerId"])
-    avg = sum(num(r["rating"]) for r in reviews) / len(reviews)
-    await db.execute(
-        'UPDATE "WorkerProfile" SET "avgRating"=$1, "updatedAt"=$2 WHERE id=$3',
-        round(avg * 10) / 10, now_utc(), booking["workerId"],
-    )
+    if is_consumer:
+        reviews = await db.fetch('SELECT rating FROM "Review" WHERE "workerId"=$1 AND "authorId"=$2', booking["workerId"], booking["consumerId"])
+        if reviews:
+            avg = sum(num(r["rating"]) for r in reviews) / len(reviews)
+            await db.execute(
+                'UPDATE "WorkerProfile" SET "avgRating"=$1, "updatedAt"=$2 WHERE id=$3',
+                round(avg * 10) / 10, now_utc(), booking["workerId"],
+            )
     review = await db.fetchrow('SELECT * FROM "Review" WHERE id=$1', review_id)
     return deep_serialize(dict(review))
 
@@ -332,6 +337,7 @@ async def get_nearby_workers(lat: float, lng: float, radius_km: float,
             "workerId": w["id"], "workerName": w["user_name"], "skillTags": w["skillTags"],
             "avgRating": num(w["avgRating"]), "totalJobs": w["totalJobs"], "bio": w["bio"],
             "experienceYears": w["experienceYears"], "distanceKm": round(d * 100) / 100,
+            "coopId": w["coopId"],
         }
         if not matches_skills(w["skillTags"], skill_tags):
             continue

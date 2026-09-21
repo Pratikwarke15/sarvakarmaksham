@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { UserRole } from "@/lib/types";
@@ -13,25 +13,30 @@ interface AuthGuardProps {
 
 export function AuthGuard({ allowedRoles, children }: AuthGuardProps) {
   const router = useRouter();
-  const { isAuthenticated, isLoading, sessionValidated, user } = useAuthStore();
+  const { isAuthenticated, isLoading, user, loadFromStorage } = useAuthStore();
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (isLoading || !sessionValidated) return;
+    loadFromStorage();
+    setHydrated(true);
+  }, [loadFromStorage]);
+
+  useEffect(() => {
+    if (!hydrated || isLoading) return;
     if (!isAuthenticated) {
-      router.replace("/login");
+      const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+      router.replace(currentPath ? `/login?redirect=${encodeURIComponent(currentPath)}` : "/login");
       return;
     }
     if (allowedRoles && user && !allowedRoles.includes(user.role)) {
       router.replace("/unauthorized");
     }
-  }, [isLoading, sessionValidated, isAuthenticated, user, allowedRoles, router]);
+  }, [hydrated, isLoading, isAuthenticated, user, allowedRoles, router]);
 
-  // Block until the session has been confirmed against the API: never render
-  // dashboard content on the strength of localStorage alone.
-  if (isLoading || !sessionValidated) {
+  if (!hydrated || isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
       </div>
     );
   }
@@ -41,7 +46,7 @@ export function AuthGuard({ allowedRoles, children }: AuthGuardProps) {
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
       </div>
     );
   }
@@ -50,3 +55,4 @@ export function AuthGuard({ allowedRoles, children }: AuthGuardProps) {
 }
 
 export default AuthGuard;
+

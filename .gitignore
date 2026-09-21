@@ -10,3 +10,8 @@ coverage/
 .turbo/
 .vercel/
 out/
+*.tsbuildinfo
+__pycache__/
+*.py[cod]
+.venv/
+venv/

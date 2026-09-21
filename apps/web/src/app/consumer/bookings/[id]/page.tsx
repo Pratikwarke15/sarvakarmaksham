@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import { BookingTracker } from "@/components/booking/BookingTracker";
 import { Rating } from "@/components/ui/rating";
+import { OpenStreetMap } from "@/components/maps/OpenStreetMap";
 import { MapPlaceholder } from "@/components/ui/map-placeholder";
 import { formatCurrency, formatDateTime, getStatusColor } from "@/lib/utils";
 import { apiGet, apiPost } from "@/lib/api";
@@ -185,8 +186,24 @@ export default function BookingDetailPage() {
         </CardContent>
       </Card>
 
-      {(booking.worker?.latitude != null || booking.worker?.longitude != null) && (
-        <MapPlaceholder lat={booking.worker.latitude} lng={booking.worker.longitude} height="200px" />
+      {(booking.latitude != null || booking.worker?.latitude != null) && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-700">Live Worker Route & Location</h3>
+            <span className="text-xs text-emerald-600 font-semibold">Live GPS Navigation</span>
+          </div>
+          <OpenStreetMap
+            lat={booking.worker?.latitude ?? booking.latitude ?? 28.6139}
+            lng={booking.worker?.longitude ?? booking.longitude ?? 77.209}
+            workerLat={booking.worker?.latitude}
+            workerLng={booking.worker?.longitude}
+            consumerLat={booking.latitude}
+            consumerLng={booking.longitude}
+            showRoute={!!(booking.worker?.latitude && booking.latitude)}
+            zoom={13}
+            className="h-72 rounded-xl border shadow-sm"
+          />
+        </div>
       )}
 
       {needsPayment && (

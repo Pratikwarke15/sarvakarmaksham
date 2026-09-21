@@ -12,11 +12,14 @@ from .db import db
 from .errors import AppError
 from .routers import (
     admin,
+    ai,
     auth,
     booking,
     coop,
     dispute,
     payment,
+    routes,
+    skills,
     social_security,
     upload,
     verification,
@@ -32,14 +35,24 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="SIH26089 Shramik Co API",
+    title="Shramik Co API",
     version="1.0.0",
     lifespan=lifespan,
 )
 
+cors_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:4000",
+    "http://127.0.0.1:4000",
+]
+if config.CORS_ORIGIN and config.CORS_ORIGIN != "*":
+    cors_origins.append(config.CORS_ORIGIN)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if config.CORS_ORIGIN == "*" else [config.CORS_ORIGIN],
+    allow_origins=cors_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -73,7 +86,8 @@ async def pydantic_handler(request: Request, exc: ValidationError):
 async def health():
     return {
         "success": True,
-        "message": "SIH26089 Shramik Co API is running",
+        "status": "ok",
+        "message": "Shramik Co API is running",
         "version": "1.0.0",
         "timestamp": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
     }
@@ -91,6 +105,9 @@ app.include_router(social_security.router, prefix=f"{API_V1}/social-security")
 app.include_router(dispute.router, prefix=f"{API_V1}/disputes")
 app.include_router(upload.router, prefix=f"{API_V1}/uploads")
 app.include_router(admin.router, prefix=f"{API_V1}/admin")
+app.include_router(skills.router, prefix=f"{API_V1}/skills")
+app.include_router(ai.router, prefix=f"{API_V1}/ai")
+app.include_router(routes.router, prefix=f"{API_V1}/routes")
 
 
 @app.exception_handler(404)

@@ -20,7 +20,9 @@ class OfflineAadhaarRequest(BaseModel):
 @router.post("/digilocker")
 async def digilocker(body: VerifyDigilockerRequest, user: dict = Depends(get_current_user)):
     result = await verification_service.verify_digilocker(body.aadhaarNumber)
-    return {"success": True, "message": "DigiLocker verified", "data": result}
+    result["badgeLabel"] = "DEMO / SANDBOX VERIFICATION"
+    result["disclaimer"] = "Simulated via DevelopmentMockProvider for SIH (Zero External Cost)"
+    return {"success": True, "message": "DigiLocker verified (Demo / Sandbox)", "data": result}
 
 
 @router.post("/aadhaar-qr")

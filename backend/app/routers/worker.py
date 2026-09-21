@@ -54,6 +54,88 @@ async def earnings(user: dict = Depends(require_roles("WORKER"))):
     return {"success": True, "data": data}
 
 
+@router.get("/recommended-jobs")
+async def get_recommended_jobs(
+    user: dict = Depends(require_roles("WORKER")),
+    destLat: float | None = Query(None),
+    destLng: float | None = Query(None),
+):
+    """Route-aware job recommendations for workers.
+    Prioritizes jobs along worker travel corridor, matching skills, and nearby next stops.
+    """
+    from ..db import db
+    from ..utils import matches_skills, haversine_km, deep_serialize
+    from ..core.providers.worker_recommendation_provider import WorkerRecommendationEngine
+
+    wp = await worker_service.get_worker_profile_by_user(user["id"])
+    worker_skills = wp.get("skillTags") or []
+    worker_lat = float(wp.get("latitude") or 28.6145)
+    worker_lng = float(wp.get("longitude") or 77.2095)
+
+    jobs_raw = await db.fetch(
+        """
+        SELECT b.id, b."bookingRef", b.status, b.address, b."consumerLatitude", b."consumerLongitude",
+               b."quotedPrice", b."createdAt", b.description,
+               s.name as "serviceName", s."categorySlug", s."basePrice",
+               u.name as "consumerName"
+        FROM "Booking" b
+        JOIN "Service" s ON s.id = b."serviceId"
+        JOIN "User" u ON u.id = b."consumerId"
+        WHERE b.status = 'PENDING'
+        ORDER BY b."createdAt" DESC
+        LIMIT 20
+        """
+    )
+
+    recommended = []
+    engine = WorkerRecommendationEngine()
+
+    for j in jobs_raw:
+        job = dict(j)
+        cat = job.get("categorySlug", "")
+        # Skill match
+        has_skill = matches_skills(worker_skills, [cat])
+        j_lat = float(job.get("consumerLatitude") or worker_lat)
+        j_lng = float(job.get("consumerLongitude") or worker_lng)
+
+        dist_km = round(haversine_km(worker_lat, worker_lng, j_lat, j_lng), 1)
+
+        corridor_bonus = 0.0
+        if destLat is not None and destLng is not None:
+            corridor_bonus = engine.calculate_corridor_bonus(
+                worker_lat, worker_lng, destLat, destLng, j_lat, j_lng
+            )
+
+        affinity_score = 50.0
+        reasons = []
+
+        if has_skill:
+            affinity_score += 35.0
+            reasons.append(f"Exact trade skill fit ({cat.title()})")
+        else:
+            affinity_score -= 20.0
+
+        if corridor_bonus > 0:
+            affinity_score += corridor_bonus
+            reasons.append("Along current travel corridor (minimal detour)")
+
+        if dist_km <= 5.0:
+            affinity_score += 15.0
+            reasons.append(f"Nearby ({dist_km} km)")
+        elif dist_km <= 15.0:
+            affinity_score += 5.0
+
+        job["distanceKm"] = dist_km
+        job["corridorBonus"] = corridor_bonus
+        job["affinityScore"] = round(min(100.0, max(0.0, affinity_score)), 1)
+        job["recommendationReasons"] = reasons
+        job["etaMinutes"] = max(10, round(dist_km * 5))
+        recommended.append(job)
+
+    recommended.sort(key=lambda x: -x["affinityScore"])
+    return {"success": True, "data": deep_serialize(recommended[:8])}
+
+
 @router.get("/search")
 async def search(
     lat: float = Query(..., description="latitude"),

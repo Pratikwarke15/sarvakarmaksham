@@ -39,6 +39,12 @@ async def register(body: RegisterRequest):
     return {"success": True, "message": "User registered successfully", "data": result}
 
 
+@router.post("/login-init")
+async def login_init(body: LoginRequest):
+    result = await auth_service.login_init(body.phone, body.password)
+    return {"success": True, "message": "Credentials verified. Server OTP generated.", "data": result}
+
+
 @router.post("/login")
 async def login(body: LoginRequest):
     result = await auth_service.login(body.phone, body.password)

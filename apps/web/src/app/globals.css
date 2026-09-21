@@ -4,19 +4,20 @@
 
 :root {
   --color-bg: #ffffff;
-  --color-bg-secondary: #f9fafb;
-  --color-text: #111827;
-  --color-text-secondary: #6b7280;
-  --color-border: #e5e7eb;
-  --color-primary: #4f46e5;
-  --color-primary-light: #818cf8;
-  --color-primary-dark: #3730a3;
+  --color-bg-secondary: #f8fafc;
+  --color-bg-warm: #fffaf5;
+  --color-text: #0f172a;
+  --color-text-secondary: #475569;
+  --color-border: #e2e8f0;
+  --color-primary: #800020;
+  --color-primary-light: #9b1b3d;
+  --color-primary-dark: #520315;
   --color-secondary: #10b981;
-  --color-accent: #fbbf24;
+  --color-accent: #800020;
   --color-danger: #ef4444;
   --color-warning: #f59e0b;
   --color-success: #10b981;
-  --color-info: #3b82f6;
+  --color-info: #0ea5e9;
 }
 
 .dark {
@@ -29,7 +30,8 @@
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply bg-slate-50/50 text-slate-900 antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 
   .dark body {
@@ -39,11 +41,20 @@
 
 @layer components {
   .glass {
-    @apply bg-white/80 backdrop-blur-md;
+    @apply bg-white/90 backdrop-blur-md;
   }
 
   .dark .glass {
-    @apply bg-slate-800/80 backdrop-blur-md;
+    @apply bg-slate-800/90 backdrop-blur-md;
+  }
+
+  /* Clean Solid Artisan Service Card */
+  .artisan-service-card {
+    @apply relative flex flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-[#800020] hover:shadow-md cursor-pointer;
+  }
+
+  .artisan-step-card {
+    @apply relative rounded-2xl border border-slate-200 bg-white p-8 text-center transition-all duration-200 hover:-translate-y-1 hover:border-[#800020] hover:shadow-md;
   }
 }
 
@@ -57,7 +68,7 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded-full;
+  @apply bg-slate-300 rounded-full hover:bg-slate-400;
 }
 
 .dark ::-webkit-scrollbar-thumb {
@@ -70,28 +81,49 @@
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideRight {
-  from { opacity: 0; transform: translateX(-10px); }
+  from { opacity: 0; transform: translateX(-12px); }
   to { opacity: 1; transform: translateX(0); }
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes floatReverse {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(10px); }
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.5s ease-out;
+  animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .animate-slide-up {
-  animation: slideUp 0.4s ease-out;
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .animate-slide-right {
-  animation: slideRight 0.4s ease-out;
+  animation: slideRight 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-float {
+  animation: float 5s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 6s ease-in-out 1.8s infinite;
+}
+
+.animate-float-slow {
+  animation: float 7s ease-in-out 3.2s infinite;
+}
+
+.animate-float-reverse {
+  animation: floatReverse 6s ease-in-out 1s infinite;
 }

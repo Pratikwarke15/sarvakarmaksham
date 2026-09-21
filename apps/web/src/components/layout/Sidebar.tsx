@@ -5,11 +5,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/I18nProvider";
 import type { LucideIcon } from "lucide-react";
 
 export interface SidebarLink {
   href: string;
   label: string;
+  key?: string;
   icon: LucideIcon;
 }
 
@@ -20,6 +22,19 @@ interface SidebarProps {
 export function Sidebar({ links }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const { t } = useI18n();
+
+  const getLabel = (link: SidebarLink) => {
+    if (link.key) {
+      const translated = t(`nav.${link.key}`);
+      if (translated && translated !== `nav.${link.key}`) return translated;
+    }
+    // Attempt standard nav keys:
+    const keyCandidate = link.label.toLowerCase().replace(/\s+/g, "");
+    const directLookup = t(`nav.${keyCandidate}`);
+    if (directLookup && directLookup !== `nav.${keyCandidate}`) return directLookup;
+    return link.label;
+  };
 
   return (
     <aside
@@ -33,6 +48,7 @@ export function Sidebar({ links }: SidebarProps) {
           {links.map((link) => {
             const Icon = link.icon;
             const active = pathname === link.href || pathname.startsWith(link.href + "/");
+            const label = getLabel(link);
             return (
               <Link
                 key={link.href}
@@ -42,10 +58,10 @@ export function Sidebar({ links }: SidebarProps) {
                   active ? "bg-indigo-50 text-indigo-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                   collapsed && "justify-center px-2"
                 )}
-                title={collapsed ? link.label : undefined}
+                title={collapsed ? label : undefined}
               >
                 <Icon className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>{link.label}</span>}
+                {!collapsed && <span>{label}</span>}
               </Link>
             );
           })}

@@ -131,6 +131,8 @@ export interface Booking {
   completedAt?: string;
   consumerLatitude?: number;
   consumerLongitude?: number;
+  latitude?: number;
+  longitude?: number;
   workerLatitude?: number;
   workerLongitude?: number;
   address: string;

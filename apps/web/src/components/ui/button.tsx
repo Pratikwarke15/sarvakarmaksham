@@ -16,23 +16,23 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : "button";
 
     const variants = {
-      primary: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm",
-      secondary: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm",
-      outline: "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
-      ghost: "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
-      danger: "bg-red-600 text-white hover:bg-red-700 shadow-sm",
+      primary: "bg-orange-600 text-white hover:bg-orange-700 shadow-xs active:scale-[0.99]",
+      secondary: "bg-emerald-700 text-white hover:bg-emerald-800 shadow-xs",
+      outline: "border border-slate-300 bg-white text-slate-700 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-400",
+      ghost: "text-slate-700 hover:bg-orange-50 hover:text-orange-700",
+      danger: "bg-red-600 text-white hover:bg-red-700 shadow-xs",
     };
 
     const sizes = {
       sm: "px-3 py-1.5 text-xs rounded-md",
-      md: "px-4 py-2 text-sm rounded-lg",
-      lg: "px-6 py-3 text-base rounded-lg",
+      md: "px-4 py-2 text-sm rounded-lg font-bold",
+      lg: "px-6 py-3 text-base rounded-xl font-bold",
     };
 
     return (
       <Comp
         className={cn(
-          "inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+          "inline-flex items-center justify-center font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
           variants[variant],
           sizes[size],
           className

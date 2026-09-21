@@ -12,6 +12,7 @@ from ..services import booking_service, coop_service, worker_service
 router = APIRouter(tags=["bookings"])
 
 
+@router.post("", status_code=201)
 @router.post("/", status_code=201)
 async def create(
     body: CreateBookingRequest,
@@ -71,10 +72,10 @@ async def update_status(
 async def rate(
     booking_id: str,
     body: RateBookingRequest,
-    user: dict = Depends(require_roles("CONSUMER")),
+    user: dict = Depends(require_roles("CONSUMER", "WORKER")),
 ):
     review = await booking_service.rate_booking(booking_id, user["id"], body.rating, body.comment)
-    return {"success": True, "message": "Review submitted", "data": review}
+    return {"success": True, "message": "Review submitted successfully", "data": review}
 
 
 @router.post("/{booking_id}/cancel")

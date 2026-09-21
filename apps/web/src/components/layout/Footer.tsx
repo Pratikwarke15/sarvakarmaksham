@@ -1,50 +1,139 @@
-import { Handshake } from "lucide-react";
+"use client";
+
 import Link from "next/link";
+import { MapPin, Phone, Mail } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="border-t bg-white">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid gap-8 md:grid-cols-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Handshake className="h-6 w-6 text-indigo-600" />
-              <span className="text-lg font-bold font-heading text-gray-900">Shramik Co</span>
-            </div>
-            <p className="mt-3 text-sm text-gray-500">
-              Empowering local workers through cooperative gig services with fair commissions, social
-              security, and transparent governance.
+    <footer className="bg-white border-t border-slate-200 text-slate-700" role="contentinfo">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+          {/* Column 1: Brand & Description */}
+          <div className="space-y-3">
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-xs overflow-hidden border border-slate-200 group-hover:border-[#800020] transition-colors p-1 shrink-0">
+                <img
+                  src="/images/logo.png"
+                  alt="Shramik Co"
+                  className="h-full w-full object-contain"
+                />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xl font-black text-[#800020] font-heading tracking-tight">
+                  Shramik Co.
+                </span>
+                <span className="text-[10px] font-semibold text-slate-500 -mt-0.5 tracking-wider uppercase">
+                  People Work Together
+                </span>
+              </div>
+            </Link>
+            <p className="text-xs text-slate-600 leading-relaxed max-w-xs">
+              Direct doorstep services connecting customers with verified local technicians. Fair pricing with 0% hidden platform cuts.
             </p>
           </div>
+
+          {/* Column 2: Quick Links */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Platform</h3>
-            <ul className="mt-3 space-y-2">
-              <li><Link href="/book" className="text-sm text-gray-500 hover:text-gray-700">Book a Service</Link></li>
-              <li><Link href="/register" className="text-sm text-gray-500 hover:text-gray-700">Become a Worker</Link></li>
-              <li><Link href="/login" className="text-sm text-gray-500 hover:text-gray-700">Sign In</Link></li>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#800020] mb-3.5">
+              Quick Links
+            </h3>
+            <ul className="space-y-2 text-xs text-slate-600">
+              <li>
+                <Link href="/consumer/book" className="hover:text-[#800020] transition-colors">
+                  Book a Repair
+                </Link>
+              </li>
+              <li>
+                <Link href="/how-it-works" className="hover:text-[#800020] transition-colors">
+                  How It Works
+                </Link>
+              </li>
+              <li>
+                <Link href="/pricing" className="hover:text-[#800020] transition-colors">
+                  Transparent Pricing
+                </Link>
+              </li>
+              <li>
+                <Link href="/download" className="hover:text-[#800020] transition-colors">
+                  Download Mobile App
+                </Link>
+              </li>
             </ul>
           </div>
+
+          {/* Column 3: For Technicians */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Company</h3>
-            <ul className="mt-3 space-y-2">
-              <li><span className="text-sm text-gray-500">About Us</span></li>
-              <li><span className="text-sm text-gray-500">Contact</span></li>
-              <li><span className="text-sm text-gray-500">Careers</span></li>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#800020] mb-3.5">
+              For Technicians
+            </h3>
+            <ul className="space-y-2 text-xs text-slate-600">
+              <li>
+                <Link href="/register?role=WORKER" className="hover:text-[#800020] transition-colors font-medium">
+                  Join as Technician
+                </Link>
+              </li>
+              <li>
+                <Link href="/login" className="hover:text-[#800020] transition-colors">
+                  Technician Login
+                </Link>
+              </li>
+              <li>
+                <Link href="/worker/dashboard" className="hover:text-[#800020] transition-colors">
+                  Worker Dashboard
+                </Link>
+              </li>
+              <li>
+                <Link href="/pricing" className="hover:text-[#800020] transition-colors">
+                  0% Commission &amp; Tool Rules
+                </Link>
+              </li>
             </ul>
           </div>
+
+          {/* Column 4: Contact */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Legal</h3>
-            <ul className="mt-3 space-y-2">
-              <li><span className="text-sm text-gray-500">Privacy Policy</span></li>
-              <li><span className="text-sm text-gray-500">Terms of Service</span></li>
-              <li><span className="text-sm text-gray-500">Cooperative Bylaws</span></li>
-            </ul>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#800020] mb-3.5">
+              Contact
+            </h3>
+            <div className="space-y-2.5 text-xs text-slate-600">
+              <p className="flex items-start gap-2">
+                <MapPin className="h-3.5 w-3.5 text-[#800020] shrink-0 mt-0.5" />
+                <span>Godavari College of Engineering, Jalgaon, Maharashtra 425003</span>
+              </p>
+              <p className="flex items-center gap-2">
+                <Phone className="h-3.5 w-3.5 text-[#800020] shrink-0" />
+                <a href="tel:+919834171226" className="hover:text-[#800020] transition-colors font-medium">
+                  +91 9834171226
+                </a>
+              </p>
+              <p className="flex items-center gap-2">
+                <Mail className="h-3.5 w-3.5 text-[#800020] shrink-0" />
+                <a href="mailto:kalpeshwarke05@gmail.com" className="hover:text-[#800020] transition-colors font-medium">
+                  kalpeshwarke05@gmail.com
+                </a>
+              </p>
+            </div>
           </div>
         </div>
-        <div className="mt-8 border-t pt-8 text-center">
-          <p className="text-sm text-gray-400">
-            Powered by Cooperative Gig Platform &copy; {new Date().getFullYear()} SIH26089
+
+        {/* Bottom Bar */}
+        <div className="mt-10 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+          <p>
+            © 2026 <strong className="text-[#800020] font-bold">Shramik Co.</strong> (People Work Together). All rights reserved.
           </p>
+          <div className="flex items-center gap-4">
+            <Link href="/how-it-works" className="hover:text-[#800020] transition-colors">
+              How It Works
+            </Link>
+            <span>·</span>
+            <Link href="/pricing" className="hover:text-[#800020] transition-colors">
+              Pricing
+            </Link>
+            <span>·</span>
+            <Link href="/download" className="hover:text-[#800020] transition-colors">
+              App
+            </Link>
+          </div>
         </div>
       </div>
     </footer>
