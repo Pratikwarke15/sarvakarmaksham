@@ -17,11 +17,11 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Shramik Co - Cooperative Gig Services",
+  title: "सर्वकर्मक्षमः - Cooperative Gig Services",
   description:
-    "Empowering local workers through cooperative gig services with fair commissions, social security, and transparent governance.",
+    "सर्वकर्मक्षमः (Sarvakarmakshamah) - Empowering local skilled workers through cooperative gig services with fair commissions, social security, and transparent governance.",
   manifest: "/manifest.json",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Shramik Co" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "सर्वकर्मक्षमः" },
   other: { "mobile-web-app-capable": "yes" },
 };
 

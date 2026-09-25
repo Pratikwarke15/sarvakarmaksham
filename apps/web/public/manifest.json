@@ -1,11 +1,11 @@
 {
-  "name": "Shramik Co Services",
-  "short_name": "Shramik Co",
-  "description": "Cooperative Gig Services Platform - Empowering Local Workers",
+  "name": "सर्वकर्मक्षमः - Cooperative Gig Services",
+  "short_name": "सर्वकर्मक्षमः",
+  "description": "सर्वकर्मक्षमः - Fair, dignified, cooperative gig platform for household & community services",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#4f46e5",
+  "theme_color": "#800020",
   "orientation": "portrait-primary",
   "icons": [
     {

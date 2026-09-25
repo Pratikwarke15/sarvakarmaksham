@@ -41,6 +41,7 @@ import {
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { VoiceJobModal } from "@/components/booking/VoiceJobModal";
+import { MobilePwaInstallPrompt } from "@/components/common/MobilePwaInstallPrompt";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -290,7 +291,7 @@ export default function HomePage() {
 
               {/* Subtitle */}
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-sm">
-                The Shramik connects you directly with nearby skilled electricians, plumbers, carpenters,
+                सर्वकर्मक्षमः (Sarvakarmakshamah) connects you directly with nearby skilled electricians, plumbers, carpenters,
                 and repair experts. Browse, connect directly by call or chat — no commission, no middlemen.
               </p>
 
@@ -800,7 +801,7 @@ export default function HomePage() {
             {/* Left Column: 4 Key Value Props */}
             <div className="lg:col-span-7">
               <h2 className="text-3xl sm:text-4xl font-black text-[#800020] tracking-tight">
-                Why Choose The Shramik?
+                Why Choose सर्वकर्मक्षमः?
               </h2>
               <p className="mt-3 text-base text-slate-600 leading-relaxed max-w-2xl">
                 We are a marketplace—we connect you with nearby service providers. You connect directly; we don&apos;t take commission or act as a middleman.
@@ -1771,6 +1772,9 @@ export default function HomePage() {
         onClose={() => setShowVoiceModal(false)}
         onConfirmJob={handleVoiceJobConfirm}
       />
+
+      {/* Mobile-Only PWA App Installation Prompt */}
+      <MobilePwaInstallPrompt />
     </div>
   );
 }

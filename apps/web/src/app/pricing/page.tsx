@@ -215,14 +215,14 @@ export default function PricingPage() {
         {/* Comparison Table */}
         <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-xs overflow-x-auto">
           <h3 className="text-xl font-bold text-slate-900 mb-1">Detailed Platform Comparison</h3>
-          <p className="text-xs text-slate-500 mb-6">How Shramik Co. contrasts with commercial service apps:</p>
+          <p className="text-xs text-slate-500 mb-6">How सर्वकर्मक्षमः contrasts with commercial service apps:</p>
 
           <table className="w-full text-xs text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-200 text-slate-500">
                 <th className="py-3 px-4 font-bold">Category</th>
                 <th className="py-3 px-4 font-bold text-red-700 bg-red-50/50 rounded-t-lg">Corporate Aggregators</th>
-                <th className="py-3 px-4 font-bold text-[#800020] bg-rose-50/60 rounded-t-lg">Shramik Co-Op</th>
+                <th className="py-3 px-4 font-bold text-[#800020] bg-rose-50/60 rounded-t-lg">सर्वकर्मक्षमः Co-Op</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">

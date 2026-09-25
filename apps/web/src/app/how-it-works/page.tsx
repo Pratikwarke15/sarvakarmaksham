@@ -63,7 +63,7 @@ export default function HowItWorksPage() {
             <span>End-to-End Workflow Guide</span>
           </div>
           <h1 className="text-4xl sm:text-5xl font-black text-slate-900 font-heading tracking-tight">
-            How <span className="text-[#800020]">Shramik Co.</span> Works
+            How <span className="text-[#800020]">सर्वकर्मक्षमः</span> Works
           </h1>
           <p className="text-base text-slate-600 leading-relaxed">
             Connecting customers directly with verified technicians for doorstep repair and maintenance. Transparent low-cost pricing starting at ₹50.

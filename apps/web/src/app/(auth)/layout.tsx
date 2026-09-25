@@ -42,21 +42,21 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white p-1 shadow-md group-hover:scale-105 transition-transform overflow-hidden border border-slate-700">
               <img
                 src="/images/logo.png"
-                alt="Shramik Co"
+                alt="सर्वकर्मक्षमः"
                 className="h-full w-full object-contain"
               />
             </div>
             <div className="text-left">
               <div className="flex items-center gap-1.5">
                 <span className="text-3xl font-black text-white font-heading tracking-tight">
-                  Shramik Co<span className="text-[#800020]">.</span>
+                  सर्वकर्मक्षमः<span className="text-[#800020]">.</span>
                 </span>
                 <span className="rounded-sm bg-emerald-900/60 border border-emerald-500/40 text-[10px] font-extrabold text-emerald-300 px-1.5 py-0.5 uppercase tracking-wide">
                   {t("nav.verified")}
                 </span>
               </div>
               <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                People Work Together
+                Sarvakarmakshamah • People Work Together
               </p>
             </div>
           </Link>

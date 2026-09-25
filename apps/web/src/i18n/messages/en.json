@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Shramik Co",
+    "appName": "सर्वकर्मक्षमः",
     "loading": "Loading...",
     "save": "Save",
     "cancel": "Cancel",
@@ -156,13 +156,13 @@
     "privacyPolicy": "Privacy Policy",
     "termsOfService": "Terms of Service",
     "coopBylaws": "Cooperative Bylaws",
-    "copyright": "© 2026 Shramik Technologies Pvt. Ltd. All rights reserved."
+    "copyright": "© 2026 सर्वकर्मक्षमः. All rights reserved."
   },
   "auth": {
     "welcomeBack": "Welcome Back",
-    "signInSubtitle": "Sign in to your Shramik Co account",
+    "signInSubtitle": "Sign in to your सर्वकर्मक्षमः account",
     "createAccount": "Create Account",
-    "createAccountSubtitle": "Join the Shramik Co cooperative platform",
+    "createAccountSubtitle": "Join the सर्वकर्मक्षमः cooperative platform",
     "phone": "Phone Number",
     "phonePlaceholder": "10-digit mobile number",
     "password": "Password",

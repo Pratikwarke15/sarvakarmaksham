@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Shramik Co",
+    "appName": "सर्वकर्मक्षमः",
     "loading": "लोड हो रहा है...",
     "save": "सहेजें",
     "cancel": "रद्द करें",
@@ -156,13 +156,13 @@
     "privacyPolicy": "गोपनीयता नीति",
     "termsOfService": "सेवा की शर्तें",
     "coopBylaws": "सहकारी उपनियम",
-    "copyright": "© 2026 श्रमिक टेक्नोलॉजीज प्राइवेट लिमिटेड। सर्वाधिकार सुरक्षित।"
+    "copyright": "© 2026 सर्वकर्मक्षमः। सर्वाधिकार सुरक्षित।"
   },
   "auth": {
     "welcomeBack": "वापस स्वागत है",
-    "signInSubtitle": "अपने Shramik Co खाते में साइन इन करें",
+    "signInSubtitle": "अपने सर्वकर्मक्षमः खाते में साइन इन करें",
     "createAccount": "खाता बनाएं",
-    "createAccountSubtitle": "Shramik Co सहकारी मंच से जुड़ें",
+    "createAccountSubtitle": "सर्वकर्मक्षमः सहकारी मंच से जुड़ें",
     "phone": "फोन नंबर",
     "phonePlaceholder": "10 अंकों का मोबाइल नंबर",
     "password": "पासवर्ड",

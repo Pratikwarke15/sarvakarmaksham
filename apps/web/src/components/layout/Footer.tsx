@@ -14,16 +14,16 @@ export function Footer() {
               <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-xs overflow-hidden border border-slate-200 group-hover:border-[#800020] transition-colors p-1 shrink-0">
                 <img
                   src="/images/logo.png"
-                  alt="Shramik Co"
+                  alt="सर्वकर्मक्षमः"
                   className="h-full w-full object-contain"
                 />
               </div>
               <div className="flex flex-col">
                 <span className="text-xl font-black text-[#800020] font-heading tracking-tight">
-                  Shramik Co.
+                  सर्वकर्मक्षमः.
                 </span>
                 <span className="text-[10px] font-semibold text-slate-500 -mt-0.5 tracking-wider uppercase">
-                  People Work Together
+                  Sarvakarmakshamah • People Work Together
                 </span>
               </div>
             </Link>
@@ -119,7 +119,7 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="mt-10 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
           <p>
-            © 2026 <strong className="text-[#800020] font-bold">Shramik Co.</strong> (People Work Together). All rights reserved.
+            © 2026 <strong className="text-[#800020] font-bold">सर्वकर्मक्षमः</strong> (Sarvakarmakshamah). All rights reserved.
           </p>
           <div className="flex items-center gap-4">
             <Link href="/how-it-works" className="hover:text-[#800020] transition-colors">

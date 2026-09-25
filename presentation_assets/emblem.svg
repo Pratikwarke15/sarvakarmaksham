@@ -1,0 +1,32 @@
+<svg width="400" height="400" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="maroonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9E0028" />
+      <stop offset="60%" stop-color="#800020" />
+      <stop offset="100%" stop-color="#550014" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBBF24" />
+      <stop offset="50%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+  </defs>
+  <!-- Sacred Geometric Hexagon / Cooperative Wheel -->
+  <polygon points="250,20 450,135 450,365 250,480 50,365 50,135" stroke="url(#goldGrad)" stroke-width="8" fill="#FFFDF8" />
+  <circle cx="250" cy="250" r="205" stroke="url(#goldGrad)" stroke-width="4" stroke-dasharray="12 8" fill="none" opacity="0.6" />
+  
+  <!-- Stylized Cooperating Figures forming 'स' & Shelter -->
+  <!-- Upper figure / Shelter -->
+  <circle cx="210" cy="105" r="42" fill="url(#maroonGrad)" />
+  <path d="M 190 165 C 230 135, 290 130, 360 170 C 380 182, 395 205, 395 230 L 395 280 C 395 295, 380 305, 365 295 L 305 245 C 285 230, 260 220, 230 225 L 180 235 C 165 238, 150 225, 150 210 L 150 185 C 150 170, 165 158, 190 165 Z" fill="url(#maroonGrad)" />
+
+  <!-- Center Gold Dynamic Handshake Link -->
+  <path d="M 160 240 L 260 180 C 275 170, 295 175, 305 190 L 325 220 C 335 235, 330 250, 315 260 L 215 320 C 200 330, 180 325, 170 310 L 150 280 C 140 265, 145 250, 160 240 Z" fill="url(#goldGrad)" />
+
+  <!-- Lower Artisan Figure -->
+  <circle cx="330" cy="290" r="40" fill="url(#maroonGrad)" />
+  <path d="M 160 270 L 230 325 C 260 345, 300 350, 340 340 L 370 330 C 385 326, 395 338, 395 355 L 395 380 C 395 400, 375 420, 350 425 C 270 440, 200 420, 160 375 C 145 358, 135 335, 135 310 L 135 285 C 135 270, 145 260, 160 270 Z" fill="url(#maroonGrad)" />
+
+  <!-- Central Star of Craftsmanship -->
+  <polygon points="250,225 258,242 275,250 258,258 250,275 242,258 225,250 242,242" fill="url(#goldGrad)" />
+</svg>
