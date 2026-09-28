@@ -180,7 +180,8 @@ export async function sendDigilockerDemoOtp(
 export async function verifyDigilockerDemoOtp(
   userId: string | undefined,
   aadhaarNumber: string,
-  otp: string
+  otp: string,
+  requestedName?: string
 ): Promise<{
   verified: boolean;
   name: string;
@@ -238,7 +239,7 @@ export async function verifyDigilockerDemoOtp(
   const now = new Date().toISOString();
 
   // Test personas mapping
-  let personName = userName || "Aadhaar Verified Citizen";
+  let personName = requestedName || userName || "Aadhaar Verified Citizen";
   let personDob = "1994-08-15";
   let personAddress = "Plot 12, Cooperative Housing Society, Ring Road, Sector 7, New Delhi - 110001";
 

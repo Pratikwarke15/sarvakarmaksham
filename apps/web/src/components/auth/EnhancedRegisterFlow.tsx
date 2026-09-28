@@ -92,11 +92,22 @@ export function EnhancedRegisterFlow() {
 
   // Consumer Address & Location
   const [streetAddress, setStreetAddress] = useState("");
-  const [city, setCity] = useState("New Delhi");
-  const [pincode, setPincode] = useState("110001");
-  const [latitude, setLatitude] = useState<number | null>(28.6145);
-  const [longitude, setLongitude] = useState<number | null>(77.2095);
+  const [city, setCity] = useState("Pune");
+  const [pincode, setPincode] = useState("411005");
+  const [latitude, setLatitude] = useState<number | null>(18.5204);
+  const [longitude, setLongitude] = useState<number | null>(73.8567);
   const [detectingLocation, setDetectingLocation] = useState(false);
+
+  // Prevent background scrolling when DigiLocker modal is open
+  useEffect(() => {
+    if (digilockerModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [digilockerModalOpen]);
 
   // Common UI State
   const [loading, setLoading] = useState(false);
@@ -344,19 +355,35 @@ export function EnhancedRegisterFlow() {
       const loc = await detectLiveLocation();
       setLatitude(loc.latitude);
       setLongitude(loc.longitude);
-      setStreetAddress(loc.streetAddress);
-      setCity(loc.city);
-      setPincode(loc.pincode);
-      toast({
-        title: "Live GPS Location Detected!",
-        description: loc.displayName,
-        variant: "success",
-      });
+      if (loc.streetAddress) {
+        setStreetAddress(loc.streetAddress);
+      }
+      if (loc.city) {
+        setCity(loc.city);
+      }
+      if (loc.pincode) {
+        setPincode(loc.pincode);
+      }
+
+      if (loc.isApproximate) {
+        toast({
+          title: "Approximate Location Detected",
+          description: "Please specify your exact colony / society / street name.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "📍 Precise Colony Location Detected!",
+          description: loc.streetAddress
+            ? `${loc.streetAddress}, ${loc.city}`
+            : loc.displayName,
+          variant: "success",
+        });
+      }
     } catch {
-      setStreetAddress("Connaught Place, Central Delhi");
       toast({
-        title: "Standard coordinates applied",
-        description: "You may manually edit your street address.",
+        title: "GPS Detection Inactive",
+        description: "Please enter your Colony / Street address manually.",
         variant: "default",
       });
     } finally {
@@ -921,10 +948,10 @@ export function EnhancedRegisterFlow() {
               </div>
 
               {/* Service / Work Location Input with Working Live GPS Detection */}
-              <div className="pt-2 border-t border-slate-100 space-y-2">
+              <div className="pt-2 border-t border-slate-100 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-slate-700">
-                    {role === "WORKER" ? "Service Operating Address" : "Service Address"}
+                  <label className="block text-xs font-bold text-slate-800">
+                    {role === "WORKER" ? "Service Operating Address" : "Service Address / Colony"}
                   </label>
                   <button
                     type="button"
@@ -935,7 +962,7 @@ export function EnhancedRegisterFlow() {
                     {detectingLocation ? (
                       <>
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        <span>Detecting GPS...</span>
+                        <span>Detecting Colony GPS...</span>
                       </>
                     ) : (
                       <>
@@ -945,28 +972,45 @@ export function EnhancedRegisterFlow() {
                     )}
                   </button>
                 </div>
-                <input
-                  type="text"
-                  value={streetAddress}
-                  onChange={(e) => setStreetAddress(e.target.value)}
-                  placeholder="Street / Colony / Flat or click Detect Live Location"
-                  className="w-full rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2.5 px-3.5 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
-                />
+
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                    Colony / Society / Flat / Street Name
+                  </label>
+                  <input
+                    type="text"
+                    value={streetAddress}
+                    onChange={(e) => setStreetAddress(e.target.value)}
+                    placeholder="e.g. Mayur Colony, Kothrud or Flat 4, Sharda Niwas"
+                    className="w-full rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2.5 px-3.5 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <input
-                    type="text"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    placeholder="City"
-                    className="rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2 px-3 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
-                  />
-                  <input
-                    type="text"
-                    value={pincode}
-                    onChange={(e) => setPincode(e.target.value)}
-                    placeholder="PIN Code"
-                    className="rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2 px-3 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
-                  />
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                      City / District
+                    </label>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="City (e.g. Pune)"
+                      className="w-full rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2 px-3 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                      PIN Code
+                    </label>
+                    <input
+                      type="text"
+                      value={pincode}
+                      onChange={(e) => setPincode(e.target.value)}
+                      placeholder="PIN Code (e.g. 411038)"
+                      className="w-full rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2 px-3 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1152,14 +1196,21 @@ export function EnhancedRegisterFlow() {
 
       {/* AUTHENTIC DIGILOCKER GATEWAY MODAL */}
       {digilockerModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs overflow-y-auto">
-          <div className="w-full max-w-lg my-8 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-3 sm:p-4 backdrop-blur-sm overflow-hidden">
+          <div className="w-full max-w-lg max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <DigiLockerDemoFlow
               userRole={role}
               initialData={{
                 name,
                 dob,
-                address: `${streetAddress}${city ? `, ${city}` : ""}${pincode ? ` - ${pincode}` : ""}`,
+                address: [
+                  streetAddress,
+                  city,
+                  pincode ? `- ${pincode}` : "",
+                ]
+                  .filter(Boolean)
+                  .join(", ")
+                  .replace(", -", " -"),
                 skills: selectedSkills,
                 skillCertificate,
               }}
