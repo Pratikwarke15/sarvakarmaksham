@@ -46,6 +46,21 @@ app.get("/api/docs.json", (_req, res) => {
   res.json(swaggerSpec);
 });
 
+app.get("/", (_req, res) => {
+  res.json({
+    success: true,
+    message: "सर्वकर्मक्षमः (Sarvakarmakshamah) API Server",
+    status: "healthy",
+    version: "1.0.0",
+    endpoints: {
+      health: "/api/v1/health",
+      docs: "/api/docs",
+      api: "/api/v1",
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get("/api/v1/health", (_req, res) => {
   res.json({
     success: true,
