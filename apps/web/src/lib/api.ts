@@ -7,9 +7,11 @@ function resolveBaseUrl(): string {
     if (host === "127.0.0.1" || host === "localhost") {
       return "http://127.0.0.1:4000";
     }
-    return `http://${host}:4000`;
+    // Production browser: use relative path so Vercel's rewrite proxies /api/* to Render
+    return "";
   }
-  return "http://127.0.0.1:4000";
+  // Production server-side: fallback to live Render backend
+  return process.env.NODE_ENV === "development" ? "http://127.0.0.1:4000" : "https://coopgig.onrender.com";
 }
 
 const api = axios.create({

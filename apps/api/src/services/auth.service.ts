@@ -264,6 +264,120 @@ export async function isTokenBlacklisted(token: string): Promise<boolean> {
   return result === "1";
 }
 
+export async function validateCredentials(
+  identifier: string,
+  password: string
+): Promise<{ phone: string; otp?: string; expiresAt: Date }> {
+  const trimmed = identifier.trim();
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { phone: trimmed },
+        { email: trimmed.toLowerCase() },
+      ],
+    },
+  });
+
+  if (!user) {
+    throw new AppError("Invalid credentials", 401);
+  }
+
+  if (!user.isActive) {
+    throw new AppError("Account is deactivated", 403);
+  }
+
+  const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+  if (!isValidPassword) {
+    throw new AppError("Invalid credentials", 401);
+  }
+
+  // Generate 6-digit OTP for user's registered phone
+  const otpResult = await generateOTP(user.phone);
+
+  const isDev = env.NODE_ENV !== "production";
+  return {
+    phone: user.phone,
+    expiresAt: otpResult.expiresAt,
+    ...(isDev ? { otp: otpResult.otp } : {}),
+  };
+}
+
+export async function generateEmailOTP(
+  email: string
+): Promise<{ otp?: string; expiresAt: Date }> {
+  const cleanEmail = email.trim().toLowerCase();
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + env.OTP_EXPIRY_MINUTES * 60 * 1000);
+
+  await prisma.otpVerification.create({
+    data: {
+      email: cleanEmail,
+      otp,
+      purpose: "EMAIL_VERIFY",
+      expiresAt,
+    },
+  });
+
+  const isDev = env.NODE_ENV !== "production";
+  return {
+    expiresAt,
+    ...(isDev ? { otp } : {}),
+  };
+}
+
+export async function verifyEmailOTP(
+  email: string,
+  otp: string
+): Promise<{ verified: boolean }> {
+  const cleanEmail = email.trim().toLowerCase();
+  const record = await prisma.otpVerification.findFirst({
+    where: {
+      email: cleanEmail,
+      purpose: "EMAIL_VERIFY",
+      verified: false,
+      expiresAt: { gte: new Date() },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!record) {
+    throw new AppError("Invalid or expired email OTP", 400);
+  }
+
+  if (record.otp !== otp) {
+    throw new AppError("Incorrect email OTP", 400);
+  }
+
+  await prisma.otpVerification.update({
+    where: { id: record.id },
+    data: { verified: true },
+  });
+
+  return { verified: true };
+}
+
+export async function checkAvailability(data: {
+  phone?: string;
+  email?: string;
+}): Promise<{ phoneAvailable: boolean; emailAvailable: boolean }> {
+  let phoneAvailable = true;
+  let emailAvailable = true;
+
+  if (data.phone) {
+    const existing = await prisma.user.findUnique({ where: { phone: data.phone } });
+    if (existing) phoneAvailable = false;
+  }
+
+  if (data.email) {
+    const existing = await prisma.user.findUnique({
+      where: { email: data.email.trim().toLowerCase() },
+    });
+    if (existing) emailAvailable = false;
+  }
+
+  return { phoneAvailable, emailAvailable };
+}
+
 export default {
   generateOTP,
   verifyOTP,
@@ -273,4 +387,8 @@ export default {
   getProfile,
   blacklistToken,
   isTokenBlacklisted,
+  validateCredentials,
+  generateEmailOTP,
+  verifyEmailOTP,
+  checkAvailability,
 };

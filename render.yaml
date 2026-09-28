@@ -2,8 +2,8 @@ services:
   - type: web
     name: coopgig
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
     plan: free
     healthCheckPath: /api/v1/health
     envVars:

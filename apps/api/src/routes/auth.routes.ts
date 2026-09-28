@@ -36,6 +36,63 @@ router.post("/register", validate(registerSchema), asyncHandler(async (req, res)
   res.status(201).json({ success: true, message: "User registered successfully", data: result });
 }));
 
+router.post(["/login-step1", "/login-init"], asyncHandler(async (req, res) => {
+  const { identifier, phone, password } = req.body;
+  const userIdentifier = identifier || phone;
+  if (!userIdentifier || !password) {
+    res.status(400).json({ success: false, error: "Identifier and password are required" });
+    return;
+  }
+  const result = await authService.validateCredentials(userIdentifier, password);
+  res.json({
+    success: true,
+    message: "Credentials valid. Demo OTP generated.",
+    data: {
+      requiresOtp: true,
+      phone: result.phone,
+      expiresAt: result.expiresAt,
+      ...(result.otp ? { otp: result.otp } : {}),
+    },
+  });
+}));
+
+router.post("/send-email-otp", asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email || !email.includes("@")) {
+    res.status(400).json({ success: false, error: "Valid email is required" });
+    return;
+  }
+  const result = await authService.generateEmailOTP(email);
+  res.json({
+    success: true,
+    message: "Email OTP generated",
+    data: {
+      expiresAt: result.expiresAt,
+      ...(result.otp ? { otp: result.otp } : {}),
+    },
+  });
+}));
+
+router.post("/verify-email-otp", asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    res.status(400).json({ success: false, error: "Email and OTP are required" });
+    return;
+  }
+  const result = await authService.verifyEmailOTP(email, otp);
+  res.json({
+    success: true,
+    message: "Email verified successfully",
+    data: result,
+  });
+}));
+
+router.post("/check-availability", asyncHandler(async (req, res) => {
+  const { phone, email } = req.body;
+  const result = await authService.checkAvailability({ phone, email });
+  res.json({ success: true, data: result });
+}));
+
 router.post("/login", validate(loginSchema), asyncHandler(async (req, res) => {
   const { phone, password } = req.body;
   const result = await authService.login(phone, password);

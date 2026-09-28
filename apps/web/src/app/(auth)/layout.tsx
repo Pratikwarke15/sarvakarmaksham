@@ -1,6 +1,5 @@
 "use client";
 
-import { Handshake } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -23,75 +22,58 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
   if (sessionValidated && isAuthenticated && user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-[#FBF8F5]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#800020] border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen">
-      {/* Voice Access Prompt Modal */}
+    <div className="min-h-screen bg-[#FBF8F5] flex flex-col justify-between text-slate-900 selection:bg-[#800020] selection:text-white">
+      {/* Voice Access Modal */}
       <VoiceAccessModal />
 
-      {/* Left Showcase */}
-      <div className="relative hidden w-1/2 bg-slate-900 border-r border-slate-800 lg:flex lg:flex-col lg:items-center lg:justify-center lg:p-12 text-white">
-        <div className="relative z-10 max-w-md text-center">
-          {/* Brand Logo */}
-          <Link href="/" className="inline-flex items-center gap-3.5 group">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white p-1 shadow-md group-hover:scale-105 transition-transform overflow-hidden border border-slate-700">
-              <img
-                src="/images/logo.png"
-                alt="सर्वकर्मक्षमः"
-                className="h-full w-full object-contain"
-              />
-            </div>
-            <div className="text-left">
-              <div className="flex items-center gap-1.5">
-                <span className="text-3xl font-black text-white font-heading tracking-tight">
-                  सर्वकर्मक्षमः<span className="text-[#800020]">.</span>
-                </span>
-                <span className="rounded-sm bg-emerald-900/60 border border-emerald-500/40 text-[10px] font-extrabold text-emerald-300 px-1.5 py-0.5 uppercase tracking-wide">
-                  {t("nav.verified")}
-                </span>
-              </div>
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                Sarvakarmakshamah • People Work Together
-              </p>
-            </div>
-          </Link>
-
-          <p className="mt-8 text-base text-slate-300 leading-relaxed font-medium">
-            {t("landing.heroDesc")}
-          </p>
-
-          {/* Stats Bar */}
-          <div className="mt-10 grid grid-cols-3 gap-3 border-t border-slate-800 pt-6 text-center">
-            <div>
-              <p className="text-2xl font-black text-rose-400 font-heading">12+</p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{t("landing.trustVerified")}</p>
-            </div>
-            <div>
-              <p className="text-2xl font-black text-white font-heading">15m</p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{t("landing.trustEta")}</p>
-            </div>
-            <div>
-              <p className="text-2xl font-black text-emerald-400 font-heading">≤5%</p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{t("landing.trustCommission")}</p>
-            </div>
+      {/* Top Header Bar */}
+      <header className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between">
+        <Link href="/" className="inline-flex items-center gap-3 group">
+          <div className="h-10 w-10 rounded-2xl bg-white p-1 border border-slate-200/80 shadow-xs flex items-center justify-center group-hover:border-[#800020] transition-colors">
+            <img
+              src="/images/logo.png"
+              alt="सर्वकर्मक्षमः"
+              className="h-full w-full object-contain"
+            />
           </div>
-        </div>
-      </div>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1.5">
+              <span className="text-lg font-black text-slate-900 font-heading tracking-tight">
+                सर्वकर्मक्षमः<span className="text-[#800020]">.</span>
+              </span>
+              <span className="rounded-sm bg-emerald-50 text-[9px] font-extrabold text-emerald-800 px-1 py-0.2 border border-emerald-300 uppercase">
+                {t("nav.verified")}
+              </span>
+            </div>
+            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+              Sarvakarmakshamah • People Work Together
+            </span>
+          </div>
+        </Link>
 
-      {/* Right Form Area */}
-      <div className="relative flex flex-1 items-center justify-center p-6 sm:p-12 bg-slate-50/50">
-        <div className="absolute right-6 top-6">
+        <div className="flex items-center gap-3">
           <LanguageSelector />
         </div>
-        <div className="w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-8 shadow-xl">
+      </header>
+
+      {/* Main Form Center Area */}
+      <main className="flex-1 flex items-center justify-center px-4 py-6 sm:py-10">
+        <div className="w-full max-w-[430px] rounded-[32px] bg-white border border-slate-100 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.08)] p-7 sm:p-9 transition-all">
           {children}
         </div>
-      </div>
+      </main>
+
+      {/* Footer Info */}
+      <footer className="w-full py-4 text-center text-xs text-slate-400">
+        <p>© 2026 सर्वकर्मक्षमः (Sarvakarmakshamah). All rights reserved.</p>
+      </footer>
     </div>
   );
 }

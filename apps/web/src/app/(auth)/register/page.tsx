@@ -1,5 +1,5 @@
-import { RegisterForm } from "@/components/auth/RegisterForm";
+import { EnhancedRegisterFlow } from "@/components/auth/EnhancedRegisterFlow";
 
 export default function RegisterPage() {
-  return <RegisterForm />;
+  return <EnhancedRegisterFlow />;
 }

@@ -99,21 +99,21 @@ export function OtpInput({ length = 6, onComplete, onResend, loading, disabled, 
             onKeyDown={(e) => handleKeyDown(i, e)}
             onPaste={handlePaste}
             disabled={loading || disabled}
-            className="h-12 w-11 rounded-lg border border-gray-300 bg-white text-center text-lg font-semibold text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-12 w-11 rounded-xl border border-slate-300 bg-white text-center text-lg font-bold text-slate-900 shadow-xs focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition"
           />
         ))}
       </div>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-rose-600 font-medium">{error}</p>}
 
       {onResend && (
         <button
           type="button"
           onClick={handleResend}
           disabled={countdown > 0 || loading}
-          className="text-sm font-medium text-indigo-600 hover:text-indigo-500 disabled:cursor-not-allowed disabled:text-gray-400"
+          className="text-xs font-semibold text-[#800020] hover:text-[#5a0016] disabled:cursor-not-allowed disabled:text-slate-400 transition"
         >
-          {countdown > 0 ? `Resend OTP in ${countdown}s` : "Resend OTP"}
+          {countdown > 0 ? `Resend security code in ${countdown}s` : "Resend security code"}
         </button>
       )}
     </div>

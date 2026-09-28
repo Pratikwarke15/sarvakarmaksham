@@ -373,7 +373,8 @@ model Dispute {
 
 model OtpVerification {
   id        String   @id @default(uuid())
-  phone     String
+  phone     String?
+  email     String?
   otp       String
   purpose   String   @default("LOGIN")
   expiresAt DateTime
@@ -381,6 +382,7 @@ model OtpVerification {
   createdAt DateTime @default(now())
 
   @@index([phone, purpose])
+  @@index([email, purpose])
 }
 
 model ServiceCategory {

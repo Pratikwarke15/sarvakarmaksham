@@ -11,7 +11,7 @@ export function Footer() {
           {/* Column 1: Brand & Description */}
           <div className="space-y-3">
             <Link href="/" className="flex items-center gap-3 group">
-              <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white shadow-xs overflow-hidden border border-slate-200 group-hover:border-[#800020] transition-colors p-1 shrink-0">
+              <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-xs overflow-hidden border border-slate-200 group-hover:border-[#800020] transition-colors p-1.5 shrink-0">
                 <img
                   src="/images/logo.png"
                   alt="सर्वकर्मक्षमः"

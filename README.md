@@ -1,194 +1,243 @@
-# Shramik Co — Cooperative Gig Services Platform for Household & Community Services
+# सर्वकर्मक्षमः (Sarvakarmakshamah)
 
-**SIH26089** — A production-ready full-stack platform that empowers local workers through
-cooperative gig services with fair commissions (<5%), social security contributions, AI-driven
-demand forecasting, and transparent cooperative governance.
+> **Decentralized Platform Cooperative for Skilled & Blue-Collar Services**  
+> **Smart India Hackathon 2026 | Problem Statement ID: SIH26089**  
+> *"Empowering India's informal workforce through democratic ownership, fair compensation, and statutory social security."*
 
 ---
 
-## 🌐 Live Deployment
+## 📌 Executive Summary
 
-| Service    | URL |
-|------------|-----|
-| Website    | https://shramik-co.vercel.app |
-| API        | https://coopgig.onrender.com |
-| API Docs   | https://coopgig.onrender.com/docs |
+India's on-demand home and doorstep services sector is projected to reach **$35 Billion by 2030**, supporting over **23.5 Million gig workers** (*NITI Aayog, 2022*). However, existing corporate aggregators extract **25%–35% in platform commissions**, enforce opaque algorithmic penalties, and offer zero formal social security nets for over 90% of technicians (*Fairwork India, 2023*).
 
-Demo logins: workers/co-op admins/consumers use phone 98123xxxxx–9876543212 (password `password123`);
-Federation (ministry) super admin: phone `9999999999` / `admin123`. Repo: https://github.com/Pratikwarke15/shramik-co
+**सर्वकर्मक्षमः (Sarvakarmakshamah)** is a decentralized, full-stack platform cooperative engineered to eliminate predatory intermediary rent-seeking. By capping operational commissions at **0%–5%**, redistributing annual surplus via **patronage dividends**, automating **Social Security Micro-Vaults** (ESI, accident coverage, micro-pensions), and verifying identities via **UIDAI Paperless Offline XML e-KYC**, सर्वकर्मक्षमः provides an institutional-grade, transparent public digital infrastructure for blue-collar gig economies.
+
+---
+
+## 🌐 Live Deployments & Repository
+
+| Service | Environment / URL | Details |
+| :--- | :--- | :--- |
+| **Web Application & PWA** | [https://sarvakarmakshamah.vercel.app](https://sarvakarmakshamah.vercel.app) | Responsive Next.js 14 PWA with Offline Support |
+| **Backend REST API** | `https://coopgig.onrender.com` / `http://localhost:4000` | Node.js Express & TypeScript Microservice |
+| **Interactive API Docs** | `https://coopgig.onrender.com/docs` | OpenAPI / Swagger Documentation |
+| **Source Code** | [https://github.com/Pratikwarke15/shramik-co](https://github.com/Pratikwarke15/shramik-co) | GitHub Monorepo |
+
+---
+
+## ⚡ Key Value Propositions & Differentiators
+
+```
+┌─────────────────────────────────┐       ┌─────────────────────────────────┐
+│     Corporate Aggregators       │  vs   │     सर्वकर्मक्षमः (Cooperative) │
+├─────────────────────────────────┼───────┼─────────────────────────────────┤
+│ • 25% – 35% commission cuts     │       │ • 0% – 5% operational cost cap  │
+│ • Zero health / pension nets    │       │ • Automated Social Security     │
+│ • Arbitrary account debarment   │       │ • Democratic worker governance  │
+│ • Surge & opaque pricing        │       │ • Transparent base rates (₹50+) │
+│ • English-heavy UI friction     │       │ • Trilingual Voice AI Interface │
+│ • Shareholder profit extraction │       │ • Patronage Dividend rebates    │
+└─────────────────────────────────┘       └─────────────────────────────────┘
+```
+
+1. **0% – 5% Commission Cap:** Server-enforced smart escrow logic ensures workers retain 95%+ of their hard-earned labor income.
+2. **Social Security Micro-Vault:** Compliant with Chapter IX of India's *Code on Social Security, 2020*. A micro-fraction of every transaction is earmarked directly into the worker's dedicated social vault (ESI, medical cover, accidental insurance, and retirement).
+3. **Paperless UIDAI e-KYC & DigiLocker:** Privacy-preserving identity verification using offline digitally signed XML files and share codes without storing plaintext 12-digit Aadhaar numbers.
+4. **Doorstep 4-Digit Handshake OTP:** Eliminates bogus service completions and protects both the customer and the artisan before work begins.
+5. **Trilingual Voice Accessibility:** Integrated speech-to-text recognition supporting **English, हिन्दी (Hindi), and मराठी (Marathi)** for vernacular and low-literacy artisans.
+6. **Offline-First Progressive Web App (PWA):** Workbox-powered client-side caching ensures job schedules, worker profiles, and emergency contacts remain accessible in poor network zones (2G/3G Tier-2 & Tier-3 belts).
+7. **Patronage Dividend Distribution:** Year-end platform operating surpluses are rebated back to worker-members proportional to their work volume and quality ratings.
 
 ---
 
 ## 📐 System Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Frontend (Next.js 14)                      │
-│   PWA · App Router · TypeScript · TailwindCSS · i18n (en/hi/mr)    │
-│   Roles: Consumer · Worker · Co-op Admin · Federation Admin        │
-│   Deployed: Vercel                                                  │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │  HTTPS / JSON (CORS, JWT Bearer)
-┌───────────────────────────▼─────────────────────────────────────┐
-│                         API (Python FastAPI)                            │
-│   Auth · Bookings · Workers · Co-ops · Payments · Disputes ·             │
-│   Social-Security · Upload · Verification (Aadhaar Secure QR + OTP)      │
-│   Deployed: Render (free tier, Docker)                                   │
-└───────────────────────────┬─────────────────────────────────────┘
-            ┌────────────────┼────────────────┐
-            ▼                ▼                ▼
-     ┌────────────┐   ┌──────────────┐   ┌──────────────┐
-     │  Supabase   │   │   Razorpay   │   │  2Factor /   │
-     │ PostgreSQL  │   │  (Test Mode) │   │  Console OTP │
-     │ (Pooler)    │   │  Payments    │   │  SMS         │
-     └────────────┘   └──────────────┘   └──────────────┘
-```
+The project is structured as an enterprise-grade TypeScript monorepo with clean separation of concerns:
 
-### Tech Stack
-
-| Layer        | Technology |
-|--------------|-----------|
-| Frontend     | Next.js 14 (App Router), TypeScript, TailwindCSS, TanStack Query, React Hook Form, Zod, `next-pwa` |
-| Backend      | Python FastAPI, asyncpg, Pydantic, PyJWT, JWT auth + phone/OTP |
-| Database     | Supabase PostgreSQL (connection pooler / PgBouncer) + asyncpg |
-| Auth         | JWT (access token) + phone/OTP verification (2Factor SMS with dev console fallback) |
-| Payments     | Razorpay Test Mode (UPI / card mock, escrow-held commission model) |
-| File Storage | Local disk via FastAPI StaticFiles (`/uploads`) served from the API |
-| Geospatial   | Application-level Haversine radius matching (PostGIS-compatible schema fields) |
-| AI/ML        | Statistical demand-forecasting engine (seasonal-weighted history + linear-trend regression) |
-| i18n         | Custom lightweight provider with English, Hindi, Marathi catalogs |
-| Infra        | Vercel (web) + Render (API), GitHub monorepo |
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Next.js 14 Frontend PWA                         │
+│   App Router · TypeScript · TailwindCSS · TanStack Query · Recharts    │
+│   Roles: Consumer · Worker / Artisan · Co-op Admin · Federation Admin   │
+│   Trilingual i18n (en / hi / mr) · Offline Service Worker (`sw.js`)    │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ HTTPS / JSON & WebSockets
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                    Express.js REST API (`apps/api`)                    │
+│   TypeScript · Socket.IO · Helmet · Winston Logger · Swagger OpenAPI   │
+│   Escrow Payment Flow · Zod Schemas · JWT Auth & Dev OTP Fallback      │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Prisma Client
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                    PostgreSQL / Supabase Database                      │
+│   Multi-tenant Cooperative Data Model · Connection Pooler (PgBouncer)   │
+│   Prisma ORM (`packages/db`) · Seed Data for Testing & Demonstration    │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+           ┌────────────────────────┼────────────────────────┐
+           ▼                        ▼                        ▼
+   ┌───────────────┐        ┌───────────────┐        ┌───────────────┐
+   │ Razorpay Test │        │ UIDAI Offline │        │ Demand Trend  │
+   │ Escrow Engine │        │ e-KYC Engine  │        │ Forecasting   │
+   └───────────────┘        └───────────────┘        └───────────────┘
+```
 
 ---
 
-## 🚀 Local Setup
+## 🛠️ Technology Stack
+
+| Layer | Framework & Technologies |
+| :--- | :--- |
+| **Frontend Framework** | **Next.js 14** (App Router), **React 18**, **TypeScript 5.5** |
+| **PWA & Mobile Native** | `@ducanh2912/next-pwa`, Workbox, `@capacitor/android` |
+| **Styling & Design System** | **TailwindCSS 3.4**, PostCSS, Autoprefixer, Custom Devanagari Typography |
+| **State & Data Fetching** | **TanStack Query (React Query v5)**, **Zustand 5**, React Hook Form, **Zod** |
+| **UI Components & Charts** | Radix UI Primitives, Lucide Icons, Recharts Analytics |
+| **Backend REST API** | **Express.js 4.21**, **TypeScript**, Socket.IO (Real-Time Tracking) |
+| **Security & Middleware** | Helmet, CORS, Morgan HTTP Logger, Winston Logging, JWT Bearer Auth |
+| **Database & ORM** | **PostgreSQL**, **Prisma ORM 5.22**, Supabase PgBouncer Connection Pooler |
+| **Internationalization** | Trilingual lightweight i18n catalogs (`en`, `hi`, `mr`) |
+| **Payments & Escrow** | Razorpay Test Mode SDK with Commission Split & Payout Routing |
+
+---
+
+## 📦 Monorepo Directory Layout
+
+```text
+├── apps/
+│   ├── api/                     # Node.js + Express TypeScript REST API
+│   │   ├── src/
+│   │   │   ├── controllers/     # Route handlers (auth, bookings, workers, etc.)
+│   │   │   ├── middleware/      # JWT auth, RBAC guards, error handling
+│   │   │   ├── routes/          # Express route definitions & Swagger JSDoc
+│   │   │   ├── services/        # Escrow payments, OTP, cooperative logic
+│   │   │   └── index.ts         # Server bootstrap & WebSocket setup
+│   │   └── package.json
+│   └── web/                     # Next.js 14 App Router PWA Frontend
+│       ├── public/              # Manifest, icons, logos, service worker
+│       ├── src/
+│       │   ├── app/             # App Router pages (Consumer, Worker, Co-op Admin)
+│       │   ├── components/      # UI components, voice search, PWA prompts
+│       │   ├── hooks/           # Custom React hooks (auth, i18n, socket)
+│       │   ├── i18n/            # Trilingual language catalogs (en, hi, mr)
+│       │   └── store/           # Zustand global state slices
+│       └── package.json
+├── backend/                     # Python microservice (Aadhaar QR, statistical ML)
+├── packages/
+│   └── db/                      # Prisma schema, migrations, and seed scripts
+│       └── prisma/
+│           ├── schema.prisma    # Cooperative data models & relational schema
+│           └── seed.ts          # Comprehensive testing fixtures
+├── docs/                        # Architecture, API specifications, and security audits
+├── docker-compose.yml           # Local container orchestration
+└── package.json                 # Monorepo root scripts & workspace definitions
+```
+
+---
+
+## 🚀 Getting Started Locally
 
 ### Prerequisites
-- Node.js ≥ 18, npm ≥ 9
-- A Supabase project (PostgreSQL + Storage bucket)
-- Razorpay test keys (free)
-- 2Factor SMS API key (free) — optional; dev console fallback works without it
+- **Node.js** >= 18.0.0
+- **npm** >= 9.0.0
+- **PostgreSQL** instance (Local or hosted via Supabase / Docker)
 
-### 1. Clone & install
+### 1. Clone & Install Dependencies
 ```bash
-git clone https://github.com/coopgig/coopgig.git
-cd coopgig
+git clone https://github.com/Pratikwarke15/shramik-co.git
+cd shramik-co
 npm install
 ```
 
-### 2. Environment variables
-Copy the template and fill values (see `.env` and `apps/web/.env.local`):
+### 2. Environment Configuration
+Create `.env` in the project root (and `apps/web/.env.local` for client variables):
 
-```bash
-# apps/api — root .env (or set in Render)
-DATABASE_URL="postgresql://USER:PASS@aws-0-<region>.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true&connection_limit=1"
-JWT_SECRET="<strong-random-secret>"
+```env
+# Database (PostgreSQL / Supabase PgBouncer URL)
+DATABASE_URL="postgresql://postgres:password@localhost:5432/sarvakarmakshamah?sslmode=disable"
+
+# Authentication & Security
+JWT_SECRET="your-super-secret-jwt-key-min-32-chars"
 CORS_ORIGIN="http://localhost:3000"
+
+# Public API URL for Frontend
 NEXT_PUBLIC_API_URL="http://localhost:4000"
-RAZORPAY_KEY_ID="rzp_test_xxxxx"
-RAZORPAY_KEY_SECRET="xxxxxxxx"
-SMS_API_KEY="<2factor-key>"          # optional
-SUPABASE_URL="https://xxxx.supabase.co"
-SUPABASE_ANON_KEY="xxxx"
-SUPABASE_SERVICE_KEY="xxxx"
+
+# Razorpay Test Credentials (Optional for payment flows)
+RAZORPAY_KEY_ID="rzp_test_mock_key"
+RAZORPAY_KEY_SECRET="mock_secret"
 ```
 
-> **Important (Supabase pooler):** always append `&pgbouncer=true&connection_limit=1` to
-> `DATABASE_URL`. Prisma uses prepared statements that conflict with PgBouncer's transaction
-> pooling; this flag disables them. Without it every write query fails with
-> `42P05 prepared statement "s0" already exists`.
-
-### 3. Database & seed
+### 3. Database Migration & Seeding
 ```bash
+# Generate Prisma Client
 npx prisma generate --schema=packages/db/prisma/schema.prisma
-npx prisma migrate deploy --schema=packages/db/prisma/schema.prisma
-# or for a fresh DB:
+
+# Push schema directly to the database
 npx prisma db push --schema=packages/db/prisma/schema.prisma
-npm --workspace apps/api run seed
+
+# Seed demo users, cooperatives, and service categories
+npm run seed --workspace=packages/db
 ```
 
-### 4. Run locally
+### 4. Run Development Servers
+Start both the Frontend and Backend concurrently with a single command:
 ```bash
-# Terminal 1 — API
-cd apps/api && npm run dev          # http://localhost:4000  (docs: /api/docs)
-
-# Terminal 2 — Web
-cd apps/web && npm run dev          # http://localhost:3000
+npm run dev
 ```
+
+- **Web Application & PWA:** [http://localhost:3000](http://localhost:3000)
+- **Backend API:** [http://localhost:4000](http://localhost:4000)
+- **Swagger Documentation:** [http://localhost:4000/docs](http://localhost:4000/docs)
 
 ---
 
-## 🧪 Testing Guide
+## 🔑 Demo & Test Credentials
 
-### Register / Login
-1. Open `http://localhost:3000/register`.
-2. Choose **Hire Workers** (Consumer) or **Work & Earn** (Worker), enter name + 10-digit phone + password (min 6).
-3. Email is optional. OTP step uses the dev console fallback (see below).
-4. Seed accounts (password `password123`):
-   - Consumer: `9812345601`–`9812345604`
-   - Worker: `9876543201`–`9876543212`
-   - Co-op Admin: `9890000001`–`9890000004`
-   - Federation Admin: `9999999999` / `admin123`
+The database seed provides pre-configured role profiles for evaluation:
 
-### Retrieve Dev OTP
-- **2Factor (production):** real SMS is sent; OTP appears in the 2Factor dashboard.
-- **Dev / console fallback:** when `SMS_API_KEY` is unset or SMS fails, the OTP is logged to the
-  API server console (`OTP for <phone>: 123456`) and can be returned via the
-  `POST /api/v1/auth/send-otp` response in non-production. Use the same OTP in
-  `POST /api/v1/auth/verify-otp`.
+| Role | Phone Number | Password | Capabilities |
+| :--- | :--- | :--- | :--- |
+| **Consumer** | `9812345601` | `password123` | Search artisans, voice booking, doorstep OTP verification |
+| **Worker / Artisan** | `9876543201` | `password123` | Job acceptance, OTP handshake, wallet & Social Security Vault |
+| **Cooperative Admin** | `9890000001` | `password123` | Worker approval, trade rate setup, dispute management |
+| **Federation Admin** | `9999999999` | `admin123` | National cooperative oversight, regulatory compliance |
 
-### Test Payments (Razorpay Test Mode)
-1. Create a booking as a Consumer → `POST /api/v1/payments/initiate`.
-2. Response returns `mockVpa` (e.g. `coopgig-xxxx@upi`) and `paymentRef`.
-3. In test mode no real charge occurs; confirm with `POST /api/v1/payments/confirm` using the
-   `razorpay_order_id`/`razorpay_payment_id` returned by `POST /api/v1/payments/create-order`
-   (use Razorpay test card `4111 1111 1111 1111`, any future expiry, any CVV).
-4. Commission (≤5%) is held in escrow; the remainder is routed to the worker wallet.
+### Development OTP Handshake
+When running in development or when SMS gateway credentials are not configured, OTP verification automatically logs to the server console:
+```text
+[AuthService] Generated OTP for +91 9812345601: 123456
+```
+Enter `123456` in the interface to verify your phone number.
 
-### AI Demand Forecasting
+---
+
+## ⚖️ Statutory Alignment & Policy Compliance
+
+* **The Code on Social Security, 2020 (Act No. 36 of 2020):** Aligned with Section 114 mandating aggregator welfare contributions to the National Social Security Board.
+* **Ministry of Cooperation (*Sahakar Se Samriddhi*):** Promotes democratic multi-stakeholder governance and transparent patronage dividend allocation.
+* **UIDAI Paperless Verification:** Strictly avoids storing 12-digit Aadhaar numbers in plaintext. Employs SHA-256 mobile hashes and offline XML digital signatures.
+
+---
+
+## 🤝 Contributing & Code Quality
+
+Contributions, issues, and feature requests are welcome!
+
 ```bash
-curl -H "Authorization: Bearer <COOP_ADMIN_TOKEN>" \
-  "https://<api>/api/v1/analytics/demand-forecast?days=7&condition=HEAVY_RAIN&temperatureC=30"
-```
-Returns a 7-day forecast per service category, demand hotspots per co-op, and workforce
-allocation recommendations. Weather multipliers (rain/heatwave) raise predicted demand.
+# Typecheck across all workspaces
+npm run typecheck --workspace=apps/web
+npm run typecheck --workspace=apps/api
 
-### Automated endpoint checks
-```bash
-# from repo root, after starting the API
-bash scripts/smoke-test.sh     # optional helper (create if needed)
-```
+# Run linting
+npm run lint
 
----
-
-## 🌐 Multilingual Support (i18n)
-Languages: **English (en)**, **Hindi (हिन्दी)**, **Marathi (मराठी)**.
-- Switch via the globe `LanguageSelector` (top-right of every page, including login/register).
-- Preference persisted in `localStorage` (`coopgig_lang`) and applied to `<html lang>`.
-- Catalogs live in `apps/web/src/i18n/messages/{en,hi,mr}.json`.
-- Use `const { t } = useI18n()` and `t("auth.welcomeBack")` in any client component.
-- To add a language: add a JSON catalog + an entry in `LOCALES` (`I18nProvider.tsx`).
-
----
-
-## 📦 Project Structure
-```
-packages/db/prisma/      Prisma schema + seed
-apps/api/                Express API (routes, services, middleware, lib)
-apps/web/                Next.js frontend (app, components, i18n, store)
+# Production build validation
+npm run build
 ```
 
 ---
 
-## 🔐 Security & Compliance Notes
-- JWT secrets via env; tokens are `Bearer` in `Authorization`.
-- CORS restricted to `CORS_ORIGIN` (Vercel URL in prod) with credentials.
-- Commission cap enforced server-side (`MAX_COMMISSION_RATE`, default 5%).
-- File uploads scoped to authenticated users; stored in Supabase Storage.
-- All inputs validated with Zod schemas; unknown fields stripped.
+## 📜 License
 
-## 📄 API Documentation
-Interactive Swagger UI: `https://<api>/docs`
-
-## 🤝 Contributing
-Monorepo uses npm workspaces. Run `npm install` at root. Lint/typecheck before PRs.
+This project is licensed under the **MIT License** — feel free to inspect, modify, and build upon this platform cooperative framework.

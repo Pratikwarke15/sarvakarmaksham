@@ -80,8 +80,8 @@ export function Navbar() {
     return (
       <nav className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-md shadow-xs">
         <div className="mx-auto flex h-16 sm:h-20 max-w-7xl items-center justify-between px-3 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2.5 sm:gap-3.5 group min-w-0">
-            <div className="relative flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-white shadow-xs overflow-hidden border border-slate-200/90 group-hover:border-[#800020] transition-colors p-1 shrink-0">
+          <Link href="/" className="flex items-center gap-3 sm:gap-4 group min-w-0">
+            <div className="relative flex h-11 w-11 sm:h-15 sm:w-15 md:h-16 md:w-16 items-center justify-center rounded-2xl bg-white shadow-sm overflow-hidden border border-slate-200/90 group-hover:border-[#800020] transition-colors p-1 shrink-0">
               <img
                 src="/images/logo.png"
                 alt="सर्वकर्मक्षमः"
@@ -91,14 +91,14 @@ export function Navbar() {
             </div>
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-base sm:text-xl font-black text-slate-900 font-heading tracking-tight truncate">
+                <span className="text-base sm:text-xl md:text-2xl font-black text-slate-900 font-heading tracking-tight truncate">
                   सर्वकर्मक्षमः<span className="text-[#800020]">.</span>
                 </span>
                 <span className="hidden xs:inline-block rounded-sm bg-emerald-50 text-[9px] font-extrabold text-emerald-800 px-1 py-0.2 border border-emerald-300 uppercase">
                   {t("nav.verified")}
                 </span>
               </div>
-              <span className="hidden sm:block text-[10px] font-semibold text-slate-500 -mt-0.5 tracking-wider uppercase truncate">
+              <span className="hidden sm:block text-[10px] sm:text-[11px] font-semibold text-slate-500 -mt-0.5 tracking-wider uppercase truncate">
                 Sarvakarmakshamah • People Work Together
               </span>
             </div>
@@ -126,8 +126,8 @@ export function Navbar() {
       <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
         <div className="flex h-16 sm:h-18 items-center justify-between">
           <div className="flex items-center gap-4 sm:gap-8 min-w-0">
-            <Link href="/" className="flex items-center gap-2.5 sm:gap-3.5 group min-w-0">
-              <div className="relative flex h-10 w-10 sm:h-13 sm:w-13 items-center justify-center rounded-2xl bg-white shadow-xs overflow-hidden border border-slate-200/90 group-hover:border-[#800020] transition-colors p-1 shrink-0">
+            <Link href="/" className="flex items-center gap-3 sm:gap-4 group min-w-0">
+              <div className="relative flex h-11 w-11 sm:h-14 sm:w-14 md:h-15 md:w-15 items-center justify-center rounded-2xl bg-white shadow-sm overflow-hidden border border-slate-200/90 group-hover:border-[#800020] transition-colors p-1 shrink-0">
                 <img
                   src="/images/logo.png"
                   alt="सर्वकर्मक्षमः"
@@ -136,10 +136,10 @@ export function Navbar() {
                 <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-emerald-600 border-2 border-white" />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="text-base sm:text-lg font-black text-slate-900 font-heading tracking-tight truncate">
+                <span className="text-base sm:text-lg md:text-xl font-black text-slate-900 font-heading tracking-tight truncate">
                   सर्वकर्मक्षमः<span className="text-[#800020]">.</span>
                 </span>
-                <span className="hidden sm:block text-[9px] font-semibold text-slate-500 -mt-0.5 tracking-wider uppercase truncate">
+                <span className="hidden sm:block text-[9px] sm:text-[10px] font-semibold text-slate-500 -mt-0.5 tracking-wider uppercase truncate">
                   Sarvakarmakshamah • People Work Together
                 </span>
               </div>

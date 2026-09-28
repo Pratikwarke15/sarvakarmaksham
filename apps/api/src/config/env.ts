@@ -30,7 +30,7 @@ export const env = {
   DATABASE_URL: resolvedDatabaseUrl,
   JWT_SECRET: optionalEnv("JWT_SECRET", "sih26089-dev-secret-key-change-in-production"),
   JWT_EXPIRES_IN: optionalEnv("JWT_EXPIRES_IN", "7d"),
-  API_PORT: parseInt(optionalEnv("API_PORT", "4000"), 10),
+  API_PORT: parseInt(optionalEnv("PORT", optionalEnv("API_PORT", "4000")), 10),
   CORS_ORIGIN: optionalEnv("CORS_ORIGIN", "*"),
   NODE_ENV: optionalEnv("NODE_ENV", "development"),
   REDIS_URL: optionalEnv("REDIS_URL", "redis://localhost:6379"),
