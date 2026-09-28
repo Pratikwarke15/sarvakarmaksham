@@ -1,4 +1,5 @@
 FROM node:20-alpine AS builder
+RUN apk add --no-cache openssl libc6-compat
 WORKDIR /app
 COPY package.json package-lock.json* tsconfig.base.json ./
 COPY packages/db ./packages/db
@@ -8,6 +9,7 @@ RUN npm run db:generate
 RUN npm run build --workspace=apps/api
 
 FROM node:20-alpine AS runner
+RUN apk add --no-cache openssl libc6-compat
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 apiuser
