@@ -69,9 +69,23 @@ export function authorize(...roles: UserRole[]) {
       });
       return;
     }
-
     next();
   };
 }
 
-export default { authenticate, authorize };
+export async function optionalAuthenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return next();
+  }
+  const token = authHeader.split(" ")[1];
+  try {
+    const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+    req.user = decoded;
+  } catch {
+    // Guest or expired token in optional auth — proceed as guest
+  }
+  next();
+}
+
+export default { authenticate, optionalAuthenticate, authorize };

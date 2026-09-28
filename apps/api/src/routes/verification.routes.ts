@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authenticate } from "../middleware/auth";
+import { authenticate, optionalAuthenticate } from "../middleware/auth";
 import { validate } from "../middleware/validate";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { verifyDigilockerSchema, verifyAadhaarOtpSchema } from "../schemas/worker.schemas";
@@ -68,14 +68,14 @@ router.post(
 // DigiLocker DEMO Flow Endpoints
 router.post(
   "/digilocker/send-otp",
-  authenticate,
+  optionalAuthenticate,
   asyncHandler(async (req, res) => {
     const { aadhaarNumber } = req.body;
     if (!aadhaarNumber) {
       res.status(400).json({ success: false, error: "Aadhaar number is required" });
       return;
     }
-    const result = await verificationService.sendDigilockerDemoOtp(req.user!.id, aadhaarNumber);
+    const result = await verificationService.sendDigilockerDemoOtp(req.user?.id, aadhaarNumber);
     res.json({
       success: true,
       message: "Demo Aadhaar verification OTP generated",
@@ -86,7 +86,7 @@ router.post(
 
 router.post(
   "/digilocker/verify-otp",
-  authenticate,
+  optionalAuthenticate,
   asyncHandler(async (req, res) => {
     const { aadhaarNumber, otp } = req.body;
     if (!aadhaarNumber || !otp) {
@@ -94,7 +94,7 @@ router.post(
       return;
     }
     const result = await verificationService.verifyDigilockerDemoOtp(
-      req.user!.id,
+      req.user?.id,
       aadhaarNumber,
       otp
     );
@@ -108,9 +108,9 @@ router.post(
 
 router.post(
   "/digilocker/authorize",
-  authenticate,
+  optionalAuthenticate,
   asyncHandler(async (req, res) => {
-    const result = await verificationService.authorizeDigilockerDemo(req.user!.id, req.body);
+    const result = await verificationService.authorizeDigilockerDemo(req.user?.id, req.body);
     res.json({
       success: true,
       message: result.message,

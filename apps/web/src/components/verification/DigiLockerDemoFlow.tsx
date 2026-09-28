@@ -2,22 +2,19 @@
 
 import { useState, useEffect } from "react";
 import {
-  ShieldCheck,
-  Building2,
-  FileCheck2,
   CheckCircle2,
   AlertCircle,
   X,
   ArrowRight,
   RefreshCw,
   Award,
-  Upload,
-  UserCheck,
-  Calendar,
-  MapPin,
   Lock,
   ChevronRight,
   Info,
+  ShieldAlert,
+  Check,
+  User,
+  ExternalLink,
 } from "lucide-react";
 import { OtpInput } from "@/components/auth/OtpInput";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -27,15 +24,10 @@ interface DigiLockerDemoFlowProps {
   userRole?: "CONSUMER" | "WORKER";
   onSuccess?: (updatedProfile: any) => void;
   onCancel?: () => void;
+  isStandalone?: boolean;
 }
 
-type DigiStep =
-  | "INIT"
-  | "LOGIN_CONSENT"
-  | "AADHAAR_ENTRY"
-  | "OTP_VERIFY"
-  | "AUTHORIZE_DATA"
-  | "SUCCESS";
+type DigiStep = "SIGN_IN" | "AADHAAR_OTP" | "CONSENT_AUTHORIZE" | "SUCCESS";
 
 interface MockCitizenData {
   name: string;
@@ -52,11 +44,12 @@ export function DigiLockerDemoFlow({
   userRole = "CONSUMER",
   onSuccess,
   onCancel,
+  isStandalone = false,
 }: DigiLockerDemoFlowProps) {
   const { toast } = useToast();
   const { user, validateToken } = useAuthStore();
 
-  const [step, setStep] = useState<DigiStep>("INIT");
+  const [step, setStep] = useState<DigiStep>("SIGN_IN");
   const [aadhaarInput, setAadhaarInput] = useState("");
   const [serverOtp, setServerOtp] = useState<string | null>(null);
   const [showOtpBanner, setShowOtpBanner] = useState(false);
@@ -70,7 +63,6 @@ export function DigiLockerDemoFlow({
   // Worker Optional Skill Certificate
   const [skillCertificate, setSkillCertificate] = useState("");
   const [skillCertFileName, setSkillCertFileName] = useState("");
-  const [consentChecked, setConsentChecked] = useState(true);
 
   // Loading & error
   const [loading, setLoading] = useState(false);
@@ -79,7 +71,7 @@ export function DigiLockerDemoFlow({
   // OTP Countdown
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (step === "OTP_VERIFY" && countdown > 0) {
+    if (step === "AADHAAR_OTP" && countdown > 0) {
       timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
     }
     return () => clearTimeout(timer);
@@ -105,8 +97,9 @@ export function DigiLockerDemoFlow({
     if (errorMessage) setErrorMessage(null);
   };
 
-  // Step 2 -> Step 3: Send Server OTP
-  const handleRequestOtp = async () => {
+  // Step 1 -> Step 2: Send Server Aadhaar OTP
+  const handleRequestOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (aadhaarInput.length !== 12) {
       setErrorMessage("Please enter a valid 12-digit test Aadhaar number");
       return;
@@ -131,9 +124,9 @@ export function DigiLockerDemoFlow({
         setServerOtp(res.data.otp);
         setShowOtpBanner(true);
         setCountdown(30);
-        setStep("OTP_VERIFY");
+        setStep("AADHAAR_OTP");
         toast({
-          title: "Demo Aadhaar OTP Generated!",
+          title: "Aadhaar OTP Generated",
           description: `Code sent to Aadhaar-linked mobile: ${res.data.maskedMobile}`,
           variant: "success",
         });
@@ -170,8 +163,8 @@ export function DigiLockerDemoFlow({
         setShowOtpBanner(true);
         setCountdown(30);
         toast({
-          title: "New Aadhaar OTP Generated!",
-          description: "Previous code is now invalid. Only this latest code will verify.",
+          title: "New Aadhaar OTP Generated",
+          description: "Previous OTP has been invalidated. Only this new code will verify.",
           variant: "success",
         });
       } else {
@@ -184,7 +177,7 @@ export function DigiLockerDemoFlow({
     }
   };
 
-  // Step 3 -> Step 4: Verify OTP
+  // Step 2 -> Step 3: Verify OTP
   const handleVerifyOtp = async (codeToVerify: string) => {
     if (!codeToVerify || codeToVerify.length !== 6) {
       setErrorMessage("Please enter the complete 6-digit Aadhaar OTP");
@@ -209,10 +202,10 @@ export function DigiLockerDemoFlow({
       if (res.success && res.data) {
         setVerifiedData(res.data);
         setShowOtpBanner(false);
-        setStep("AUTHORIZE_DATA");
+        setStep("CONSENT_AUTHORIZE");
         toast({
-          title: "Aadhaar Identity Confirmed!",
-          description: "Review authorized credentials to link to your profile.",
+          title: "UIDAI Aadhaar Verified",
+          description: "Review authorized credentials to grant access.",
           variant: "success",
         });
       } else {
@@ -220,7 +213,7 @@ export function DigiLockerDemoFlow({
       }
     } catch (err: any) {
       setErrorMessage(
-        err?.response?.data?.error || "OTP verification failed. Previous codes are invalid."
+        err?.response?.data?.error || "OTP verification failed. Previous code is now invalid."
       );
     } finally {
       setLoading(false);
@@ -233,13 +226,9 @@ export function DigiLockerDemoFlow({
     handleVerifyOtp(code);
   };
 
-  // Step 4 -> Step 5: Authorize and Update Profile
+  // Step 3 -> Step 4: Authorize and Update Profile
   const handleAuthorize = async () => {
     if (!verifiedData) return;
-    if (!consentChecked) {
-      setErrorMessage("Please confirm your consent to link verified credentials.");
-      return;
-    }
 
     setLoading(true);
     setErrorMessage(null);
@@ -264,8 +253,8 @@ export function DigiLockerDemoFlow({
         setStep("SUCCESS");
         await validateToken();
         toast({
-          title: "Profile Successfully Verified!",
-          description: "Official verification badge linked to your account.",
+          title: "Consent Granted Successfully!",
+          description: "Verified profile attributes updated on Sarvakarmakshamah.",
           variant: "success",
         });
         if (onSuccess) {
@@ -284,69 +273,113 @@ export function DigiLockerDemoFlow({
   };
 
   return (
-    <div className="w-full rounded-3xl bg-white border border-slate-200/90 shadow-xl overflow-hidden text-slate-900 transition-all">
-      {/* Official Top Demo Disclaimer Banner */}
-      <div className="bg-[#0B1528] text-white px-5 py-3 border-b border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="h-6 w-6 rounded-md bg-[#006699] flex items-center justify-center font-bold text-white text-[10px]">
-            DL
+    <div className={`w-full max-w-xl mx-auto rounded-2xl bg-white border border-slate-300 shadow-2xl overflow-hidden font-sans text-slate-800 ${isStandalone ? "my-6" : ""}`}>
+      {/* 1. Indian National Flag Tricolor Bar */}
+      <div className="h-1.5 w-full flex">
+        <div className="h-full w-1/3 bg-[#FF9933]" />
+        <div className="h-full w-1/3 bg-white" />
+        <div className="h-full w-1/3 bg-[#138808]" />
+      </div>
+
+      {/* 2. Official DigiLocker Government Header */}
+      <header className="bg-[#002F6C] text-white px-5 py-3.5 flex items-center justify-between border-b border-blue-900">
+        <div className="flex items-center gap-3">
+          {/* Government of India Ashoka Stambh Emblem SVG */}
+          <div className="flex flex-col items-center">
+            <svg
+              className="h-9 w-7 text-amber-300 fill-current"
+              viewBox="0 0 100 130"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-label="National Emblem of India"
+            >
+              <path d="M50 5 C40 5 35 15 35 25 C35 32 40 40 50 40 C60 40 65 32 65 25 C65 15 60 5 50 5 Z" />
+              <path d="M25 15 C20 18 15 28 18 38 C22 45 30 45 34 38 C35 32 30 20 25 15 Z" />
+              <path d="M75 15 C80 18 85 28 82 38 C78 45 70 45 66 38 C65 32 70 20 75 15 Z" />
+              <rect x="20" y="48" width="60" height="8" rx="2" fill="#E6A100" />
+              <circle cx="50" cy="68" r="10" fill="none" stroke="#FFFFFF" strokeWidth="2.5" />
+              <circle cx="50" cy="68" r="3" fill="#FFFFFF" />
+              <path d="M20 78 C20 85 30 90 50 90 C70 90 80 85 80 78 Z" fill="#E6A100" />
+              <text x="50" y="112" textAnchor="middle" fill="#FFFFFF" fontSize="13" fontWeight="bold" fontFamily="sans-serif">
+                सत्यमेव जयते
+              </text>
+            </svg>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black tracking-wide uppercase text-blue-200">
-                DigiLocker Sandbox
+
+          <div className="border-l border-white/20 pl-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-base font-black tracking-tight text-white font-heading">
+                DigiLocker
               </span>
-              <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[9px] font-bold px-1.5 py-0.2 uppercase">
-                Demo / Mock
+              <span className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">
+                Government of India
               </span>
             </div>
-            <p className="text-[10px] text-slate-400">
-              Simulated government paperless e-KYC integration (No real Aadhaar processed)
+            <p className="text-[10px] text-blue-200 leading-none">
+              Ministry of Electronics & Information Technology (MeitY)
             </p>
           </div>
         </div>
 
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="text-slate-400 hover:text-white transition p-1"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col items-end">
+            <span className="rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[9px] font-bold px-2 py-0.5 uppercase tracking-wider">
+              National Sandbox
+            </span>
+            <span className="text-[9px] text-blue-200">Demo Environment</span>
+          </div>
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="text-blue-200 hover:text-white transition p-1 ml-1"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* 3. Demo / Mock Disclaimer Banner */}
+      <div className="bg-amber-50 border-b border-amber-200 px-5 py-2 text-xs text-amber-900 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 text-amber-700 flex-shrink-0" />
+          <span className="font-semibold text-[11px]">
+            <strong>Demo / Mock Verification:</strong> Use test Aadhaar credentials. Real government Aadhaar is not processed.
+          </span>
+        </div>
       </div>
 
-      {/* Floating Demo Push Notification Banner */}
+      {/* 4. Floating Demo Server OTP Notification Banner */}
       {showOtpBanner && serverOtp && (
         <div
           role="alert"
+          aria-live="assertive"
           className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[94%] max-w-md animate-in slide-in-from-top-6 duration-300"
         >
-          <div className="flex flex-col gap-2 rounded-2xl border border-[#800020]/30 bg-[#0F172A]/95 p-4 text-white shadow-2xl backdrop-blur-md ring-1 ring-white/10">
+          <div className="flex flex-col gap-2 rounded-2xl border border-blue-400/40 bg-[#002F6C]/95 p-4 text-white shadow-2xl backdrop-blur-md ring-1 ring-white/10">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#800020] text-white">
-                  <ShieldCheck className="h-4 w-4" />
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-500 text-white font-bold text-xs">
+                  DL
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-white">UIDAI Aadhaar OTP (Demo)</p>
-                  <p className="text-[10px] text-slate-300">Sent to linked mobile: {maskedMobile}</p>
+                  <p className="text-xs font-bold text-white">UIDAI Aadhaar OTP (Demo Server)</p>
+                  <p className="text-[10px] text-blue-200">Sent to linked mobile: {maskedMobile}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowOtpBanner(false)}
-                className="text-slate-400 hover:text-white transition"
+                className="text-blue-200 hover:text-white transition"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="flex items-center justify-between rounded-xl bg-white/5 border border-white/10 px-3 py-2">
+            <div className="flex items-center justify-between rounded-xl bg-white/10 border border-white/10 px-3 py-2">
               <div>
-                <p className="text-[10px] text-slate-300">Active server OTP:</p>
+                <p className="text-[10px] text-blue-200">Active server OTP:</p>
                 <p className="text-xl font-mono font-black tracking-widest text-emerald-400">
                   {serverOtp}
                 </p>
@@ -354,249 +387,150 @@ export function DigiLockerDemoFlow({
               <button
                 type="button"
                 onClick={() => autoFillOtp(serverOtp)}
-                className="rounded-xl bg-[#800020] text-white px-3 py-1.5 text-xs font-bold hover:bg-[#68001a] transition"
+                className="rounded-xl bg-[#006699] text-white px-3 py-1.5 text-xs font-bold hover:bg-[#005580] transition"
               >
-                Auto-Fill
+                Auto-Fill Code
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* STEP 1: INITIAL SELECTION */}
-      {step === "INIT" && (
+      {/* STEP 1: SIGN IN VIA DIGILOCKER (AUTHENTIC DIGILOCKER LOGIN) */}
+      {step === "SIGN_IN" && (
         <div className="p-6 sm:p-8 space-y-6">
-          <div className="flex items-start gap-4">
-            <div className="h-14 w-14 rounded-2xl bg-[#800020]/10 border border-[#800020]/20 flex items-center justify-center text-[#800020] flex-shrink-0">
-              <ShieldCheck className="h-7 w-7" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black text-slate-900 font-heading">
-                Verify Identity with DigiLocker
-              </h3>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Connect your DigiLocker digital wallet to fetch authentic citizen credentials.
-                Quick, paperless, and encrypted under Digital India guidelines.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-2.5 text-xs text-slate-700">
-            <div className="font-bold text-slate-900 flex items-center gap-2">
-              <Info className="h-4 w-4 text-[#800020]" />
-              Why verify with DigiLocker?
-            </div>
-            <ul className="space-y-1.5 pl-5 list-disc text-slate-600">
-              <li>
-                <strong>Instant Verified Badge:</strong> Stand out to cooperative members and customers with the verified shield.
-              </li>
-              <li>
-                <strong>Fair Gig Allocation:</strong> Higher trust tier enables priority access to bookings and cooperative dividends.
-              </li>
-              <li>
-                <strong>Paperless & Tamper-proof:</strong> Direct cryptographic verification of name, age, and address.
-              </li>
-            </ul>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setStep("LOGIN_CONSENT")}
-            className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 text-sm font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition flex items-center justify-center gap-2"
-          >
-            <span>Proceed with DigiLocker Verification</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* STEP 2: DIGILOCKER AUTHORIZATION / LOGIN CONCEPT */}
-      {step === "LOGIN_CONSENT" && (
-        <div className="p-6 sm:p-8 space-y-6">
-          {/* DigiLocker Branded Header Box */}
-          <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 via-indigo-50/30 to-white p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-[#006699] text-white font-black flex items-center justify-center text-sm shadow-xs">
-                DL
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-blue-950 font-heading">
-                  DigiLocker Document Gateway
-                </h4>
-                <p className="text-[10px] text-blue-700 font-medium">
-                  Ministry of Electronics & IT, Government of India
-                </p>
-              </div>
-            </div>
-            <span className="text-[10px] font-bold text-slate-400 border border-slate-200 rounded-md px-2 py-0.5 bg-white">
-              OAuth 2.0 Mock
+          {/* DigiLocker Tab Header */}
+          <div className="border-b border-slate-200 flex items-center gap-8 text-sm">
+            <button
+              type="button"
+              className="font-bold text-[#006699] border-b-2 border-[#006699] pb-3"
+            >
+              Sign In with Aadhaar
+            </button>
+            <span className="text-slate-400 pb-3 text-xs">
+              DigiLocker Single Sign-On (SSO)
             </span>
           </div>
 
-          <div className="space-y-2">
-            <h3 className="text-lg font-black text-slate-900 font-heading">
-              Consent for Digital Credential Verification
-            </h3>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Sarvakarmakshamah Cooperative is requesting access to your verified UIDAI e-KYC record.
-              This demo simulates official identity issuance.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2 text-xs text-slate-700">
-            <p className="font-bold text-slate-900">Application Requested Permissions:</p>
-            <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Full Legal Name</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Date of Birth / Age</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Registered Address</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Masked Aadhaar ID</span>
-              </div>
-              {userRole === "WORKER" && (
-                <div className="flex items-center gap-1.5 col-span-2 text-[#800020] font-semibold">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-[#800020]" />
-                  <span>Trade / Skill Certificate (Optional)</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setStep("INIT")}
-              className="flex-1 rounded-2xl border border-slate-200 bg-white py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep("AADHAAR_ENTRY")}
-              className="flex-2 rounded-2xl bg-[#006699] hover:bg-[#005580] text-white py-3 text-xs font-bold shadow-md transition flex items-center justify-center gap-2"
-            >
-              <span>Continue with DigiLocker</span>
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 3: AADHAAR NUMBER ENTRY (SANDBOX DEMO) */}
-      {step === "AADHAAR_ENTRY" && (
-        <div className="p-6 sm:p-8 space-y-6">
           <div>
-            <h3 className="text-xl font-black text-slate-900 font-heading">
-              Enter Test Aadhaar Number
-            </h3>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              In this demo sandbox, enter a 12-digit test number or click a quick-fill test persona.
-              Real citizen credentials are never requested or stored.
+            <h2 className="text-lg font-bold text-slate-900 font-heading">
+              Sign In to your DigiLocker Account
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Enter your 12-digit Aadhaar number to verify your citizen profile.
             </p>
           </div>
 
           {errorMessage && (
-            <div className="flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800">
+            <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
               <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
               <span>{errorMessage}</span>
             </div>
           )}
 
-          <div className="space-y-3">
-            <label className="block text-xs font-semibold text-slate-700">
-              12-Digit Test Aadhaar Number
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={formatAadhaar(aadhaarInput)}
-                onChange={handleAadhaarChange}
-                placeholder="9999 8888 7777"
-                maxLength={14}
-                className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200 py-3.5 px-4 font-mono text-base font-bold tracking-widest text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 outline-none transition"
-                autoFocus
-              />
-              <div className="absolute inset-y-0 right-0 pr-4 flex items-center text-xs font-mono text-slate-400">
-                {aadhaarInput.length}/12
+          <form onSubmit={handleRequestOtp} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                Aadhaar Number
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formatAadhaar(aadhaarInput)}
+                  onChange={handleAadhaarChange}
+                  placeholder="XXXX XXXX XXXX"
+                  maxLength={14}
+                  className="w-full rounded-xl bg-slate-50 border border-slate-300 py-3.5 px-4 font-mono text-base font-bold tracking-widest text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#006699] focus:ring-2 focus:ring-blue-100 outline-none transition"
+                  autoFocus
+                />
+                <div className="absolute inset-y-0 right-0 pr-4 flex items-center text-xs font-mono text-slate-400">
+                  {aadhaarInput.length}/12
+                </div>
               </div>
             </div>
 
-            {/* Quick Test Numbers */}
-            <div className="pt-1">
-              <p className="text-[11px] font-semibold text-slate-500 mb-1.5">
-                Quick Select Test Sandbox Personas:
-              </p>
+            {/* Quick-fill Test Sandbox Personas */}
+            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-3 text-xs">
+              <span className="font-bold text-blue-900 block mb-1.5 text-[11px]">
+                Quick Select Test Personas (Demo Sandbox):
+              </span>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => fillQuickAadhaar("999988887777")}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-[#800020] hover:bg-rose-50/50 transition"
+                  className="rounded-lg border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-blue-950 hover:border-blue-400 hover:bg-blue-50 transition"
                 >
-                  9999 8888 7777 (Test Citizen A)
+                  9999 8888 7777 (Citizen Priya)
                 </button>
                 <button
                   type="button"
                   onClick={() => fillQuickAadhaar("888877776666")}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-[#800020] hover:bg-rose-50/50 transition"
+                  className="rounded-lg border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-blue-950 hover:border-blue-400 hover:bg-blue-50 transition"
                 >
-                  8888 7777 6666 (Test Worker B)
+                  8888 7777 6666 (Electrician Ramesh)
                 </button>
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-3 pt-2">
+            <div className="text-[11px] text-slate-500 leading-relaxed">
+              By clicking Next, you consent to receive an authentication OTP on your UIDAI-registered mobile number.
+            </div>
+
             <button
-              type="button"
-              onClick={() => setStep("LOGIN_CONSENT")}
-              className="flex-1 rounded-2xl border border-slate-200 bg-white py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
-            >
-              Back
-            </button>
-            <button
-              type="button"
+              type="submit"
               disabled={loading || aadhaarInput.length !== 12}
-              onClick={handleRequestOtp}
-              className="flex-2 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3 text-xs font-bold shadow-md shadow-[#800020]/20 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+              className="w-full rounded-xl bg-[#006699] hover:bg-[#005580] text-white py-3.5 text-sm font-bold shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <div className="flex items-center gap-2">
-                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  <span>Requesting OTP...</span>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <span>Contacting UIDAI Server...</span>
                 </div>
               ) : (
-                "Request Aadhaar OTP"
+                <>
+                  <span>Next / Send Aadhaar OTP</span>
+                  <ArrowRight className="h-4 w-4" />
+                </>
               )}
             </button>
+          </form>
+
+          <div className="pt-2 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+            <Lock className="h-3.5 w-3.5 text-emerald-600" />
+            <span>256-bit Encrypted Government Authentication Gateway</span>
           </div>
         </div>
       )}
 
-      {/* STEP 4: SERVER OTP VERIFICATION */}
-      {step === "OTP_VERIFY" && (
+      {/* STEP 2: UIDAI AADHAAR MOBILE OTP STEP */}
+      {step === "AADHAAR_OTP" && (
         <div className="p-6 sm:p-8 space-y-6">
+          <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Step 2: UIDAI Verification
+            </span>
+            <button
+              type="button"
+              onClick={() => setStep("SIGN_IN")}
+              className="text-xs font-bold text-[#006699] hover:underline"
+            >
+              ← Edit Aadhaar
+            </button>
+          </div>
+
           <div>
-            <h3 className="text-xl font-black text-slate-900 font-heading">
-              Verify Aadhaar OTP
-            </h3>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+            <h2 className="text-lg font-bold text-slate-900 font-heading">
+              Enter UIDAI Security OTP
+            </h2>
+            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
               OTP sent to your Aadhaar-linked mobile number:{" "}
-              <span className="font-bold text-slate-800">{maskedMobile}</span>.
-              The OTP is generated by the server and previous codes are invalidated upon resend.
+              <span className="font-bold text-slate-900">{maskedMobile}</span>.
+              Enter the 6-digit verification code below.
             </p>
           </div>
 
           {errorMessage && (
-            <div className="flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800">
+            <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
               <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
               <span>{errorMessage}</span>
             </div>
@@ -614,23 +548,16 @@ export function DigiLockerDemoFlow({
             />
           </div>
 
-          <div className="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setStep("AADHAAR_ENTRY")}
-              className="font-semibold text-slate-600 hover:text-slate-900"
-            >
-              ← Change Aadhaar Number
-            </button>
-
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
+            <span>Didn&apos;t receive security code?</span>
             <div>
               {countdown > 0 ? (
-                <span className="text-slate-400 font-medium">Resend in {countdown}s</span>
+                <span className="text-slate-400 font-semibold">Resend in {countdown}s</span>
               ) : (
                 <button
                   type="button"
                   onClick={handleResendOtp}
-                  className="font-bold text-[#800020] hover:underline"
+                  className="font-bold text-[#006699] hover:underline"
                 >
                   Resend New OTP
                 </button>
@@ -640,87 +567,87 @@ export function DigiLockerDemoFlow({
         </div>
       )}
 
-      {/* STEP 5: AUTHORIZATION / CONSENT SCREEN */}
-      {step === "AUTHORIZE_DATA" && verifiedData && (
+      {/* STEP 3: OFFICIAL DIGILOCKER OAUTH CONSENT / AUTHORIZATION SCREEN */}
+      {step === "CONSENT_AUTHORIZE" && verifiedData && (
         <div className="p-6 sm:p-8 space-y-6">
-          <div>
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-0.5 text-[11px] font-bold text-emerald-800 mb-2">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              <span>DigiLocker Identity Verified</span>
-            </div>
-            <h3 className="text-xl font-black text-slate-900 font-heading">
-              Authorize Verified Profile Information
-            </h3>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              DigiLocker has released the following authenticated record. Confirm authorization
-              to attach this verified status to your account profile.
-            </p>
-          </div>
-
-          {errorMessage && (
-            <div className="flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800">
-              <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-          {/* Verified Attributes Card */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 space-y-3 text-xs">
-            <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
-              <span className="text-slate-500 font-medium">Legal Name</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-slate-900">{verifiedData.name}</span>
-                <span className="rounded-sm bg-emerald-100 text-emerald-800 font-bold px-1 py-0.2 text-[9px]">
-                  ✓ Verified
-                </span>
+          {/* Header Request Box */}
+          <div className="rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50/70 to-indigo-50/30 p-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-[#800020] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0">
+                सह
               </div>
-            </div>
-
-            <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
-              <span className="text-slate-500 font-medium">Date of Birth / Age</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-slate-900">{verifiedData.dob} (~31 yrs)</span>
-                <span className="rounded-sm bg-emerald-100 text-emerald-800 font-bold px-1 py-0.2 text-[9px]">
-                  ✓ Verified
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-start justify-between border-b border-slate-200/80 pb-2.5">
-              <span className="text-slate-500 font-medium flex-shrink-0">Registered Address</span>
-              <div className="text-right pl-4">
-                <p className="font-bold text-slate-900">{verifiedData.address}</p>
-                <span className="rounded-sm bg-emerald-100 text-emerald-800 font-bold px-1 py-0.2 text-[9px] inline-block mt-0.5">
-                  ✓ Verified
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-medium">Aadhaar Reference</span>
-              <div className="flex items-center gap-1.5 font-mono">
-                <span className="font-bold text-slate-900">{verifiedData.maskedAadhaar}</span>
-                <span className="text-[10px] text-slate-400">({verifiedData.digilockerRef})</span>
+              <div>
+                <p className="text-xs font-semibold text-slate-600">
+                  Application Requesting Access:
+                </p>
+                <h3 className="text-sm font-black text-slate-900 font-heading">
+                  Sarvakarmakshamah Cooperative Platform
+                </h3>
+                <p className="text-[10px] text-slate-500">
+                  Multi-State Gig & Platform Workers Democratic Cooperative Federation
+                </p>
               </div>
             </div>
           </div>
 
-          {/* WORKER SPECIFIC: OPTIONAL SKILL CERTIFICATE */}
-          {userRole === "WORKER" && (
-            <div className="rounded-2xl border border-amber-200/80 bg-amber-50/40 p-4 space-y-3 text-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-bold text-slate-900">
-                  <Award className="h-4 w-4 text-[#800020]" />
-                  <span>Skill Certificate</span>
+          <div className="text-xs text-slate-600">
+            Sarvakarmakshamah is requesting your authorization to fetch the following verified
+            documents from your DigiLocker account:
+          </div>
+
+          {/* Citizen Identity Verification Card */}
+          <div className="rounded-xl border border-slate-300 bg-slate-50 p-4 space-y-3 text-xs">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="h-6 w-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center">
+                  <User className="h-3.5 w-3.5" />
                 </div>
-                <span className="rounded-full bg-slate-200/80 text-slate-600 px-2 py-0.5 text-[10px] font-bold uppercase">
+                <span className="font-bold text-slate-900">{verifiedData.name}</span>
+              </div>
+              <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 flex items-center gap-1">
+                <Check className="h-3 w-3" />
+                <span>UIDAI Verified</span>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div>
+                <span className="text-slate-500">Date of Birth / Age</span>
+                <p className="font-semibold text-slate-900">{verifiedData.dob} (~31 yrs)</p>
+              </div>
+              <div>
+                <span className="text-slate-500">Gender</span>
+                <p className="font-semibold text-slate-900">Female / Male</p>
+              </div>
+            </div>
+
+            <div className="text-[11px] pt-1">
+              <span className="text-slate-500">Registered Residential Address</span>
+              <p className="font-semibold text-slate-900 leading-snug">{verifiedData.address}</p>
+            </div>
+
+            <div className="text-[11px] pt-1 flex items-center justify-between text-slate-500 font-mono">
+              <span>Masked UID: {verifiedData.maskedAadhaar}</span>
+              <span className="text-[10px]">Ref: {verifiedData.digilockerRef}</span>
+            </div>
+          </div>
+
+          {/* WORKER ROLE: OPTIONAL SKILL CERTIFICATE INPUT */}
+          {userRole === "WORKER" && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50/50 p-4 space-y-3 text-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-amber-950">
+                  <Award className="h-4 w-4 text-[#800020]" />
+                  <span>Skill & Vocational Certificate</span>
+                </div>
+                <span className="rounded-md bg-amber-200/80 text-amber-900 font-bold px-2 py-0.5 text-[9px] uppercase">
                   Optional
                 </span>
               </div>
 
               <p className="text-slate-600 text-[11px] leading-relaxed">
-                If you possess an ITI, NSDC, PMKVY, or vocational trade certificate, you can include
-                it with your verification. If you don&apos;t have one right now, you can leave it blank and continue.
+                If you have an ITI, NSDC, PMKVY, or vocational trade document, include it in your verified credentials.
+                If you do not have one right now, you can leave it blank and still continue.
               </p>
 
               <div className="space-y-2">
@@ -728,8 +655,8 @@ export function DigiLockerDemoFlow({
                   type="text"
                   value={skillCertificate}
                   onChange={(e) => setSkillCertificate(e.target.value)}
-                  placeholder="e.g. NSDC Level 4 Electrician Certificate (Optional)"
-                  className="w-full rounded-xl bg-white border border-slate-200 py-2.5 px-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-[#800020] outline-none"
+                  placeholder="e.g. Government ITI Electrician Certificate (Optional)"
+                  className="w-full rounded-lg bg-white border border-slate-300 py-2.5 px-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-[#006699] outline-none"
                 />
 
                 <div className="flex items-center gap-2">
@@ -739,12 +666,12 @@ export function DigiLockerDemoFlow({
                       setSkillCertificate("Government ITI Certified Wireman - Grade I (Ref: DL-ITI-2025)");
                       setSkillCertFileName("ITI_Certificate_Grade1.pdf");
                     }}
-                    className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[10px] font-medium text-slate-700 hover:bg-slate-50 transition"
+                    className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[10px] font-medium text-slate-700 hover:bg-slate-100 transition"
                   >
                     + Attach Demo ITI Certificate
                   </button>
                   {skillCertFileName && (
-                    <span className="text-[10px] text-emerald-700 font-medium">
+                    <span className="text-[10px] text-emerald-700 font-bold">
                       ✓ Attached: {skillCertFileName}
                     </span>
                   )}
@@ -753,68 +680,87 @@ export function DigiLockerDemoFlow({
             </div>
           )}
 
-          {/* Consent Checkbox */}
-          <label className="flex items-start gap-2.5 text-xs text-slate-700 cursor-pointer pt-1">
-            <input
-              type="checkbox"
-              checked={consentChecked}
-              onChange={(e) => setConsentChecked(e.target.checked)}
-              className="mt-0.5 rounded border-slate-300 text-[#800020] focus:ring-[#800020]"
-            />
-            <span>
-              I authorize Sarvakarmakshamah Cooperative to store and display my verified name,
-              address, and credentials on my member profile pursuant to the platform privacy policy.
-            </span>
-          </label>
+          {/* Granular Permission Checklist */}
+          <div className="space-y-1.5 text-xs text-slate-700">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+              <span>Allow verification of Full Legal Name & Date of Birth</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+              <span>Allow verification of Residential Address for local service allocation</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+              <span>Allow storage of DigiLocker Audit Reference token</span>
+            </div>
+          </div>
 
-          {/* Action Button */}
-          <button
-            type="button"
-            disabled={loading || !consentChecked}
-            onClick={handleAuthorize}
-            className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 text-sm font-bold shadow-md shadow-[#800020]/20 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <div className="flex items-center gap-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                <span>Linking to Profile...</span>
-              </div>
-            ) : (
-              "Authorize & Continue"
-            )}
-          </button>
+          {/* Official DigiLocker ALLOW and DENY Action Buttons */}
+          <div className="flex items-center gap-3 pt-3">
+            <button
+              type="button"
+              onClick={onCancel ? onCancel : () => setStep("SIGN_IN")}
+              className="flex-1 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 py-3 text-xs font-bold text-slate-700 transition"
+            >
+              Deny
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleAuthorize}
+              className="flex-2 rounded-xl bg-[#006699] hover:bg-[#005580] text-white py-3 text-xs font-bold shadow-md transition flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <span>Authorizing...</span>
+                </div>
+              ) : (
+                <>
+                  <span>Allow (Authorize & Continue)</span>
+                  <Check className="h-4 w-4" />
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
 
-      {/* STEP 6: SUCCESS */}
+      {/* STEP 4: SUCCESS */}
       {step === "SUCCESS" && (
-        <div className="p-6 sm:p-8 text-center space-y-5 animate-fade-in">
-          <div className="mx-auto h-16 w-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600">
-            <CheckCircle2 className="h-9 w-9" />
+        <div className="p-8 text-center space-y-5 animate-fade-in">
+          <div className="mx-auto h-16 w-16 rounded-full bg-emerald-50 border border-emerald-300 flex items-center justify-center text-emerald-600">
+            <CheckCircle2 className="h-10 w-10" />
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-2xl font-black text-slate-900 font-heading">
-              DigiLocker Verification Complete!
+            <h3 className="text-xl font-black text-slate-900 font-heading">
+              DigiLocker Verification Authorized!
             </h3>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-              Your identity has been authenticated. Your profile now features the verified member
-              badge with distinguished verified details.
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              Your verified credentials have been authenticated and attached to your member profile.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 max-w-sm mx-auto text-left text-xs space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500">Member:</span>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 max-w-sm mx-auto text-left text-xs space-y-1.5">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Name:</span>
               <span className="font-bold text-slate-900">{verifiedData?.name}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500">Status:</span>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Identity Status:</span>
               <span className="text-emerald-700 font-bold">✓ Aadhaar Verified</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500">Source:</span>
-              <span className="text-slate-700">DigiLocker National Sandbox</span>
+            {skillCertificate && (
+              <div className="flex justify-between">
+                <span className="text-slate-500">Skill Certificate:</span>
+                <span className="text-emerald-700 font-bold">✓ Verified</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-slate-500">Gateway Ref:</span>
+              <span className="font-mono text-slate-600 text-[11px]">{verifiedData?.digilockerRef}</span>
             </div>
           </div>
 
@@ -823,9 +769,9 @@ export function DigiLockerDemoFlow({
             onClick={() => {
               if (onCancel) onCancel();
             }}
-            className="w-full sm:w-auto px-8 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3 text-xs font-bold shadow-md shadow-[#800020]/20 transition"
+            className="w-full sm:w-auto px-8 rounded-xl bg-[#006699] hover:bg-[#005580] text-white py-3 text-xs font-bold shadow-md transition"
           >
-            Done
+            Return to Dashboard
           </button>
         </div>
       )}

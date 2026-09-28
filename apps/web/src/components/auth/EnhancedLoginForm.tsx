@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Lock, Eye, EyeOff, Sparkles, AlertCircle, X, ShieldCheck } from "lucide-react";
 import { OtpInput } from "./OtpInput";
+import { LegalModal } from "@/components/legal/LegalModal";
 import { useAuthStore } from "@/store/authStore";
 import { useToast } from "@/components/providers/ToastProvider";
 import { getRoleDashboardPath } from "@/lib/utils";
@@ -22,6 +23,10 @@ export function EnhancedLoginForm() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Legal modal state
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<"terms" | "privacy">("terms");
 
   // Demo Push Notification State
   const [serverOtpNotification, setServerOtpNotification] = useState<string | null>(null);
@@ -266,9 +271,27 @@ export function EnhancedLoginForm() {
             </h1>
             <p className="text-xs text-slate-500 mt-2 font-medium leading-relaxed">
               By logging in, you agree to our{" "}
-              <Link href="/terms" className="text-slate-800 font-bold hover:underline">
+              <button
+                type="button"
+                onClick={() => {
+                  setLegalModalTab("terms");
+                  setLegalModalOpen(true);
+                }}
+                className="text-[#800020] font-bold hover:underline cursor-pointer"
+              >
                 Terms of Use
-              </Link>
+              </button>{" "}
+              and{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setLegalModalTab("privacy");
+                  setLegalModalOpen(true);
+                }}
+                className="text-[#800020] font-bold hover:underline cursor-pointer"
+              >
+                Privacy Policy
+              </button>
               .
             </p>
           </div>
@@ -485,6 +508,13 @@ export function EnhancedLoginForm() {
           </div>
         </div>
       )}
+
+      {/* Terms & Privacy Popup Modal */}
+      <LegalModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        defaultTab={legalModalTab}
+      />
     </div>
   );
 }

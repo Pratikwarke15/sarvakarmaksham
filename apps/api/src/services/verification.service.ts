@@ -127,7 +127,7 @@ export async function verifyAadhaarOtp(
 // ---------- DigiLocker DEMO Multi-step Verification Engine ----------
 
 export async function sendDigilockerDemoOtp(
-  userId: string,
+  userId: string | undefined,
   aadhaarNumber: string
 ): Promise<{ otp: string; expiresAt: Date; maskedMobile: string }> {
   const cleanAadhaar = aadhaarNumber.replace(/\D/g, "");
@@ -135,15 +135,16 @@ export async function sendDigilockerDemoOtp(
     throw new AppError("Aadhaar number must be exactly 12 digits for demo verification", 400);
   }
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) {
-    throw new AppError("Authenticated user not found", 404);
+  let phone = "9812345601";
+  if (userId) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (user?.phone) phone = user.phone;
   }
 
-  // Invalidate any previous unverified DigiLocker OTP for this user
+  // Invalidate any previous unverified DigiLocker OTP for this phone
   await prisma.otpVerification.updateMany({
     where: {
-      phone: user.phone,
+      phone,
       purpose: "DIGILOCKER_DEMO",
       verified: false,
     },
@@ -158,7 +159,7 @@ export async function sendDigilockerDemoOtp(
 
   await prisma.otpVerification.create({
     data: {
-      phone: user.phone,
+      phone,
       otp,
       purpose: "DIGILOCKER_DEMO",
       expiresAt,
@@ -166,8 +167,8 @@ export async function sendDigilockerDemoOtp(
     },
   });
 
-  const masked = user.phone.length >= 4 ? `XXXXXX${user.phone.slice(-4)}` : user.phone;
-  logger.info(`DigiLocker Demo OTP generated for user ${userId}, mobile: ${masked}`);
+  const masked = phone.length >= 4 ? `XXXXXX${phone.slice(-4)}` : phone;
+  logger.info(`DigiLocker Demo OTP generated for mobile: ${masked}`);
 
   return {
     otp,
@@ -177,7 +178,7 @@ export async function sendDigilockerDemoOtp(
 }
 
 export async function verifyDigilockerDemoOtp(
-  userId: string,
+  userId: string | undefined,
   aadhaarNumber: string,
   otp: string
 ): Promise<{
@@ -200,14 +201,17 @@ export async function verifyDigilockerDemoOtp(
     throw new AppError("OTP must be 6 digits", 400);
   }
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) {
-    throw new AppError("Authenticated user not found", 404);
+  let phone = "9812345601";
+  let userName: string | undefined;
+  if (userId) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (user?.phone) phone = user.phone;
+    if (user?.name) userName = user.name;
   }
 
   const record = await prisma.otpVerification.findFirst({
     where: {
-      phone: user.phone,
+      phone,
       purpose: "DIGILOCKER_DEMO",
       verified: false,
       expiresAt: { gte: new Date() },
@@ -233,13 +237,27 @@ export async function verifyDigilockerDemoOtp(
   const digilockerRef = `DL-DEMO-${Date.now()}-${last4}`;
   const now = new Date().toISOString();
 
-  // Consistent demo profile matching citizen
+  // Test personas mapping
+  let personName = userName || "Aadhaar Verified Citizen";
+  let personDob = "1994-08-15";
+  let personAddress = "Plot 12, Cooperative Housing Society, Ring Road, Sector 7, New Delhi - 110001";
+
+  if (cleanAadhaar.endsWith("7777")) {
+    personName = "Ramesh Kumar Sharma";
+    personDob = "1991-05-14";
+    personAddress = "H-42, Shramik Vihar, Phase 2, Rohini, New Delhi - 110085";
+  } else if (cleanAadhaar.endsWith("6666")) {
+    personName = "Sunita Devi Patel";
+    personDob = "1988-11-23";
+    personAddress = "Flat 304, Sahakar Enclave, Sector 14, Dwarka, New Delhi - 110078";
+  }
+
   return {
     verified: true,
-    name: user.name || "Aadhaar Verified Citizen",
-    dob: "1994-08-15",
-    gender: "M/F",
-    address: "Plot 12, Cooperative Housing Society, Ring Road, Sector 7, New Delhi - 110001",
+    name: personName,
+    dob: personDob,
+    gender: cleanAadhaar.endsWith("6666") ? "F" : "M",
+    address: personAddress,
     maskedAadhaar: `XXXX XXXX ${last4}`,
     digilockerRef,
     verificationSource: "DigiLocker Demo Sandbox (UIDAI e-KYC Mock)",
@@ -248,7 +266,7 @@ export async function verifyDigilockerDemoOtp(
 }
 
 export async function authorizeDigilockerDemo(
-  userId: string,
+  userId: string | undefined,
   payload: {
     aadhaarNumber: string;
     aadhaarName: string;
@@ -258,6 +276,18 @@ export async function authorizeDigilockerDemo(
     skillCertificate?: string;
   }
 ): Promise<{ success: boolean; message: string; role: string; profile: any }> {
+  if (!userId) {
+    return {
+      success: true,
+      message: "Verified details recorded for registration",
+      role: "GUEST",
+      profile: {
+        ...payload,
+        aadhaarVerified: true,
+      },
+    };
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { consumerProfile: true, workerProfile: true },
