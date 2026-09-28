@@ -136,7 +136,11 @@ export function WorkerRegistrationForm({ user }: WorkerRegistrationFormProps) {
       });
       if (res.success) {
         setAadhaarOtpSent(true);
-        toast({ title: "OTP sent to your Aadhaar-linked mobile", variant: "success" });
+        toast({
+          title: "Aadhaar OTP Generated",
+          description: res.data?.otp ? `Demo Code: ${res.data.otp}` : "OTP sent to your Aadhaar-linked mobile",
+          variant: "success",
+        });
       } else {
         toast({ title: res.error || "Failed to send OTP", variant: "danger" });
       }

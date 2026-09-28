@@ -30,20 +30,93 @@ export async function verifyDigilocker(aadhaarNumber: string): Promise<{
   };
 }
 
-// ---------- Aadhaar OTP verification (legacy fallback) ----------
-export async function verifyAadhaarOtp(aadhaarNumber: string, otp: string): Promise<{
+// ---------- Aadhaar OTP verification (Server OTP Engine) ----------
+export async function sendAadhaarOtp(
+  aadhaarNumber: string,
+  mobile?: string
+): Promise<{ otp: string; expiresAt: Date; maskedMobile: string }> {
+  const cleanAadhaar = aadhaarNumber.replace(/\D/g, "");
+  if (cleanAadhaar.length !== 12) {
+    throw new AppError("Invalid Aadhaar number format. Must be 12 digits.", 400);
+  }
+
+  const phone = mobile ? mobile.replace(/\D/g, "") : "9812345601";
+
+  // Invalidate any previous unverified Aadhaar OTPs for this phone
+  await prisma.otpVerification.updateMany({
+    where: {
+      phone,
+      purpose: "AADHAAR_OTP",
+      verified: false,
+    },
+    data: {
+      verified: true,
+      expiresAt: new Date(0),
+    },
+  });
+
+  const otp = crypto.randomInt(100000, 1000000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+  await prisma.otpVerification.create({
+    data: {
+      phone,
+      otp,
+      purpose: "AADHAAR_OTP",
+      expiresAt,
+      verified: false,
+    },
+  });
+
+  const masked = phone.length >= 4 ? `XXXXXX${phone.slice(-4)}` : phone;
+  return { otp, expiresAt, maskedMobile: masked };
+}
+
+export async function verifyAadhaarOtp(
+  aadhaarNumber: string,
+  otp: string,
+  mobile?: string
+): Promise<{
   verified: boolean;
   name: string;
   dob: string;
 }> {
-  if (!/^\d{12}$/.test(aadhaarNumber)) {
+  const cleanAadhaar = aadhaarNumber.replace(/\D/g, "");
+  if (cleanAadhaar.length !== 12) {
     throw new AppError("Invalid Aadhaar number format", 400);
   }
-  if (!/^\d{6}$/.test(otp)) {
+  const cleanOtp = otp.trim();
+  if (cleanOtp.length !== 6) {
     throw new AppError("OTP must be exactly 6 digits", 400);
   }
-  const result = await verifyAadhaar(aadhaarNumber);
-  logger.info(`Aadhaar OTP verification: ${aadhaarNumber.slice(0, 4)}**** OTP=${otp.slice(0, 2)}**** verified`);
+
+  const phone = mobile ? mobile.replace(/\D/g, "") : "9812345601";
+
+  const record = await prisma.otpVerification.findFirst({
+    where: {
+      phone,
+      purpose: "AADHAAR_OTP",
+      verified: false,
+      expiresAt: { gte: new Date() },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!record) {
+    throw new AppError("Invalid or expired Aadhaar OTP code", 400);
+  }
+
+  if (record.otp !== cleanOtp) {
+    throw new AppError("Incorrect Aadhaar OTP entered", 400);
+  }
+
+  await prisma.otpVerification.update({
+    where: { id: record.id },
+    data: { verified: true },
+  });
+
+  const result = await verifyAadhaar(cleanAadhaar);
+  logger.info(`Aadhaar OTP verified for ${cleanAadhaar.slice(0, 4)}****`);
   return {
     verified: true,
     name: result.name,
@@ -319,6 +392,7 @@ export async function getConsumerVerificationStatus(userId: string): Promise<any
 export default {
   verifyDigilocker,
   verifyAadhaarOtp,
+  sendAadhaarOtp,
   sendDigilockerDemoOtp,
   verifyDigilockerDemoOtp,
   authorizeDigilockerDemo,

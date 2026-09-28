@@ -19,16 +19,37 @@ router.post(
   })
 );
 
-// Dummy Aadhaar OTP verification — any 6-digit OTP passes.
-// Future: integrate UIDAI OTP send + verify APIs.
+// Aadhaar OTP send endpoint (server-generated 6-digit OTP with variable resend)
+router.post(
+  "/aadhaar-otp/send",
+  asyncHandler(async (req, res) => {
+    const { aadhaarNumber, mobile } = req.body;
+    if (!aadhaarNumber) {
+      res.status(400).json({ success: false, error: "Aadhaar number is required" });
+      return;
+    }
+    const result = await verificationService.sendAadhaarOtp(aadhaarNumber, mobile);
+    res.json({
+      success: true,
+      message: "Aadhaar OTP generated successfully",
+      data: result,
+    });
+  })
+);
+
+// Aadhaar OTP verification against active server record
 router.post(
   "/aadhaar-otp",
-  authenticate,
-  validate(verifyAadhaarOtpSchema),
   asyncHandler(async (req, res) => {
+    const { aadhaarNumber, otp, mobile } = req.body;
+    if (!aadhaarNumber || !otp) {
+      res.status(400).json({ success: false, error: "Aadhaar number and OTP are required" });
+      return;
+    }
     const result = await verificationService.verifyAadhaarOtp(
-      req.body.aadhaarNumber,
-      req.body.otp
+      aadhaarNumber,
+      otp,
+      mobile
     );
     res.json({ success: true, message: "Aadhaar OTP verified", data: result });
   })
