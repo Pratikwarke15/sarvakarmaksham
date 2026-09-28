@@ -16,7 +16,7 @@ router.post("/send-otp", validate(sendOtpSchema), asyncHandler(async (req, res) 
     message: "OTP sent successfully",
     data: {
       expiresAt: result.expiresAt,
-      ...(env.NODE_ENV !== "production" ? { otp: result.otp } : {}),
+      otp: result.otp,
     },
   });
 }));
@@ -46,12 +46,12 @@ router.post(["/login-step1", "/login-init"], asyncHandler(async (req, res) => {
   const result = await authService.validateCredentials(userIdentifier, password);
   res.json({
     success: true,
-    message: "Credentials valid. Demo OTP generated.",
+    message: "Credentials valid. Security verification code generated.",
     data: {
       requiresOtp: true,
       phone: result.phone,
       expiresAt: result.expiresAt,
-      ...(result.otp ? { otp: result.otp } : {}),
+      otp: result.otp,
     },
   });
 }));
@@ -68,7 +68,7 @@ router.post("/send-email-otp", asyncHandler(async (req, res) => {
     message: "Email OTP generated",
     data: {
       expiresAt: result.expiresAt,
-      ...(result.otp ? { otp: result.otp } : {}),
+      otp: result.otp,
     },
   });
 }));
@@ -84,6 +84,48 @@ router.post("/verify-email-otp", asyncHandler(async (req, res) => {
     success: true,
     message: "Email verified successfully",
     data: result,
+  });
+}));
+
+// Forgot Password Flow — Uses the same server OTP mechanism
+router.post("/forgot-password/send-otp", asyncHandler(async (req, res) => {
+  const { identifier } = req.body;
+  if (!identifier) {
+    res.status(400).json({ success: false, error: "Mobile number or email is required" });
+    return;
+  }
+  const result = await authService.initiateForgotPassword(identifier);
+  res.json({
+    success: true,
+    message: "Password reset verification code generated",
+    data: result,
+  });
+}));
+
+router.post("/forgot-password/verify-otp", asyncHandler(async (req, res) => {
+  const { identifier, otp } = req.body;
+  if (!identifier || !otp) {
+    res.status(400).json({ success: false, error: "Identifier and OTP are required" });
+    return;
+  }
+  const result = await authService.verifyForgotPasswordOTP(identifier, otp);
+  res.json({
+    success: true,
+    message: "OTP verified successfully. You may now set a new password.",
+    data: result,
+  });
+}));
+
+router.post("/forgot-password/reset", asyncHandler(async (req, res) => {
+  const { resetToken, newPassword } = req.body;
+  if (!resetToken || !newPassword) {
+    res.status(400).json({ success: false, error: "Reset token and new password are required" });
+    return;
+  }
+  await authService.resetPasswordWithToken(resetToken, newPassword);
+  res.json({
+    success: true,
+    message: "Password successfully updated. You can now log in.",
   });
 }));
 

@@ -44,6 +44,60 @@ router.post(
   })
 );
 
+// DigiLocker DEMO Flow Endpoints
+router.post(
+  "/digilocker/send-otp",
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const { aadhaarNumber } = req.body;
+    if (!aadhaarNumber) {
+      res.status(400).json({ success: false, error: "Aadhaar number is required" });
+      return;
+    }
+    const result = await verificationService.sendDigilockerDemoOtp(req.user!.id, aadhaarNumber);
+    res.json({
+      success: true,
+      message: "Demo Aadhaar verification OTP generated",
+      data: result,
+    });
+  })
+);
+
+router.post(
+  "/digilocker/verify-otp",
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const { aadhaarNumber, otp } = req.body;
+    if (!aadhaarNumber || !otp) {
+      res.status(400).json({ success: false, error: "Aadhaar number and OTP are required" });
+      return;
+    }
+    const result = await verificationService.verifyDigilockerDemoOtp(
+      req.user!.id,
+      aadhaarNumber,
+      otp
+    );
+    res.json({
+      success: true,
+      message: "Aadhaar demo verification successful",
+      data: result,
+    });
+  })
+);
+
+router.post(
+  "/digilocker/authorize",
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const result = await verificationService.authorizeDigilockerDemo(req.user!.id, req.body);
+    res.json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  })
+);
+
 // Consumer verification status check
 router.get(
   "/consumer/status",

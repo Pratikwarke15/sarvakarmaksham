@@ -161,11 +161,12 @@ export function EnhancedRegisterFlow() {
       }>("/auth/send-otp", { phone: cleanPhone });
 
       if (res.success && res.data) {
-        const otpCode = res.data.otp || "482910";
-        triggerPushBanner("SMS", otpCode);
+        if (res.data.otp) {
+          triggerPushBanner("SMS", res.data.otp);
+        }
         setCountdown(30);
         setStep("mobile_otp");
-        toast({ title: "Demo Mobile OTP Sent!", variant: "success" });
+        toast({ title: "Mobile Verification Code Sent!", variant: "success" });
       } else {
         setErrorMessage(res.error || "Failed to send mobile OTP");
       }
@@ -231,11 +232,12 @@ export function EnhancedRegisterFlow() {
       }>("/auth/send-email-otp", { email: cleanEmail });
 
       if (res.success && res.data) {
-        const otpCode = res.data.otp || "918234";
-        triggerPushBanner("EMAIL", otpCode);
+        if (res.data.otp) {
+          triggerPushBanner("EMAIL", res.data.otp);
+        }
         setCountdown(30);
         setStep("email_otp");
-        toast({ title: "Demo Email OTP Sent!", variant: "success" });
+        toast({ title: "Email Verification Code Sent!", variant: "success" });
       } else {
         setErrorMessage(res.error || "Failed to generate email verification code");
       }

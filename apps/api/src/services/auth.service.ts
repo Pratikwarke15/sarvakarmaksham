@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { Prisma, UserRole } from "@prisma/client";
@@ -17,17 +18,32 @@ function generateJwtToken(user: { id: string; phone: string; role: UserRole }): 
 }
 
 export async function generateOTP(
-  phone: string
+  phone: string,
+  purpose: string = "LOGIN"
 ): Promise<{ otp: string; expiresAt: Date }> {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  // Invalidate any previous unverified OTP for this phone and purpose immediately
+  await prisma.otpVerification.updateMany({
+    where: {
+      phone,
+      purpose,
+      verified: false,
+    },
+    data: {
+      verified: true,
+      expiresAt: new Date(0),
+    },
+  });
+
+  const otp = crypto.randomInt(100000, 1000000).toString();
   const expiresAt = new Date(Date.now() + env.OTP_EXPIRY_MINUTES * 60 * 1000);
 
   await prisma.otpVerification.create({
     data: {
       phone,
       otp,
-      purpose: "LOGIN",
+      purpose,
       expiresAt,
+      verified: false,
     },
   });
 
@@ -41,12 +57,16 @@ export async function generateOTP(
 
 export async function verifyOTP(
   phone: string,
-  otp: string
+  otp: string,
+  purpose: string = "LOGIN"
 ): Promise<{ verified: boolean; token?: string; user?: any }> {
+  const cleanOtp = otp.trim();
+
+  // Query only the latest active, unverified, and non-expired OTP record
   const record = await prisma.otpVerification.findFirst({
     where: {
       phone,
-      purpose: "LOGIN",
+      purpose,
       verified: false,
       expiresAt: { gte: new Date() },
     },
@@ -57,29 +77,32 @@ export async function verifyOTP(
     throw new AppError("Invalid or expired OTP", 400);
   }
 
-  if (record.otp !== otp) {
+  if (record.otp !== cleanOtp) {
     throw new AppError("Incorrect OTP", 400);
   }
 
+  // Consume OTP so it cannot be used again
   await prisma.otpVerification.update({
     where: { id: record.id },
     data: { verified: true },
   });
 
-  const existingUser = await prisma.user.findUnique({ where: { phone } });
+  if (purpose === "LOGIN") {
+    const existingUser = await prisma.user.findUnique({ where: { phone } });
 
-  if (existingUser) {
-    const token = generateJwtToken(existingUser);
-    return {
-      verified: true,
-      token,
-      user: {
-        id: existingUser.id,
-        phone: existingUser.phone,
-        name: existingUser.name,
-        role: existingUser.role,
-      },
-    };
+    if (existingUser) {
+      const token = generateJwtToken(existingUser);
+      return {
+        verified: true,
+        token,
+        user: {
+          id: existingUser.id,
+          phone: existingUser.phone,
+          name: existingUser.name,
+          role: existingUser.role,
+        },
+      };
+    }
   }
 
   return { verified: true };
@@ -294,46 +317,63 @@ export async function validateCredentials(
   // Generate 6-digit OTP for user's registered phone
   const otpResult = await generateOTP(user.phone);
 
-  const isDev = env.NODE_ENV !== "production";
   return {
     phone: user.phone,
     expiresAt: otpResult.expiresAt,
-    ...(isDev ? { otp: otpResult.otp } : {}),
+    otp: otpResult.otp,
   };
 }
 
 export async function generateEmailOTP(
-  email: string
-): Promise<{ otp?: string; expiresAt: Date }> {
+  email: string,
+  purpose: string = "EMAIL_VERIFY"
+): Promise<{ otp: string; expiresAt: Date }> {
   const cleanEmail = email.trim().toLowerCase();
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  // Invalidate any previous unverified OTP for this email and purpose
+  await prisma.otpVerification.updateMany({
+    where: {
+      email: cleanEmail,
+      purpose,
+      verified: false,
+    },
+    data: {
+      verified: true,
+      expiresAt: new Date(0),
+    },
+  });
+
+  const otp = crypto.randomInt(100000, 1000000).toString();
   const expiresAt = new Date(Date.now() + env.OTP_EXPIRY_MINUTES * 60 * 1000);
 
   await prisma.otpVerification.create({
     data: {
       email: cleanEmail,
       otp,
-      purpose: "EMAIL_VERIFY",
+      purpose,
       expiresAt,
+      verified: false,
     },
   });
 
-  const isDev = env.NODE_ENV !== "production";
   return {
+    otp,
     expiresAt,
-    ...(isDev ? { otp } : {}),
   };
 }
 
 export async function verifyEmailOTP(
   email: string,
-  otp: string
+  otp: string,
+  purpose: string = "EMAIL_VERIFY"
 ): Promise<{ verified: boolean }> {
   const cleanEmail = email.trim().toLowerCase();
+  const cleanOtp = otp.trim();
+
   const record = await prisma.otpVerification.findFirst({
     where: {
       email: cleanEmail,
-      purpose: "EMAIL_VERIFY",
+      purpose,
       verified: false,
       expiresAt: { gte: new Date() },
     },
@@ -344,7 +384,7 @@ export async function verifyEmailOTP(
     throw new AppError("Invalid or expired email OTP", 400);
   }
 
-  if (record.otp !== otp) {
+  if (record.otp !== cleanOtp) {
     throw new AppError("Incorrect email OTP", 400);
   }
 
@@ -354,6 +394,105 @@ export async function verifyEmailOTP(
   });
 
   return { verified: true };
+}
+
+export async function initiateForgotPassword(identifier: string): Promise<{
+  expiresAt: Date;
+  otp: string;
+  channel: "SMS" | "EMAIL";
+  maskedDestination: string;
+}> {
+  const clean = identifier.trim();
+  const isEmail = clean.includes("@");
+
+  let targetPhone = "";
+  let targetEmail = "";
+
+  if (isEmail) {
+    targetEmail = clean.toLowerCase();
+    const res = await generateEmailOTP(targetEmail, "FORGOT_PASSWORD");
+    const masked = targetEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3");
+    return {
+      expiresAt: res.expiresAt,
+      otp: res.otp,
+      channel: "EMAIL",
+      maskedDestination: masked,
+    };
+  } else {
+    targetPhone = clean.replace(/\D/g, "");
+    if (!targetPhone || targetPhone.length < 10) {
+      throw new AppError("Please provide a valid 10-digit mobile number or email address", 400);
+    }
+    const res = await generateOTP(targetPhone, "FORGOT_PASSWORD");
+    const masked = targetPhone.length >= 4 ? `XXXXXX${targetPhone.slice(-4)}` : targetPhone;
+    return {
+      expiresAt: res.expiresAt,
+      otp: res.otp,
+      channel: "SMS",
+      maskedDestination: masked,
+    };
+  }
+}
+
+export async function verifyForgotPasswordOTP(
+  identifier: string,
+  otp: string
+): Promise<{ resetToken: string }> {
+  const clean = identifier.trim();
+  const isEmail = clean.includes("@");
+
+  let targetPhone = "";
+  let targetEmail = "";
+  let user: any = null;
+
+  if (isEmail) {
+    targetEmail = clean.toLowerCase();
+    await verifyEmailOTP(targetEmail, otp, "FORGOT_PASSWORD");
+    user = await prisma.user.findUnique({ where: { email: targetEmail } });
+  } else {
+    targetPhone = clean.replace(/\D/g, "");
+    await verifyOTP(targetPhone, otp, "FORGOT_PASSWORD");
+    user = await prisma.user.findUnique({ where: { phone: targetPhone } });
+  }
+
+  if (!user) {
+    throw new AppError("No account associated with this contact information", 404);
+  }
+
+  // Issue 15-minute secure JWT reset token
+  const resetToken = jwt.sign(
+    { userId: user.id, purpose: "PASSWORD_RESET" },
+    env.JWT_SECRET,
+    { expiresIn: "15m" }
+  );
+
+  return { resetToken };
+}
+
+export async function resetPasswordWithToken(
+  resetToken: string,
+  newPassword: string
+): Promise<void> {
+  if (!newPassword || newPassword.length < 6) {
+    throw new AppError("Password must be at least 6 characters long", 400);
+  }
+
+  let payload: any;
+  try {
+    payload = jwt.verify(resetToken, env.JWT_SECRET);
+  } catch {
+    throw new AppError("Password reset session has expired. Please request a new OTP.", 400);
+  }
+
+  if (payload.purpose !== "PASSWORD_RESET" || !payload.userId) {
+    throw new AppError("Invalid password reset token", 400);
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await prisma.user.update({
+    where: { id: payload.userId },
+    data: { passwordHash },
+  });
 }
 
 export async function checkAvailability(data: {
@@ -390,5 +529,9 @@ export default {
   validateCredentials,
   generateEmailOTP,
   verifyEmailOTP,
+  initiateForgotPassword,
+  verifyForgotPasswordOTP,
+  resetPasswordWithToken,
   checkAvailability,
 };
+
