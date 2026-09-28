@@ -14,6 +14,9 @@ function DigiLockerStandaloneContent() {
 
   const roleParam = searchParams.get("role");
   const redirectParam = searchParams.get("redirect");
+  const nameParam = searchParams.get("name") || undefined;
+  const dobParam = searchParams.get("dob") || undefined;
+  const addressParam = searchParams.get("address") || undefined;
 
   const userRole: "CONSUMER" | "WORKER" =
     roleParam?.toUpperCase() === "WORKER" ? "WORKER" : "CONSUMER";
@@ -85,6 +88,11 @@ function DigiLockerStandaloneContent() {
         <div className="w-full max-w-lg">
           <DigiLockerDemoFlow
             userRole={userRole}
+            initialData={{
+              name: nameParam,
+              dob: dobParam,
+              address: addressParam,
+            }}
             isStandalone={true}
             onSuccess={handleSuccess}
             onCancel={handleCancel}

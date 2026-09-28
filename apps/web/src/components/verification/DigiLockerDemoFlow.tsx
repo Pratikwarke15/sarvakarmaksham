@@ -20,8 +20,18 @@ import { OtpInput } from "@/components/auth/OtpInput";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useAuthStore } from "@/store/authStore";
 
+export interface DigiLockerInitialData {
+  name?: string;
+  dob?: string;
+  address?: string;
+  aadhaarNumber?: string;
+  skillCertificate?: string;
+  skills?: string[];
+}
+
 interface DigiLockerDemoFlowProps {
   userRole?: "CONSUMER" | "WORKER";
+  initialData?: DigiLockerInitialData;
   onSuccess?: (updatedProfile: any) => void;
   onCancel?: () => void;
   isStandalone?: boolean;
@@ -42,6 +52,7 @@ interface MockCitizenData {
 
 export function DigiLockerDemoFlow({
   userRole = "CONSUMER",
+  initialData,
   onSuccess,
   onCancel,
   isStandalone = false,
@@ -50,7 +61,9 @@ export function DigiLockerDemoFlow({
   const { user, validateToken } = useAuthStore();
 
   const [step, setStep] = useState<DigiStep>("SIGN_IN");
-  const [aadhaarInput, setAadhaarInput] = useState("");
+  const [aadhaarInput, setAadhaarInput] = useState(
+    initialData?.aadhaarNumber ? initialData.aadhaarNumber.replace(/\D/g, "").slice(0, 12) : ""
+  );
   const [serverOtp, setServerOtp] = useState<string | null>(null);
   const [showOtpBanner, setShowOtpBanner] = useState(false);
   const [countdown, setCountdown] = useState(30);
@@ -61,8 +74,10 @@ export function DigiLockerDemoFlow({
   const [verifiedData, setVerifiedData] = useState<MockCitizenData | null>(null);
 
   // Worker Optional Skill Certificate
-  const [skillCertificate, setSkillCertificate] = useState("");
-  const [skillCertFileName, setSkillCertFileName] = useState("");
+  const [skillCertificate, setSkillCertificate] = useState(initialData?.skillCertificate || "");
+  const [skillCertFileName, setSkillCertFileName] = useState(
+    initialData?.skillCertificate ? "Skill_Certificate.pdf" : ""
+  );
 
   // Loading & error
   const [loading, setLoading] = useState(false);
@@ -235,6 +250,11 @@ export function DigiLockerDemoFlow({
 
     try {
       const { apiPost } = await import("@/lib/api");
+      const finalName = initialData?.name || verifiedData.name;
+      const finalDob = initialData?.dob || verifiedData.dob;
+      const finalAddress = initialData?.address || verifiedData.address;
+      const finalSkillCert = skillCertificate || initialData?.skillCertificate;
+
       const res = await apiPost<{
         success: boolean;
         message: string;
@@ -242,11 +262,11 @@ export function DigiLockerDemoFlow({
         error?: string;
       }>("/verification/digilocker/authorize", {
         aadhaarNumber: aadhaarInput,
-        aadhaarName: verifiedData.name,
-        aadhaarDob: verifiedData.dob,
-        address: verifiedData.address,
+        aadhaarName: finalName,
+        aadhaarDob: finalDob,
+        address: finalAddress,
         digilockerRef: verifiedData.digilockerRef,
-        skillCertificate: skillCertificate || undefined,
+        skillCertificate: finalSkillCert || undefined,
       });
 
       if (res.success) {
@@ -258,7 +278,15 @@ export function DigiLockerDemoFlow({
           variant: "success",
         });
         if (onSuccess) {
-          onSuccess(res.data?.profile);
+          onSuccess({
+            ...res.data?.profile,
+            digilockerRef: verifiedData.digilockerRef,
+            aadhaarNumber: aadhaarInput,
+            name: finalName,
+            dob: finalDob,
+            address: finalAddress,
+            skillCertificate: finalSkillCert,
+          });
         }
       } else {
         setErrorMessage(res.error || "Failed to authorize profile credentials");
@@ -591,44 +619,68 @@ export function DigiLockerDemoFlow({
           </div>
 
           <div className="text-xs text-slate-600">
-            Sarvakarmakshamah is requesting your authorization to fetch the following verified
-            documents from your DigiLocker account:
+            Sarvakarmakshamah is requesting your authorization to cross-verify the following member profile
+            details with your official DigiLocker Aadhaar account:
           </div>
 
-          {/* Citizen Identity Verification Card */}
-          <div className="rounded-xl border border-slate-300 bg-slate-50 p-4 space-y-3 text-xs">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
-              <div className="flex items-center gap-2">
-                <div className="h-6 w-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center">
-                  <User className="h-3.5 w-3.5" />
-                </div>
-                <span className="font-bold text-slate-900">{verifiedData.name}</span>
-              </div>
-              <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 flex items-center gap-1">
-                <Check className="h-3 w-3" />
-                <span>UIDAI Verified</span>
+          {/* User-Provided Profile Context Being Authorized */}
+          <div className="rounded-xl border border-sky-200 bg-sky-50/70 p-3.5 space-y-2 text-xs">
+            <div className="flex items-center justify-between border-b border-sky-100 pb-2">
+              <span className="font-bold text-sky-950 flex items-center gap-1.5">
+                <Info className="h-4 w-4 text-[#006699]" />
+                <span>Profile Information Being Authorized</span>
+              </span>
+              <span className="text-[10px] text-sky-800 font-bold bg-sky-200/60 px-2 py-0.5 rounded-md">
+                Submitted Profile
               </span>
             </div>
-
             <div className="grid grid-cols-2 gap-2 text-[11px]">
               <div>
-                <span className="text-slate-500">Date of Birth / Age</span>
-                <p className="font-semibold text-slate-900">{verifiedData.dob} (~31 yrs)</p>
+                <span className="text-slate-500">Legal Name:</span>
+                <p className="font-bold text-slate-900">{initialData?.name || verifiedData.name}</p>
               </div>
               <div>
-                <span className="text-slate-500">Gender</span>
-                <p className="font-semibold text-slate-900">Female / Male</p>
+                <span className="text-slate-500">Date of Birth / Age:</span>
+                <p className="font-bold text-slate-900">{initialData?.dob || verifiedData.dob}</p>
               </div>
             </div>
-
-            <div className="text-[11px] pt-1">
-              <span className="text-slate-500">Registered Residential Address</span>
-              <p className="font-semibold text-slate-900 leading-snug">{verifiedData.address}</p>
+            <div className="text-[11px]">
+              <span className="text-slate-500">Address / Location:</span>
+              <p className="font-bold text-slate-900 leading-snug">{initialData?.address || verifiedData.address}</p>
             </div>
+            {userRole === "WORKER" && initialData?.skills && initialData.skills.length > 0 && (
+              <div className="text-[11px] pt-1 border-t border-sky-100">
+                <span className="text-slate-500">Selected Skills:</span>
+                <p className="font-medium text-slate-800">{initialData.skills.join(", ")}</p>
+              </div>
+            )}
+          </div>
 
-            <div className="text-[11px] pt-1 flex items-center justify-between text-slate-500 font-mono">
-              <span>Masked UID: {verifiedData.maskedAadhaar}</span>
-              <span className="text-[10px]">Ref: {verifiedData.digilockerRef}</span>
+          {/* Official UIDAI Aadhaar Verification Record */}
+          <div className="rounded-xl border border-slate-300 bg-white p-3.5 space-y-2.5 text-xs shadow-xs">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+              <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-emerald-600" />
+                <span>UIDAI Aadhaar Verified Record</span>
+              </span>
+              <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 flex items-center gap-1">
+                <Check className="h-3 w-3" />
+                <span>Authenticated</span>
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div>
+                <span className="text-slate-500">Aadhaar Name:</span>
+                <p className="font-semibold text-slate-900">{verifiedData.name}</p>
+              </div>
+              <div>
+                <span className="text-slate-500">Masked Aadhaar:</span>
+                <p className="font-mono font-bold text-slate-900">{verifiedData.maskedAadhaar}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 font-mono">
+              <span>Source: UIDAI e-KYC Gateway</span>
+              <span>Ref: {verifiedData.digilockerRef}</span>
             </div>
           </div>
 

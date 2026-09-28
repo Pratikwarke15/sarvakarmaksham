@@ -16,11 +16,17 @@ import {
   Check,
   MapPin,
   Sparkles,
+  Loader2,
+  Calendar,
+  Navigation,
+  Award,
+  ChevronRight,
 } from "lucide-react";
 import { PhoneInput } from "./PhoneInput";
 import { OtpInput } from "./OtpInput";
 import { DigiLockerDemoFlow } from "@/components/verification/DigiLockerDemoFlow";
 import { LegalModal } from "@/components/legal/LegalModal";
+import { detectLiveLocation } from "@/lib/location";
 import { useAuthStore } from "@/store/authStore";
 import { useToast } from "@/components/providers/ToastProvider";
 import { getRoleDashboardPath } from "@/lib/utils";
@@ -71,6 +77,10 @@ export function EnhancedRegisterFlow() {
   const [digilockerRef, setDigilockerRef] = useState<string | null>(null);
   const [digilockerModalOpen, setDigilockerModalOpen] = useState(false);
   const [digilockerVerifying, setDigilockerVerifying] = useState(false);
+
+  // Profile Details (DOB, Location, Skills)
+  const [dob, setDob] = useState("1994-08-15");
+  const [skillCertificate, setSkillCertificate] = useState("");
 
   // Legal Modal
   const [legalModalOpen, setLegalModalOpen] = useState(false);
@@ -311,8 +321,10 @@ export function EnhancedRegisterFlow() {
     setIsAadhaarVerified(true);
     setDigilockerRef(data.digilockerRef);
     if (data.name) setName(data.name);
+    if (data.dob) setDob(data.dob);
     if (data.address) setStreetAddress(data.address);
     if (data.aadhaarNumber) setAadhaarInput(data.aadhaarNumber);
+    if (data.skillCertificate) setSkillCertificate(data.skillCertificate);
     setDigilockerModalOpen(false);
     toast({
       title: "DigiLocker Authorization Successful!",
@@ -325,31 +337,31 @@ export function EnhancedRegisterFlow() {
     setDigilockerModalOpen(true);
   };
 
-  const detectLocation = () => {
+  const detectLocation = async () => {
     setDetectingLocation(true);
-    if (!navigator.geolocation) {
-      setDetectingLocation(false);
+    setErrorMessage(null);
+    try {
+      const loc = await detectLiveLocation();
+      setLatitude(loc.latitude);
+      setLongitude(loc.longitude);
+      setStreetAddress(loc.streetAddress);
+      setCity(loc.city);
+      setPincode(loc.pincode);
+      toast({
+        title: "Live GPS Location Detected!",
+        description: loc.displayName,
+        variant: "success",
+      });
+    } catch {
       setStreetAddress("Connaught Place, Central Delhi");
-      toast({ title: "Applied standard coordinates", variant: "default" });
-      return;
+      toast({
+        title: "Standard coordinates applied",
+        description: "You may manually edit your street address.",
+        variant: "default",
+      });
+    } finally {
+      setDetectingLocation(false);
     }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setDetectingLocation(false);
-        const lat = Number(pos.coords.latitude.toFixed(6));
-        const lng = Number(pos.coords.longitude.toFixed(6));
-        setLatitude(lat);
-        setLongitude(lng);
-        setStreetAddress((prev) => prev || "Flat 204, Shramik Residential Enclave");
-        toast({ title: "Accurate GPS Location Detected!", variant: "success" });
-      },
-      () => {
-        setDetectingLocation(false);
-        setStreetAddress((prev) => prev || "Connaught Place, Central Delhi");
-      },
-      { timeout: 8000 }
-    );
   };
 
   const handleFinalSubmit = async (e: React.FormEvent) => {
@@ -583,17 +595,17 @@ export function EnhancedRegisterFlow() {
 
           <div className="mb-6">
             <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
-              Your name
+              Your name & details
             </h1>
             <p className="text-xs text-slate-500 mt-2 font-medium">
-              Please enter your full legal name as per official documents.
+              Please enter your full legal name and date of birth as per official records.
             </p>
           </div>
 
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Full Name
+                Full Legal Name
               </label>
               <input
                 type="text"
@@ -606,6 +618,21 @@ export function EnhancedRegisterFlow() {
                 className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200/90 py-3.5 px-4 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 outline-none transition"
                 autoFocus
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Date of Birth
+              </label>
+              <input
+                type="date"
+                value={dob}
+                onChange={(e) => setDob(e.target.value)}
+                className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200/90 py-3.5 px-4 text-sm font-medium text-slate-900 focus:bg-white focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 outline-none transition"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Required for matching your official DigiLocker UIDAI verification.
+              </p>
             </div>
 
             <button
@@ -862,123 +889,248 @@ export function EnhancedRegisterFlow() {
 
           <div className="mb-6">
             <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
-              Identity verification
+              Identity & location
             </h1>
             <p className="text-xs text-slate-500 mt-2 font-medium">
-              DigiLocker sandbox verification. Zero raw Aadhaar numbers stored.
+              Verify your live location and connect with DigiLocker to authorize your credentials.
             </p>
           </div>
 
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-200/90 bg-[#F8F9FA] p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold text-slate-900">
-                  DigiLocker Aadhaar e-KYC
+          <div className="space-y-5">
+            {/* 1. Member Profile & Location Context Box */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3.5 shadow-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                  <User className="h-4 w-4 text-[#800020]" />
+                  <span>Submitted Member Profile</span>
                 </span>
-                {isAadhaarVerified ? (
-                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                    Verified
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
-                    Demo Sandbox
-                  </span>
-                )}
+                <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md">
+                  {role} Account
+                </span>
               </div>
 
-              {!isAadhaarVerified ? (
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    value={aadhaarInput}
-                    onChange={(e) => handleAadhaarChange(e.target.value)}
-                    placeholder="XXXX XXXX XXXX (e.g. 5432 9876 1234)"
-                    className="w-full font-mono rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-[#800020] outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const clean = aadhaarInput.replace(/\s/g, "");
-                      if (clean.length !== 12) {
-                        setErrorMessage("Please enter a 12-digit Aadhaar number");
-                        return;
-                      }
-                      setDigilockerModalOpen(true);
-                    }}
-                    className="w-full rounded-xl bg-slate-900 text-white py-2.5 text-xs font-bold hover:bg-black transition"
-                  >
-                    Authorize with DigiLocker
-                  </button>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-slate-400 block text-[11px]">Full Name</span>
+                  <span className="font-bold text-slate-900">{name || "Not specified"}</span>
                 </div>
-              ) : (
-                <p className="text-xs text-emerald-800 font-medium">
-                  Verified reference: <span className="font-mono">{digilockerRef}</span>
-                </p>
-              )}
-            </div>
-
-            {/* Role Specific */}
-            {role === "WORKER" ? (
-              <div className="space-y-2">
-                <label className="block text-xs font-semibold text-slate-700">
-                  Select Your Skills
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {SKILL_OPTIONS.map((skill) => {
-                    const isSelected = selectedSkills.includes(skill);
-                    return (
-                      <button
-                        key={skill}
-                        type="button"
-                        onClick={() => {
-                          setSelectedSkills((prev) =>
-                            isSelected ? prev.filter((s) => s !== skill) : [...prev, skill]
-                          );
-                        }}
-                        className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition border ${
-                          isSelected
-                            ? "bg-[#800020] text-white border-[#800020]"
-                            : "bg-[#F8F9FA] text-slate-700 border-slate-200"
-                        }`}
-                      >
-                        {skill}
-                      </button>
-                    );
-                  })}
+                <div>
+                  <span className="text-slate-400 block text-[11px]">Date of Birth</span>
+                  <span className="font-bold text-slate-900">{dob}</span>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-2">
+
+              {/* Service / Work Location Input with Working Live GPS Detection */}
+              <div className="pt-2 border-t border-slate-100 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-semibold text-slate-700">
-                    Service Address
+                    {role === "WORKER" ? "Service Operating Address" : "Service Address"}
                   </label>
                   <button
                     type="button"
                     onClick={detectLocation}
                     disabled={detectingLocation}
-                    className="text-[11px] font-bold text-[#800020] hover:underline"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#800020] hover:text-[#68001a] transition hover:underline disabled:opacity-50 cursor-pointer"
                   >
-                    {detectingLocation ? "Detecting..." : "Detect GPS"}
+                    {detectingLocation ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Detecting GPS...</span>
+                      </>
+                    ) : (
+                      <>
+                        <MapPin className="h-3.5 w-3.5" />
+                        <span>📍 Detect Live Location</span>
+                      </>
+                    )}
                   </button>
                 </div>
                 <input
                   type="text"
                   value={streetAddress}
                   onChange={(e) => setStreetAddress(e.target.value)}
-                  placeholder="Street / Colony / Flat"
-                  className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200/90 py-2.5 px-3.5 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
+                  placeholder="Street / Colony / Flat or click Detect Live Location"
+                  className="w-full rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2.5 px-3.5 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
                 />
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="City"
+                    className="rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2 px-3 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
+                  />
+                  <input
+                    type="text"
+                    value={pincode}
+                    onChange={(e) => setPincode(e.target.value)}
+                    placeholder="PIN Code"
+                    className="rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2 px-3 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
+                  />
+                </div>
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={loading || !isAadhaarVerified}
-              className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all mt-4 disabled:opacity-50"
-            >
-              {loading ? "Creating Account..." : "Connect"}
-            </button>
+              {/* Worker Skills & Optional Certificate */}
+              {role === "WORKER" && (
+                <div className="pt-2 border-t border-slate-100 space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Select Your Skills
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {SKILL_OPTIONS.map((skill) => {
+                        const isSelected = selectedSkills.includes(skill);
+                        return (
+                          <button
+                            key={skill}
+                            type="button"
+                            onClick={() => {
+                              setSelectedSkills((prev) =>
+                                isSelected ? prev.filter((s) => s !== skill) : [...prev, skill]
+                              );
+                            }}
+                            className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition border ${
+                              isSelected
+                                ? "bg-[#800020] text-white border-[#800020]"
+                                : "bg-[#F8F9FA] text-slate-700 border-slate-200"
+                            }`}
+                          >
+                            {skill}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Vocational / Skill Certificate (Optional)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSkillCertificate("Government ITI Certified Wireman - Grade I (Ref: DL-ITI-2025)")
+                        }
+                        className="text-[10px] font-bold text-[#800020] hover:underline"
+                      >
+                        + Attach Demo ITI Certificate
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={skillCertificate}
+                      onChange={(e) => setSkillCertificate(e.target.value)}
+                      placeholder="e.g. ITI Electrician Certificate (Optional)"
+                      className="w-full rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2 px-3 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Connect with DigiLocker Gateway Box (NO Aadhaar Number Asked Twice!) */}
+            <div className="rounded-2xl border border-[#002F6C]/25 bg-gradient-to-br from-[#002F6C]/5 via-white to-white p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-9 w-9 rounded-xl bg-[#002F6C] text-white flex items-center justify-center font-black text-xs shadow-xs">
+                    DL
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 font-heading">
+                      DigiLocker Identity Verification
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      Ministry of Electronics & IT (MeitY) • National e-KYC
+                    </p>
+                  </div>
+                </div>
+                {isAadhaarVerified ? (
+                  <span className="rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold px-3 py-1 flex items-center gap-1">
+                    <Check className="h-3.5 w-3.5" />
+                    <span>Connected</span>
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold px-2.5 py-0.5">
+                    Required Step
+                  </span>
+                )}
+              </div>
+
+              {!isAadhaarVerified ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Connect with DigiLocker to authenticate your identity. Your legal name, date of birth, and service location
+                    above will be authorized and cross-matched with your official Aadhaar credentials.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!streetAddress || streetAddress.trim().length < 3) {
+                        setErrorMessage("Please enter or detect your address before connecting with DigiLocker.");
+                        return;
+                      }
+                      setErrorMessage(null);
+                      setDigilockerModalOpen(true);
+                    }}
+                    className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-[#002F6C] hover:bg-[#00224d] text-white py-3.5 text-sm font-bold shadow-md shadow-[#002F6C]/20 transition"
+                  >
+                    <span>Connect with DigiLocker</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 space-y-1.5 text-xs text-emerald-900">
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="flex items-center gap-1.5">
+                        <Check className="h-4 w-4 text-emerald-600" />
+                        <span>Aadhaar Identity Successfully Verified</span>
+                      </span>
+                      <span className="font-mono text-[11px] text-emerald-700">{digilockerRef}</span>
+                    </div>
+                    <p className="text-[11px] text-emerald-800">
+                      Masked UID: <span className="font-mono font-bold">{aadhaarInput ? `XXXX-XXXX-${aadhaarInput.replace(/\D/g, "").slice(-4)}` : "XXXX-XXXX-7777"}</span> • UIDAI Audit Match Confirmed
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDigilockerModalOpen(true)}
+                    className="text-[11px] font-bold text-[#002F6C] hover:underline inline-flex items-center gap-1"
+                  >
+                    <span>Re-verify or change persona</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 3. Final Submission Button (Only enabled once connected with DigiLocker) */}
+            <div>
+              <button
+                type="submit"
+                disabled={loading || !isAadhaarVerified}
+                className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-4 text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Creating Account...</span>
+                  </div>
+                ) : isAadhaarVerified ? (
+                  <>
+                    <span>Complete Registration & Join</span>
+                    <Check className="h-5 w-5" />
+                  </>
+                ) : (
+                  <span>Connect with DigiLocker to Continue</span>
+                )}
+              </button>
+              {!isAadhaarVerified && (
+                <p className="text-center text-[11px] text-slate-400 mt-2 font-medium">
+                  Please click &quot;Connect with DigiLocker&quot; above to authorize your credentials.
+                </p>
+              )}
+            </div>
           </div>
         </form>
       )}
@@ -1004,6 +1156,13 @@ export function EnhancedRegisterFlow() {
           <div className="w-full max-w-lg my-8 animate-in fade-in zoom-in-95 duration-200">
             <DigiLockerDemoFlow
               userRole={role}
+              initialData={{
+                name,
+                dob,
+                address: `${streetAddress}${city ? `, ${city}` : ""}${pincode ? ` - ${pincode}` : ""}`,
+                skills: selectedSkills,
+                skillCertificate,
+              }}
               onSuccess={handleDigiLockerSuccess}
               onCancel={() => setDigilockerModalOpen(false)}
             />
