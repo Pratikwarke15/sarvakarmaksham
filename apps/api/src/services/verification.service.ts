@@ -135,16 +135,13 @@ export async function sendDigilockerDemoOtp(
     throw new AppError("Aadhaar number must be exactly 12 digits for demo verification", 400);
   }
 
-  let phone = "9812345601";
-  if (userId) {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (user?.phone) phone = user.phone;
-  }
+  // Key by cleanAadhaar so each Aadhaar number has its own isolated, variable, resendable OTP
+  const phoneKey = cleanAadhaar;
 
-  // Invalidate any previous unverified DigiLocker OTP for this phone
+  // Invalidate any previous unverified DigiLocker OTP for this Aadhaar immediately
   await prisma.otpVerification.updateMany({
     where: {
-      phone,
+      phone: phoneKey,
       purpose: "DIGILOCKER_DEMO",
       verified: false,
     },
@@ -159,7 +156,7 @@ export async function sendDigilockerDemoOtp(
 
   await prisma.otpVerification.create({
     data: {
-      phone,
+      phone: phoneKey,
       otp,
       purpose: "DIGILOCKER_DEMO",
       expiresAt,
@@ -167,8 +164,13 @@ export async function sendDigilockerDemoOtp(
     },
   });
 
-  const masked = phone.length >= 4 ? `XXXXXX${phone.slice(-4)}` : phone;
-  logger.info(`DigiLocker Demo OTP generated for mobile: ${masked}`);
+  let displayMobile = "9812345601";
+  if (userId) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (user?.phone) displayMobile = user.phone;
+  }
+  const masked = `XXXXXX${displayMobile.slice(-4)}`;
+  logger.info(`DigiLocker Demo OTP generated for Aadhaar ${cleanAadhaar.slice(0, 4)}****`);
 
   return {
     otp,
@@ -202,23 +204,35 @@ export async function verifyDigilockerDemoOtp(
     throw new AppError("OTP must be 6 digits", 400);
   }
 
-  let phone = "9812345601";
   let userName: string | undefined;
   if (userId) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (user?.phone) phone = user.phone;
     if (user?.name) userName = user.name;
   }
 
-  const record = await prisma.otpVerification.findFirst({
+  // 1. Primary check by cleanAadhaar
+  let record = await prisma.otpVerification.findFirst({
     where: {
-      phone,
+      phone: cleanAadhaar,
       purpose: "DIGILOCKER_DEMO",
       verified: false,
       expiresAt: { gte: new Date() },
     },
     orderBy: { createdAt: "desc" },
   });
+
+  // 2. Fallback check by legacy static phone or user.phone for backward compatibility
+  if (!record) {
+    record = await prisma.otpVerification.findFirst({
+      where: {
+        phone: { in: ["9812345601", "9876543201"] },
+        purpose: "DIGILOCKER_DEMO",
+        verified: false,
+        expiresAt: { gte: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
 
   if (!record) {
     throw new AppError("Invalid or expired Aadhaar OTP. Please request a new code.", 400);

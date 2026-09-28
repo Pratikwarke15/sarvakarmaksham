@@ -21,10 +21,15 @@ export async function generateOTP(
   phone: string,
   purpose: string = "LOGIN"
 ): Promise<{ otp: string; expiresAt: Date }> {
+  const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+  if (!cleanPhone || cleanPhone.length !== 10) {
+    throw new AppError("Phone number must be a valid 10-digit number", 400);
+  }
+
   // Invalidate any previous unverified OTP for this phone and purpose immediately
   await prisma.otpVerification.updateMany({
     where: {
-      phone,
+      phone: cleanPhone,
       purpose,
       verified: false,
     },
@@ -39,7 +44,7 @@ export async function generateOTP(
 
   await prisma.otpVerification.create({
     data: {
-      phone,
+      phone: cleanPhone,
       otp,
       purpose,
       expiresAt,
@@ -47,9 +52,9 @@ export async function generateOTP(
     },
   });
 
-  const sent = await sendOTPSms(phone, otp);
+  const sent = await sendOTPSms(cleanPhone, otp);
   if (!sent) {
-    logger.warn(`Failed to send OTP to ${phone}, but record created`);
+    logger.warn(`Failed to send OTP to ${cleanPhone}, but record created`);
   }
 
   return { otp, expiresAt };
@@ -60,12 +65,13 @@ export async function verifyOTP(
   otp: string,
   purpose: string = "LOGIN"
 ): Promise<{ verified: boolean; token?: string; user?: any }> {
+  const cleanPhone = phone.replace(/\D/g, "").slice(-10);
   const cleanOtp = otp.trim();
 
   // Query only the latest active, unverified, and non-expired OTP record
   const record = await prisma.otpVerification.findFirst({
     where: {
-      phone,
+      phone: cleanPhone,
       purpose,
       verified: false,
       expiresAt: { gte: new Date() },
@@ -88,7 +94,7 @@ export async function verifyOTP(
   });
 
   if (purpose === "LOGIN") {
-    const existingUser = await prisma.user.findUnique({ where: { phone } });
+    const existingUser = await prisma.user.findUnique({ where: { phone: cleanPhone } });
 
     if (existingUser) {
       const token = generateJwtToken(existingUser);
@@ -450,7 +456,7 @@ export async function verifyForgotPasswordOTP(
     await verifyEmailOTP(targetEmail, otp, "FORGOT_PASSWORD");
     user = await prisma.user.findUnique({ where: { email: targetEmail } });
   } else {
-    targetPhone = clean.replace(/\D/g, "");
+    targetPhone = clean.replace(/\D/g, "").slice(-10);
     await verifyOTP(targetPhone, otp, "FORGOT_PASSWORD");
     user = await prisma.user.findUnique({ where: { phone: targetPhone } });
   }

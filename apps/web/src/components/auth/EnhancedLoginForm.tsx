@@ -21,6 +21,7 @@ export function EnhancedLoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp] = useState("");
+  const [userPhone, setUserPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -104,6 +105,9 @@ export function EnhancedLoginForm() {
       if (res.success && res.data) {
         setStep("otp");
         setCountdown(30);
+        if (res.data.phone) {
+          setUserPhone(res.data.phone);
+        }
         if (res.data.otp) {
           triggerPushNotification(res.data.otp);
         }
@@ -135,13 +139,13 @@ export function EnhancedLoginForm() {
 
     try {
       const { apiPost } = await import("@/lib/api");
-      const cleanPhone = identifier.replace(/\D/g, "") || identifier;
+      const targetPhone = userPhone || identifier.replace(/\D/g, "").slice(-10);
       const res = await apiPost<{
         success: boolean;
         data?: { user: any; token: string };
         error?: string;
         message?: string;
-      }>("/auth/verify-otp", { phone: cleanPhone, otp: codeToVerify });
+      }>("/auth/verify-otp", { phone: targetPhone, otp: codeToVerify });
 
       if (res.success && res.data?.token) {
         login(res.data.user, res.data.token);
@@ -480,6 +484,7 @@ export function EnhancedLoginForm() {
           <div className="py-2">
             <OtpInput
               length={6}
+              value={otp}
               onComplete={(code) => {
                 setOtp(code);
                 handleOtpVerify(code);

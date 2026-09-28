@@ -416,6 +416,7 @@ export default function ForgotPasswordPage() {
           <div className="py-2">
             <OtpInput
               length={6}
+              value={otp}
               onComplete={(code) => {
                 setOtp(code);
                 handleVerifyOtp(code);

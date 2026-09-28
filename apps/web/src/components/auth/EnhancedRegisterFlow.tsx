@@ -209,7 +209,7 @@ export function EnhancedRegisterFlow() {
     setErrorMessage(null);
     try {
       const { apiPost } = await import("@/lib/api");
-      const cleanPhone = phone.replace(/\D/g, "");
+      const cleanPhone = phone.replace(/\D/g, "").slice(-10);
       const res = await apiPost<{
         success: boolean;
         data?: { verified: boolean };
@@ -741,8 +741,15 @@ export function EnhancedRegisterFlow() {
           <div className="py-2">
             <OtpInput
               length={6}
-              onComplete={handleVerifyMobileOtp}
-              onResend={() => handleSendMobileOtp({ preventDefault: () => {} } as any)}
+              value={mobileOtp}
+              onComplete={(code) => {
+                setMobileOtp(code);
+                handleVerifyMobileOtp(code);
+              }}
+              onResend={() => {
+                setMobileOtp("");
+                handleSendMobileOtp({ preventDefault: () => {} } as any);
+              }}
               loading={loading}
             />
           </div>
@@ -821,8 +828,15 @@ export function EnhancedRegisterFlow() {
           <div className="py-2">
             <OtpInput
               length={6}
-              onComplete={handleVerifyEmailOtp}
-              onResend={() => handleSendEmailOtp({ preventDefault: () => {} } as any)}
+              value={emailOtp}
+              onComplete={(code) => {
+                setEmailOtp(code);
+                handleVerifyEmailOtp(code);
+              }}
+              onResend={() => {
+                setEmailOtp("");
+                handleSendEmailOtp({ preventDefault: () => {} } as any);
+              }}
               loading={loading}
             />
           </div>

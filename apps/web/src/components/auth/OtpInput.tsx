@@ -4,22 +4,61 @@ import { useState, useRef, useEffect, useCallback } from "react";
 
 interface OtpInputProps {
   length?: number;
+  value?: string;
   onComplete: (otp: string) => void;
   onResend?: () => void;
   loading?: boolean;
   disabled?: boolean;
   error?: string;
+  placeholder?: string;
+  autoFocus?: boolean;
 }
 
-export function OtpInput({ length = 6, onComplete, onResend, loading, disabled, error }: OtpInputProps) {
-  const [digits, setDigits] = useState<string[]>(Array(length).fill(""));
+export function OtpInput({
+  length = 6,
+  value,
+  onComplete,
+  onResend,
+  loading,
+  disabled,
+  error,
+  autoFocus = true,
+}: OtpInputProps) {
+  const [digits, setDigits] = useState<string[]>(() => {
+    if (value) {
+      const clean = value.replace(/\D/g, "").slice(0, length);
+      const arr = clean.split("");
+      while (arr.length < length) arr.push("");
+      return arr;
+    }
+    return Array(length).fill("");
+  });
   const [countdown, setCountdown] = useState(30);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // Focus first input on mount
   useEffect(() => {
-    inputRefs.current[0]?.focus();
-  }, []);
+    if (autoFocus && inputRefs.current[0]) {
+      inputRefs.current[0].focus();
+    }
+  }, [autoFocus]);
 
+  // Sync external controlled value prop
+  useEffect(() => {
+    if (value !== undefined) {
+      const clean = value.replace(/\D/g, "").slice(0, length);
+      const updated = Array(length).fill("");
+      for (let i = 0; i < clean.length; i++) {
+        updated[i] = clean[i];
+      }
+      setDigits(updated);
+      if (clean.length === length) {
+        onComplete(clean);
+      }
+    }
+  }, [value, length, onComplete]);
+
+  // Countdown timer
   useEffect(() => {
     if (countdown <= 0) return;
     const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
@@ -35,9 +74,35 @@ export function OtpInput({ length = 6, onComplete, onResend, loading, disabled, 
     [onComplete]
   );
 
-  const handleChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return;
-    const digit = value.slice(-1);
+  const handleChange = (index: number, rawVal: string) => {
+    const clean = rawVal.replace(/\D/g, "");
+
+    // If cleared
+    if (!clean) {
+      const updated = [...digits];
+      updated[index] = "";
+      setDigits(updated);
+      return;
+    }
+
+    // If multi-digit (SMS autofill, password manager, or paste)
+    if (clean.length > 1) {
+      const chars = clean.slice(0, length);
+      const updated = [...digits];
+      for (let i = 0; i < chars.length; i++) {
+        if (index + i < length) {
+          updated[index + i] = chars[i];
+        }
+      }
+      setDigits(updated);
+      const nextIndex = Math.min(index + chars.length, length - 1);
+      inputRefs.current[nextIndex]?.focus();
+      submitIfComplete(updated);
+      return;
+    }
+
+    // Single digit input
+    const digit = clean.slice(-1);
     const updated = [...digits];
     updated[index] = digit;
     setDigits(updated);
@@ -52,11 +117,21 @@ export function OtpInput({ length = 6, onComplete, onResend, loading, disabled, 
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !digits[index] && index > 0) {
-      const updated = [...digits];
-      updated[index - 1] = "";
-      setDigits(updated);
+    if (e.key === "Backspace") {
+      if (!digits[index] && index > 0) {
+        const updated = [...digits];
+        updated[index - 1] = "";
+        setDigits(updated);
+        inputRefs.current[index - 1]?.focus();
+      } else {
+        const updated = [...digits];
+        updated[index] = "";
+        setDigits(updated);
+      }
+    } else if (e.key === "ArrowLeft" && index > 0) {
       inputRefs.current[index - 1]?.focus();
+    } else if (e.key === "ArrowRight" && index < length - 1) {
+      inputRefs.current[index + 1]?.focus();
     }
   };
 
@@ -64,11 +139,13 @@ export function OtpInput({ length = 6, onComplete, onResend, loading, disabled, 
     e.preventDefault();
     const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, length);
     if (!pasted) return;
-    const updated = [...digits];
+
+    const updated = Array(length).fill("");
     for (let i = 0; i < pasted.length; i++) {
       updated[i] = pasted[i];
     }
     setDigits(updated);
+
     const nextIndex = Math.min(pasted.length, length - 1);
     inputRefs.current[nextIndex]?.focus();
     submitIfComplete(updated);
@@ -83,23 +160,28 @@ export function OtpInput({ length = 6, onComplete, onResend, loading, disabled, 
   };
 
   return (
-    <div className="flex flex-col items-center gap-5">
-      <p className="text-sm text-gray-500">Enter the 6-digit code sent to your phone</p>
+    <div className="flex flex-col items-center gap-4">
+      <p className="text-xs text-slate-500 font-medium">
+        Enter the 6-digit verification code below
+      </p>
 
-      <div className="flex gap-2.5">
+      <div className="flex gap-2 sm:gap-2.5">
         {digits.map((digit, i) => (
           <input
             key={i}
-            ref={(el) => { inputRefs.current[i] = el; }}
+            ref={(el) => {
+              inputRefs.current[i] = el;
+            }}
             type="tel"
             inputMode="numeric"
-            maxLength={1}
+            autoComplete="one-time-code"
+            maxLength={6}
             value={digit}
             onChange={(e) => handleChange(i, e.target.value)}
             onKeyDown={(e) => handleKeyDown(i, e)}
             onPaste={handlePaste}
             disabled={loading || disabled}
-            className="h-12 w-11 rounded-xl border border-slate-300 bg-white text-center text-lg font-bold text-slate-900 shadow-xs focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition"
+            className="h-12 w-10 sm:w-11 rounded-xl border border-slate-300 bg-white text-center text-lg font-bold text-slate-900 shadow-xs focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition"
           />
         ))}
       </div>
@@ -113,7 +195,9 @@ export function OtpInput({ length = 6, onComplete, onResend, loading, disabled, 
           disabled={countdown > 0 || loading}
           className="text-xs font-semibold text-[#800020] hover:text-[#5a0016] disabled:cursor-not-allowed disabled:text-slate-400 transition"
         >
-          {countdown > 0 ? `Resend security code in ${countdown}s` : "Resend security code"}
+          {countdown > 0
+            ? `Resend security code in ${countdown}s`
+            : "Resend security code"}
         </button>
       )}
     </div>

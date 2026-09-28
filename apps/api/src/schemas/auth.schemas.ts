@@ -3,15 +3,15 @@ import { z } from "zod";
 export const sendOtpSchema = z.object({
   phone: z
     .string()
-    .length(10, "Phone number must be exactly 10 digits")
-    .regex(/^\d{10}$/, "Phone number must contain only digits"),
+    .transform((val) => val.replace(/\D/g, "").slice(-10))
+    .refine((val) => val.length === 10, { message: "Phone number must be a valid 10-digit number" }),
 });
 
 export const verifyOtpSchema = z.object({
   phone: z
     .string()
-    .length(10, "Phone number must be exactly 10 digits")
-    .regex(/^\d{10}$/, "Phone number must contain only digits"),
+    .transform((val) => val.replace(/\D/g, "").slice(-10))
+    .refine((val) => val.length === 10, { message: "Phone number must be a valid 10-digit number" }),
   otp: z
     .string()
     .length(6, "OTP must be exactly 6 digits")

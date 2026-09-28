@@ -576,6 +576,7 @@ export function DigiLockerDemoFlow({
             <div className="py-2">
               <OtpInput
                 length={6}
+                value={otpValue}
                 onComplete={(code) => {
                   setOtpValue(code);
                   handleVerifyOtp(code);
