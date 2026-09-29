@@ -19,11 +19,18 @@ interface AuthActions {
   validateToken: () => Promise<void>;
 }
 
+import {
+  isPwaMode,
+  getStoredToken,
+  getStoredUser,
+  setStoredSession,
+  clearStoredSession,
+} from "@/lib/storage";
+
 function clearSessionStorage() {
   if (typeof window === "undefined") return;
   try {
-    localStorage.removeItem("coopgig_token");
-    localStorage.removeItem("coopgig_user");
+    clearStoredSession();
     // Clear all cached server state (React Query) so Account A data never leaks to Account B
     queryClient.clear();
     queryClient.cancelQueries();
@@ -43,8 +50,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
     // Switching accounts must reset any cached data from the previous session
     clearSessionStorage();
     if (typeof window !== "undefined") {
-      localStorage.setItem("coopgig_token", token);
-      localStorage.setItem("coopgig_user", JSON.stringify(user));
+      setStoredSession(token, user);
     }
     set({ user, token, isAuthenticated: true, isLoading: false, sessionValidated: true });
   },
@@ -59,23 +65,29 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
   loadFromStorage: () => {
     if (typeof window === "undefined") return;
     try {
-      const token = localStorage.getItem("coopgig_token");
-      const userStr = localStorage.getItem("coopgig_user");
+      // In regular website mode (browser tab), ensure any old persistent localStorage tokens are wiped
+      // so exiting the website logs the user out upon reopening.
+      if (!isPwaMode()) {
+        localStorage.removeItem("coopgig_token");
+        localStorage.removeItem("coopgig_user");
+      }
+      const token = getStoredToken();
+      const userStr = getStoredUser();
       if (token && userStr) {
         const user = JSON.parse(userStr) as User;
         set({ user, token, isAuthenticated: true, isLoading: false });
       } else {
-        set({ isLoading: false });
+        set({ user: null, token: null, isAuthenticated: false, isLoading: false });
       }
     } catch {
-      set({ isLoading: false });
+      set({ user: null, token: null, isAuthenticated: false, isLoading: false });
     }
   },
 
   // Server-validates the stored session in background on app load.
   validateToken: async () => {
     if (typeof window === "undefined") return;
-    const token = localStorage.getItem("coopgig_token");
+    const token = getStoredToken();
     if (!token) {
       set({ user: null, token: null, isAuthenticated: false, isLoading: false, sessionValidated: true });
       return;
@@ -89,7 +101,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
         : null;
       if (serverUser) {
         const storedUser = useAuthStore.getState().user;
-        localStorage.setItem("coopgig_user", JSON.stringify(serverUser));
+        setStoredSession(token, serverUser);
         set({ user: serverUser, token, isAuthenticated: true, isLoading: false, sessionValidated: true });
         // If role changed on server, handle gracefully
         if (storedUser && storedUser.role !== serverUser.role) {

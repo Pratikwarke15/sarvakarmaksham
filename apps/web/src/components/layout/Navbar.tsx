@@ -21,6 +21,7 @@ import {
   X,
   LogOut,
   ChevronDown,
+  User,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store/authStore";
@@ -43,11 +44,13 @@ const navConfig: Record<string, NavLinkItem[]> = {
     { href: "/consumer/book", label: "Book Service", key: "bookService", icon: CalendarCheck },
     { href: "/consumer/bookings", label: "My Bookings", key: "myBookings", icon: Briefcase },
     { href: "/consumer/wallet", label: "Wallet", key: "wallet", icon: Wallet },
+    { href: "/consumer/profile", label: "Profile", key: "profile", icon: User },
   ],
   WORKER: [
     { href: "/worker/dashboard", label: "Dashboard", key: "dashboard", icon: LayoutDashboard },
     { href: "/worker/jobs", label: "My Jobs", key: "myJobs", icon: Briefcase },
     { href: "/worker/earnings", label: "Earnings", key: "earnings", icon: DollarSign },
+    { href: "/worker/profile", label: "Profile", key: "profile", icon: Settings },
   ],
 };
 
@@ -190,6 +193,16 @@ export function Navbar() {
                       <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                       <p className="text-xs text-gray-500">{user?.role?.replace("_", " ")}</p>
                     </div>
+                    {user?.role && (
+                      <Link
+                        href={user.role === "WORKER" ? "/worker/profile" : "/consumer/profile"}
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <User className="h-4 w-4 text-gray-500" />
+                        <span>{t("nav.profile")}</span>
+                      </Link>
+                    )}
                     <button
                       onClick={handleLogout}
                       className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"

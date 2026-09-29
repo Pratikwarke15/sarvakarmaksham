@@ -19,9 +19,11 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+import { getStoredToken, clearStoredSession } from "./storage";
+
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("coopgig_token");
+    const token = getStoredToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -33,10 +35,9 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && typeof window !== "undefined") {
-      const token = localStorage.getItem("coopgig_token");
+      const token = getStoredToken();
       if (token) {
-        localStorage.removeItem("coopgig_token");
-        localStorage.removeItem("coopgig_user");
+        clearStoredSession();
         const currentPath = window.location.pathname;
         const isProtected =
           currentPath.startsWith("/consumer") ||

@@ -6,7 +6,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Footer } from "@/components/layout/Footer";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { useAuth } from "@/hooks/useAuth";
-import { LayoutDashboard, CalendarCheck, Briefcase, Wallet } from "lucide-react";
+import { LayoutDashboard, CalendarCheck, Briefcase, Wallet, User } from "lucide-react";
 import type { SidebarLink } from "@/components/layout/Sidebar";
 
 const sidebarLinks: SidebarLink[] = [
@@ -14,6 +14,7 @@ const sidebarLinks: SidebarLink[] = [
   { href: "/consumer/book", label: "Book Service", icon: CalendarCheck },
   { href: "/consumer/bookings", label: "My Bookings", icon: Briefcase },
   { href: "/consumer/wallet", label: "Wallet", icon: Wallet },
+  { href: "/consumer/profile", label: "My Profile", icon: User },
 ];
 
 const publicExplainerRoutes = ["/consumer/bookings", "/consumer/wallet", "/consumer/book"];

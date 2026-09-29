@@ -28,8 +28,15 @@ router.patch("/availability", authenticate, authorize("WORKER"), validate(update
 }));
 
 router.get("/profile", authenticate, authorize("WORKER"), asyncHandler(async (req, res) => {
-  const wp = await prisma.workerProfile.findUnique({ where: { userId: req.user!.id } });
-  if (!wp) { res.status(404).json({ success: false, error: "Worker profile not found" }); return; }
+  let wp = await prisma.workerProfile.findUnique({ where: { userId: req.user!.id } });
+  if (!wp) {
+    wp = await prisma.workerProfile.create({
+      data: {
+        userId: req.user!.id,
+        phoneVerified: true,
+      },
+    });
+  }
   const profile = await workerService.getWorkerProfile(wp.id);
   res.json({ success: true, data: profile });
 }));

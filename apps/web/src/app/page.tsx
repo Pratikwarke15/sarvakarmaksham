@@ -48,7 +48,7 @@ import { useAuth } from "@/hooks/useAuth";
 export default function HomePage() {
   const { t } = useI18n();
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [issueQuery, setIssueQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState("Jalgaon, Maharashtra");
@@ -57,6 +57,19 @@ export default function HomePage() {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [customCityInput, setCustomCityInput] = useState("");
   const [locationNotice, setLocationNotice] = useState<string | null>(null);
+
+  // Authenticated redirect: if already logged in (e.g. reopened PWA or active session), don't show landing page
+  useEffect(() => {
+    if (isAuthenticated && user?.role) {
+      const target =
+        user.role === "WORKER"
+          ? "/worker/dashboard"
+          : user.role === "COOP_ADMIN" || user.role === "MINISTRY_SUPER_ADMIN"
+          ? "/admin/dashboard"
+          : "/consumer/dashboard";
+      router.replace(target);
+    }
+  }, [isAuthenticated, user, router]);
 
   const detectLocation = useCallback(async (interactive = false) => {
     setIsLocating(true);
@@ -259,6 +272,15 @@ export default function HomePage() {
       icon: HardHat,
     },
   ];
+
+  if (isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#FCFBFA] flex flex-col items-center justify-center p-4">
+        <Loader2 className="h-10 w-10 animate-spin text-[#800020] mb-3" />
+        <p className="text-sm font-semibold text-slate-700">Opening your dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FCFBFA] text-slate-900 font-sans selection:bg-[#800020] selection:text-white">

@@ -344,7 +344,6 @@ export default function ForgotPasswordPage() {
                   }}
                   placeholder="e.g. 9812345601 or member@coop.in"
                   className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200/90 py-3.5 pl-4 pr-10 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 outline-none transition"
-                  autoFocus
                 />
                 <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 pointer-events-none">
                   {identifier.includes("@") ? (
@@ -482,7 +481,6 @@ export default function ForgotPasswordPage() {
                   }}
                   placeholder="At least 6 characters"
                   className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200/90 py-3.5 pl-4 pr-11 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 outline-none transition"
-                  autoFocus
                 />
                 <button
                   type="button"

@@ -479,7 +479,6 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
                 }}
                 placeholder={activeRole === "WORKER" ? "e.g. 9876543201 or worker@email.com" : "e.g. 9812345601 or consumer@email.com"}
                 className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200/90 py-3.5 px-4 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 outline-none transition"
-                autoFocus
               />
             </div>
 

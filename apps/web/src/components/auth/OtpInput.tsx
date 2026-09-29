@@ -22,7 +22,7 @@ export function OtpInput({
   loading,
   disabled,
   error,
-  autoFocus = true,
+  autoFocus = false,
 }: OtpInputProps) {
   const [digits, setDigits] = useState<string[]>(() => {
     if (value) {
@@ -37,12 +37,7 @@ export function OtpInput({
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const lastSubmittedCodeRef = useRef<string>("");
 
-  // Focus first input on mount
-  useEffect(() => {
-    if (autoFocus && inputRefs.current[0]) {
-      inputRefs.current[0].focus();
-    }
-  }, [autoFocus]);
+  // Keyboard only opens upon explicit user interaction (click/tap)
 
   // Sync external controlled value prop safely without duplicate onComplete loops
   useEffect(() => {
@@ -172,7 +167,6 @@ export function OtpInput({
     lastSubmittedCodeRef.current = "";
     setDigits(Array(length).fill(""));
     setCountdown(30);
-    inputRefs.current[0]?.focus();
     onResend();
   };
 

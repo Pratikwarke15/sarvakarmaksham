@@ -480,7 +480,6 @@ export function DigiLockerDemoFlow({
                     placeholder="XXXX XXXX XXXX"
                     maxLength={14}
                     className="w-full rounded-xl bg-slate-50 border border-slate-300 py-3 px-3.5 font-mono text-base font-bold tracking-widest text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#006699] focus:ring-2 focus:ring-blue-100 outline-none transition"
-                    autoFocus
                   />
                   <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-xs font-mono text-slate-400">
                     {aadhaarInput.length}/12

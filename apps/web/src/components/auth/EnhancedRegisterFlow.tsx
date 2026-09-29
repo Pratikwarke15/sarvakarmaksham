@@ -765,7 +765,6 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
                 }}
                 placeholder="e.g. Ramesh Sharma"
                 className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200/90 py-3.5 px-4 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 outline-none transition"
-                autoFocus
               />
             </div>
 
@@ -927,7 +926,6 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
                 }}
                 placeholder="your@email.com"
                 className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200/90 py-3.5 px-4 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 outline-none transition"
-                autoFocus
               />
             </div>
 
@@ -1025,7 +1023,6 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
                   }}
                   placeholder="At least 6 characters"
                   className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200/90 py-3.5 pl-4 pr-11 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 outline-none transition"
-                  autoFocus
                 />
                 <button
                   type="button"
