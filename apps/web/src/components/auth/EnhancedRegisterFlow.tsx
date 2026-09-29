@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -40,6 +40,7 @@ type RegisterStep =
   | "email"
   | "email_otp"
   | "password"
+  | "location"
   | "identity"
   | "complete";
 
@@ -204,7 +205,10 @@ export function EnhancedRegisterFlow() {
     }
   };
 
+  const verifyingMobileRef = useRef(false);
   const handleVerifyMobileOtp = async (code: string) => {
+    if (loading || verifyingMobileRef.current) return;
+    verifyingMobileRef.current = true;
     setLoading(true);
     setErrorMessage(null);
     try {
@@ -217,6 +221,7 @@ export function EnhancedRegisterFlow() {
       }>("/auth/verify-otp", { phone: cleanPhone, otp: code });
 
       if (res.success) {
+        setErrorMessage(null);
         setDemoOtpNotification(null);
         toast({ title: "Mobile Number Verified!", variant: "success" });
         setStep("email");
@@ -227,6 +232,7 @@ export function EnhancedRegisterFlow() {
       setErrorMessage(err?.response?.data?.error || "Invalid OTP code");
     } finally {
       setLoading(false);
+      verifyingMobileRef.current = false;
     }
   };
 
@@ -275,7 +281,10 @@ export function EnhancedRegisterFlow() {
     }
   };
 
+  const verifyingEmailRef = useRef(false);
   const handleVerifyEmailOtp = async (code: string) => {
+    if (loading || verifyingEmailRef.current) return;
+    verifyingEmailRef.current = true;
     setLoading(true);
     setErrorMessage(null);
     try {
@@ -288,6 +297,7 @@ export function EnhancedRegisterFlow() {
       }>("/auth/verify-email-otp", { email: cleanEmail, otp: code });
 
       if (res.success) {
+        setErrorMessage(null);
         setDemoOtpNotification(null);
         toast({ title: "Email Verified!", variant: "success" });
         setStep("password");
@@ -298,6 +308,7 @@ export function EnhancedRegisterFlow() {
       setErrorMessage(err?.response?.data?.error || "Invalid email OTP code");
     } finally {
       setLoading(false);
+      verifyingEmailRef.current = false;
     }
   };
 
@@ -312,7 +323,41 @@ export function EnhancedRegisterFlow() {
       return;
     }
     setErrorMessage(null);
+    setStep("location");
+  };
+
+  const handleLocationSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!streetAddress || streetAddress.trim().length < 3) {
+      setErrorMessage("Please enter or detect your colony / street address");
+      return;
+    }
+    setErrorMessage(null);
     setStep("identity");
+  };
+
+  // Personalized Greeting & Guidance Note Banner
+  const firstName = name.trim().split(" ")[0] || name.trim();
+  const renderGuidanceBanner = (stepTag: string, note: string) => {
+    if (!firstName) return null;
+    return (
+      <div className="mb-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-[#800020]/5 to-transparent border border-amber-500/20 p-2.5 sm:p-3 flex items-start gap-2.5 shadow-2xs">
+        <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-xl bg-[#800020] text-white flex items-center justify-center text-[11px] sm:text-xs font-bold shrink-0 mt-0.5 shadow-xs">
+          {firstName.charAt(0).toUpperCase()}
+        </div>
+        <div className="text-xs">
+          <div className="font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+            <span>Hello, {firstName}!</span>
+            <span className="text-[10px] text-amber-800 font-semibold bg-amber-100/90 px-1.5 py-0.2 rounded-md">
+              {stepTag}
+            </span>
+          </div>
+          <p className="text-slate-600 mt-0.5 text-[11px] leading-relaxed">
+            {note}
+          </p>
+        </div>
+      </div>
+    );
   };
 
   const handleAadhaarChange = (val: string) => {
@@ -678,19 +723,24 @@ export function EnhancedRegisterFlow() {
           <button
             type="button"
             onClick={() => setStep("name")}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-6 shadow-xs"
+            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-4 sm:mb-6 shadow-xs"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
 
-          <div className="mb-6">
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading">
               Mobile number
             </h1>
-            <p className="text-xs text-slate-500 mt-2 font-medium">
+            <p className="text-xs text-slate-500 mt-1 font-medium">
               We will send you a 6-digit verification code.
             </p>
           </div>
+
+          {renderGuidanceBanner(
+            "Mobile Verification",
+            "Enter your 10-digit phone number. We will send a secure SMS code to verify your device."
+          )}
 
           <div className="space-y-4">
             <div>
@@ -724,19 +774,24 @@ export function EnhancedRegisterFlow() {
           <button
             type="button"
             onClick={() => setStep("mobile")}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-6 shadow-xs"
+            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-4 sm:mb-6 shadow-xs"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
 
-          <div className="mb-6">
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading">
               Verify mobile
             </h1>
-            <p className="text-xs text-slate-500 mt-2 font-medium">
+            <p className="text-xs text-slate-500 mt-1 font-medium">
               Enter the 6-digit code sent to +91 {phone}.
             </p>
           </div>
+
+          {renderGuidanceBanner(
+            "Enter Code",
+            `We sent a 6-digit verification code to +91 ${phone}. Enter it below to confirm.`
+          )}
 
           <div className="py-2">
             <OtpInput
@@ -762,19 +817,24 @@ export function EnhancedRegisterFlow() {
           <button
             type="button"
             onClick={() => setStep("mobile")}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-6 shadow-xs"
+            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-4 sm:mb-6 shadow-xs"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
 
-          <div className="mb-6">
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading">
               Your email
             </h1>
-            <p className="text-xs text-slate-500 mt-2 font-medium">
+            <p className="text-xs text-slate-500 mt-1 font-medium">
               We will send you a verification code to confirm your email.
             </p>
           </div>
+
+          {renderGuidanceBanner(
+            "Official Email",
+            "Enter your email for cooperative receipts, job notices, and account recovery."
+          )}
 
           <div className="space-y-4">
             <div>
@@ -811,19 +871,24 @@ export function EnhancedRegisterFlow() {
           <button
             type="button"
             onClick={() => setStep("email")}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-6 shadow-xs"
+            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-4 sm:mb-6 shadow-xs"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
 
-          <div className="mb-6">
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading">
               Verify email
             </h1>
-            <p className="text-xs text-slate-500 mt-2 font-medium">
+            <p className="text-xs text-slate-500 mt-1 font-medium">
               Enter the 6-digit code sent to {email}.
             </p>
           </div>
+
+          {renderGuidanceBanner(
+            "Verify Inbox",
+            `A 6-digit code has been sent to ${email}. Enter it below to confirm.`
+          )}
 
           <div className="py-2">
             <OtpInput
@@ -849,19 +914,24 @@ export function EnhancedRegisterFlow() {
           <button
             type="button"
             onClick={() => setStep("email")}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-6 shadow-xs"
+            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-4 sm:mb-6 shadow-xs"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
 
-          <div className="mb-6">
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading">
               Create password
             </h1>
-            <p className="text-xs text-slate-500 mt-2 font-medium">
+            <p className="text-xs text-slate-500 mt-1 font-medium">
               Must be at least 6 characters.
             </p>
           </div>
+
+          {renderGuidanceBanner(
+            "Account Security",
+            "Choose a strong password with at least 6 characters to safeguard your account."
+          )}
 
           <div className="space-y-4">
             <div>
@@ -917,114 +987,95 @@ export function EnhancedRegisterFlow() {
         </form>
       )}
 
-      {/* STEP 6: IDENTITY (AADHAAR/DIGILOCKER DEMO) */}
-      {step === "identity" && (
-        <form onSubmit={handleFinalSubmit}>
+      {/* STEP 6: SERVICE LOCATION & DETAILS (Cleanly separated for mobile view!) */}
+      {step === "location" && (
+        <form onSubmit={handleLocationSubmit}>
           <button
             type="button"
             onClick={() => setStep("password")}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-6 shadow-xs"
+            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-4 sm:mb-6 shadow-xs"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
 
-          <div className="mb-6">
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
-              Identity & location
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading">
+              Service location
             </h1>
-            <p className="text-xs text-slate-500 mt-2 font-medium">
-              Verify your live location and connect with DigiLocker to authorize your credentials.
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              Enter your colony/society and city for localized cooperative matching.
             </p>
           </div>
 
-          <div className="space-y-5">
-            {/* 1. Member Profile & Location Context Box */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3.5 shadow-xs">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                  <User className="h-4 w-4 text-[#800020]" />
-                  <span>Submitted Member Profile</span>
-                </span>
-                <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md">
-                  {role} Account
-                </span>
+          {renderGuidanceBanner(
+            "Service Location",
+            "Tell us your colony and city so we can match you with nearby cooperative jobs and verified local members."
+          )}
+
+          <div className="space-y-4">
+            {/* Live GPS Detection Button */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 space-y-3 shadow-xs">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-800">
+                  {role === "WORKER" ? "Service Operating Area" : "Service Address / Colony"}
+                </label>
+                <button
+                  type="button"
+                  onClick={detectLocation}
+                  disabled={detectingLocation}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#800020] hover:text-[#68001a] transition hover:underline disabled:opacity-50 cursor-pointer"
+                >
+                  {detectingLocation ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Detecting Colony GPS...</span>
+                    </>
+                  ) : (
+                    <>
+                      <MapPin className="h-3.5 w-3.5" />
+                      <span>📍 Detect Live Location</span>
+                    </>
+                  )}
+                </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Full Name</span>
-                  <span className="font-bold text-slate-900">{name || "Not specified"}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[11px]">Date of Birth</span>
-                  <span className="font-bold text-slate-900">{dob}</span>
-                </div>
+              <div>
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                  Colony / Society / Flat / Street Name
+                </label>
+                <input
+                  type="text"
+                  value={streetAddress}
+                  onChange={(e) => setStreetAddress(e.target.value)}
+                  placeholder="e.g. Mayur Colony, Kothrud or Flat 4, Sharda Niwas"
+                  className="w-full rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2.5 px-3.5 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
+                />
               </div>
 
-              {/* Service / Work Location Input with Working Live GPS Detection */}
-              <div className="pt-2 border-t border-slate-100 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-slate-800">
-                    {role === "WORKER" ? "Service Operating Address" : "Service Address / Colony"}
-                  </label>
-                  <button
-                    type="button"
-                    onClick={detectLocation}
-                    disabled={detectingLocation}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#800020] hover:text-[#68001a] transition hover:underline disabled:opacity-50 cursor-pointer"
-                  >
-                    {detectingLocation ? (
-                      <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        <span>Detecting Colony GPS...</span>
-                      </>
-                    ) : (
-                      <>
-                        <MapPin className="h-3.5 w-3.5" />
-                        <span>📍 Detect Live Location</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                    Colony / Society / Flat / Street Name
+                    City / District
                   </label>
                   <input
                     type="text"
-                    value={streetAddress}
-                    onChange={(e) => setStreetAddress(e.target.value)}
-                    placeholder="e.g. Mayur Colony, Kothrud or Flat 4, Sharda Niwas"
-                    className="w-full rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2.5 px-3.5 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="City (e.g. Pune)"
+                    className="w-full rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2 px-3 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                      City / District
-                    </label>
-                    <input
-                      type="text"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      placeholder="City (e.g. Pune)"
-                      className="w-full rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2 px-3 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                      PIN Code
-                    </label>
-                    <input
-                      type="text"
-                      value={pincode}
-                      onChange={(e) => setPincode(e.target.value)}
-                      placeholder="PIN Code (e.g. 411038)"
-                      className="w-full rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2 px-3 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                    PIN Code
+                  </label>
+                  <input
+                    type="text"
+                    value={pincode}
+                    onChange={(e) => setPincode(e.target.value)}
+                    placeholder="PIN Code (e.g. 411038)"
+                    className="w-full rounded-xl bg-[#F8F9FA] border border-slate-200/90 py-2 px-3 text-xs text-slate-900 focus:bg-white focus:border-[#800020] outline-none"
+                  />
                 </div>
               </div>
 
@@ -1047,7 +1098,7 @@ export function EnhancedRegisterFlow() {
                                 isSelected ? prev.filter((s) => s !== skill) : [...prev, skill]
                               );
                             }}
-                            className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition border ${
+                            className={`rounded-xl px-2.5 py-1 text-xs font-semibold transition border ${
                               isSelected
                                 ? "bg-[#800020] text-white border-[#800020]"
                                 : "bg-[#F8F9FA] text-slate-700 border-slate-200"
@@ -1063,7 +1114,7 @@ export function EnhancedRegisterFlow() {
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-xs font-semibold text-slate-700">
-                        Vocational / Skill Certificate (Optional)
+                        Vocational Certificate (Optional)
                       </label>
                       <button
                         type="button"
@@ -1087,67 +1138,131 @@ export function EnhancedRegisterFlow() {
               )}
             </div>
 
-            {/* 2. Connect with DigiLocker Gateway Box (NO Aadhaar Number Asked Twice!) */}
-            <div className="rounded-2xl border border-[#002F6C]/25 bg-gradient-to-br from-[#002F6C]/5 via-white to-white p-5 shadow-xs space-y-4">
+            <button
+              type="submit"
+              className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 text-sm sm:text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all flex items-center justify-center gap-2"
+            >
+              <span>Next: DigiLocker Verification</span>
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* STEP 7: IDENTITY & DIGILOCKER AUTHORIZATION (Fits cleanly on mobile screen!) */}
+      {step === "identity" && (
+        <form onSubmit={handleFinalSubmit}>
+          <button
+            type="button"
+            onClick={() => setStep("location")}
+            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-4 sm:mb-6 shadow-xs"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading">
+              DigiLocker authorization
+            </h1>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              Ministry of Electronics & IT (MeitY) • National e-KYC
+            </p>
+          </div>
+
+          {renderGuidanceBanner(
+            "DigiLocker Authorization",
+            "Final step! Authorize your official government Aadhaar credentials securely via DigiLocker."
+          )}
+
+          <div className="space-y-4">
+            {/* 1. Submitted Member Profile Card */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 space-y-2.5 shadow-xs">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                  <User className="h-4 w-4 text-[#800020]" />
+                  <span>Citizen Registration Details</span>
+                </span>
+                <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md">
+                  {role} Account
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-slate-400 block text-[10px]">Legal Name</span>
+                  <span className="font-bold text-slate-900 truncate block">{name || "Not specified"}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[10px]">Date of Birth</span>
+                  <span className="font-bold text-slate-900">{dob}</span>
+                </div>
+              </div>
+
+              <div className="text-xs pt-1.5 border-t border-slate-100">
+                <span className="text-slate-400 block text-[10px]">Colony & Location</span>
+                <span className="font-semibold text-slate-800 text-[11px] truncate block">
+                  {[streetAddress, city, pincode].filter(Boolean).join(", ")}
+                </span>
+              </div>
+            </div>
+
+            {/* 2. Connect with DigiLocker Gateway Box */}
+            <div className="rounded-2xl border border-[#002F6C]/25 bg-gradient-to-br from-[#002F6C]/5 via-white to-white p-4 shadow-xs space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-9 w-9 rounded-xl bg-[#002F6C] text-white flex items-center justify-center font-black text-xs shadow-xs">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-xl bg-[#002F6C] text-white flex items-center justify-center font-black text-xs shadow-xs">
                     DL
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-slate-900 font-heading">
+                    <h3 className="text-xs sm:text-sm font-black text-slate-900 font-heading">
                       DigiLocker Identity Verification
                     </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Ministry of Electronics & IT (MeitY) • National e-KYC
+                    <p className="text-[10px] text-slate-500">
+                      Government of India • UIDAI e-KYC
                     </p>
                   </div>
                 </div>
                 {isAadhaarVerified ? (
-                  <span className="rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold px-3 py-1 flex items-center gap-1">
-                    <Check className="h-3.5 w-3.5" />
+                  <span className="rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5 flex items-center gap-1">
+                    <Check className="h-3 w-3" />
                     <span>Connected</span>
                   </span>
                 ) : (
-                  <span className="rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold px-2.5 py-0.5">
+                  <span className="rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5">
                     Required Step
                   </span>
                 )}
               </div>
 
               {!isAadhaarVerified ? (
-                <div className="space-y-3">
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    Connect with DigiLocker to authenticate your identity. Your legal name, date of birth, and service location
+                <div className="space-y-2.5">
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Connect with DigiLocker to authenticate your identity. Your legal name, age, and location
                     above will be authorized and cross-matched with your official Aadhaar credentials.
                   </p>
                   <button
                     type="button"
                     onClick={() => {
-                      if (!streetAddress || streetAddress.trim().length < 3) {
-                        setErrorMessage("Please enter or detect your address before connecting with DigiLocker.");
-                        return;
-                      }
                       setErrorMessage(null);
                       setDigilockerModalOpen(true);
                     }}
-                    className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-[#002F6C] hover:bg-[#00224d] text-white py-3.5 text-sm font-bold shadow-md shadow-[#002F6C]/20 transition"
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#002F6C] hover:bg-[#00224d] text-white py-3 text-xs sm:text-sm font-bold shadow-md shadow-[#002F6C]/20 transition"
                   >
                     <span>Connect with DigiLocker</span>
                     <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 space-y-1.5 text-xs text-emerald-900">
+                <div className="space-y-2.5">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 space-y-1 text-xs text-emerald-900">
                     <div className="flex items-center justify-between font-bold">
                       <span className="flex items-center gap-1.5">
                         <Check className="h-4 w-4 text-emerald-600" />
                         <span>Aadhaar Identity Successfully Verified</span>
                       </span>
-                      <span className="font-mono text-[11px] text-emerald-700">{digilockerRef}</span>
+                      <span className="font-mono text-[10px] text-emerald-700">{digilockerRef}</span>
                     </div>
-                    <p className="text-[11px] text-emerald-800">
+                    <p className="text-[10px] text-emerald-800">
                       Masked UID: <span className="font-mono font-bold">{aadhaarInput ? `XXXX-XXXX-${aadhaarInput.replace(/\D/g, "").slice(-4)}` : "XXXX-XXXX-7777"}</span> • UIDAI Audit Match Confirmed
                     </p>
                   </div>
@@ -1162,12 +1277,12 @@ export function EnhancedRegisterFlow() {
               )}
             </div>
 
-            {/* 3. Final Submission Button (Only enabled once connected with DigiLocker) */}
+            {/* 3. Final Submission Button */}
             <div>
               <button
                 type="submit"
                 disabled={loading || !isAadhaarVerified}
-                className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-4 text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 sm:py-4 text-sm sm:text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
@@ -1184,7 +1299,7 @@ export function EnhancedRegisterFlow() {
                 )}
               </button>
               {!isAadhaarVerified && (
-                <p className="text-center text-[11px] text-slate-400 mt-2 font-medium">
+                <p className="text-center text-[10px] text-slate-400 mt-1.5 font-medium">
                   Please click &quot;Connect with DigiLocker&quot; above to authorize your credentials.
                 </p>
               )}
@@ -1193,15 +1308,19 @@ export function EnhancedRegisterFlow() {
         </form>
       )}
 
-      {/* STEP 7: COMPLETE */}
+      {/* STEP 8: COMPLETE */}
       {step === "complete" && (
-        <div className="py-10 text-center">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-4">
+        <div className="py-8 sm:py-10 text-center">
+          <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-4 shadow-sm">
             <Check className="h-8 w-8 text-emerald-600" />
           </div>
-          <h2 className="text-2xl font-black text-slate-900 font-heading">
-            Account Created
+          <h2 className="text-2xl font-black text-slate-900 font-heading mb-2">
+            Account Created!
           </h2>
+          {renderGuidanceBanner(
+            "Account Verified",
+            `Welcome to Sarvakarmakshamah, ${firstName || "Member"}! Your account is verified and active. Directing you to your workspace...`
+          )}
           <p className="text-xs text-slate-500 mt-2">
             Welcome to Sarvakarmakshamah. Redirecting to your dashboard...
           </p>
@@ -1210,8 +1329,8 @@ export function EnhancedRegisterFlow() {
 
       {/* AUTHENTIC DIGILOCKER GATEWAY MODAL */}
       {digilockerModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-3 sm:p-4 backdrop-blur-sm overflow-hidden">
-          <div className="w-full max-w-lg max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-2 sm:p-4 backdrop-blur-sm overflow-hidden">
+          <div className="w-full max-w-lg max-h-[94vh] sm:max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <DigiLockerDemoFlow
               userRole={role}
               initialData={{

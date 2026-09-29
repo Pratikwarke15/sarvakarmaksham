@@ -35,6 +35,7 @@ export function OtpInput({
   });
   const [countdown, setCountdown] = useState(30);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const lastSubmittedCodeRef = useRef<string>("");
 
   // Focus first input on mount
   useEffect(() => {
@@ -43,17 +44,26 @@ export function OtpInput({
     }
   }, [autoFocus]);
 
-  // Sync external controlled value prop
+  // Sync external controlled value prop safely without duplicate onComplete loops
   useEffect(() => {
     if (value !== undefined) {
       const clean = value.replace(/\D/g, "").slice(0, length);
-      const updated = Array(length).fill("");
-      for (let i = 0; i < clean.length; i++) {
-        updated[i] = clean[i];
-      }
-      setDigits(updated);
-      if (clean.length === length) {
+      setDigits((prev) => {
+        const current = prev.join("");
+        if (current === clean) return prev;
+        const updated = Array(length).fill("");
+        for (let i = 0; i < clean.length; i++) {
+          updated[i] = clean[i];
+        }
+        return updated;
+      });
+
+      // Only trigger if externally set to complete (e.g. autofill) and not already submitted
+      if (clean.length === length && clean !== lastSubmittedCodeRef.current) {
+        lastSubmittedCodeRef.current = clean;
         onComplete(clean);
+      } else if (clean.length < length) {
+        lastSubmittedCodeRef.current = "";
       }
     }
   }, [value, length, onComplete]);
@@ -67,11 +77,15 @@ export function OtpInput({
 
   const submitIfComplete = useCallback(
     (d: string[]) => {
-      if (d.every((digit) => digit !== "")) {
-        onComplete(d.join(""));
+      const code = d.join("");
+      if (d.every((digit) => digit !== "") && code.length === length) {
+        if (code !== lastSubmittedCodeRef.current) {
+          lastSubmittedCodeRef.current = code;
+          onComplete(code);
+        }
       }
     },
-    [onComplete]
+    [length, onComplete]
   );
 
   const handleChange = (index: number, rawVal: string) => {
@@ -79,6 +93,7 @@ export function OtpInput({
 
     // If cleared
     if (!clean) {
+      lastSubmittedCodeRef.current = "";
       const updated = [...digits];
       updated[index] = "";
       setDigits(updated);
@@ -118,6 +133,7 @@ export function OtpInput({
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
     if (e.key === "Backspace") {
+      lastSubmittedCodeRef.current = "";
       if (!digits[index] && index > 0) {
         const updated = [...digits];
         updated[index - 1] = "";
@@ -153,6 +169,7 @@ export function OtpInput({
 
   const handleResend = () => {
     if (!onResend) return;
+    lastSubmittedCodeRef.current = "";
     setDigits(Array(length).fill(""));
     setCountdown(30);
     inputRefs.current[0]?.focus();
@@ -160,12 +177,12 @@ export function OtpInput({
   };
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <p className="text-xs text-slate-500 font-medium">
+    <div className="flex flex-col items-center gap-3 sm:gap-4 w-full">
+      <p className="text-[11px] sm:text-xs text-slate-500 font-medium text-center">
         Enter the 6-digit verification code below
       </p>
 
-      <div className="flex gap-2 sm:gap-2.5">
+      <div className="flex justify-center gap-1.5 sm:gap-2.5 w-full">
         {digits.map((digit, i) => (
           <input
             key={i}
@@ -181,7 +198,7 @@ export function OtpInput({
             onKeyDown={(e) => handleKeyDown(i, e)}
             onPaste={handlePaste}
             disabled={loading || disabled}
-            className="h-12 w-10 sm:w-11 rounded-xl border border-slate-300 bg-white text-center text-lg font-bold text-slate-900 shadow-xs focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition"
+            className="h-11 w-9 sm:h-12 sm:w-11 rounded-xl border border-slate-300 bg-white text-center text-lg font-bold text-slate-900 shadow-xs focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition"
           />
         ))}
       </div>

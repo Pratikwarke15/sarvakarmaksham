@@ -80,6 +80,38 @@ export async function verifyOTP(
   });
 
   if (!record) {
+    // Idempotency check: if verified within last 10 minutes with the same OTP, return success
+    const recentlyVerified = await prisma.otpVerification.findFirst({
+      where: {
+        phone: cleanPhone,
+        purpose,
+        verified: true,
+        otp: cleanOtp,
+        createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (recentlyVerified) {
+      if (purpose === "LOGIN") {
+        const existingUser = await prisma.user.findUnique({ where: { phone: cleanPhone } });
+        if (existingUser) {
+          const token = generateJwtToken(existingUser);
+          return {
+            verified: true,
+            token,
+            user: {
+              id: existingUser.id,
+              phone: existingUser.phone,
+              name: existingUser.name,
+              role: existingUser.role,
+            },
+          };
+        }
+      }
+      return { verified: true };
+    }
+
     throw new AppError("Invalid or expired OTP", 400);
   }
 
@@ -387,6 +419,22 @@ export async function verifyEmailOTP(
   });
 
   if (!record) {
+    // Idempotency check: if already verified within last 10 minutes with same OTP, return success
+    const recentlyVerified = await prisma.otpVerification.findFirst({
+      where: {
+        email: cleanEmail,
+        purpose,
+        verified: true,
+        otp: cleanOtp,
+        createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (recentlyVerified) {
+      return { verified: true };
+    }
+
     throw new AppError("Invalid or expired email OTP", 400);
   }
 

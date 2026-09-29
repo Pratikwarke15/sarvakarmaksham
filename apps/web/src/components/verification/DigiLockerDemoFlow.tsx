@@ -304,7 +304,7 @@ export function DigiLockerDemoFlow({
   return (
     <div
       className={`w-full max-w-lg mx-auto rounded-2xl bg-white border border-slate-300 shadow-2xl overflow-hidden font-sans text-slate-800 flex flex-col ${
-        isStandalone ? "my-6 shadow-xl" : "max-h-[88vh]"
+        isStandalone ? "my-4 sm:my-6 shadow-xl" : "max-h-[92vh] sm:max-h-[88vh]"
       }`}
     >
       {/* STICKY TOP HEADER (Tricolor + Official DigiLocker Branding + Demo Notice) */}

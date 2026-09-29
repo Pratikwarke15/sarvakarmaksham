@@ -128,12 +128,15 @@ export function EnhancedLoginForm() {
   };
 
   // Step 2: Verify OTP
+  const verifyingOtpRef = useRef(false);
   const handleOtpVerify = async (codeToVerify: string) => {
     if (!codeToVerify || codeToVerify.length !== 6) {
       setErrorMessage("Please enter the complete 6-digit code");
       return;
     }
 
+    if (loading || verifyingOtpRef.current) return;
+    verifyingOtpRef.current = true;
     setLoading(true);
     setErrorMessage(null);
 
@@ -164,6 +167,7 @@ export function EnhancedLoginForm() {
       setErrorMessage(msg);
     } finally {
       setLoading(false);
+      verifyingOtpRef.current = false;
     }
   };
 

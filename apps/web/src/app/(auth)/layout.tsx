@@ -34,9 +34,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <VoiceAccessModal />
 
       {/* Top Header Bar */}
-      <header className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between">
+      <header className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-5 flex items-center justify-between">
         <Link href="/" className="inline-flex items-center gap-3 group">
-          <div className="h-10 w-10 rounded-2xl bg-white p-1 border border-slate-200/80 shadow-xs flex items-center justify-center group-hover:border-[#800020] transition-colors">
+          <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-2xl bg-white p-1 border border-slate-200/80 shadow-xs flex items-center justify-center group-hover:border-[#800020] transition-colors">
             <img
               src="/images/logo.png"
               alt="सर्वकर्मक्षमः"
@@ -45,14 +45,14 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
-              <span className="text-lg font-black text-slate-900 font-heading tracking-tight">
+              <span className="text-base sm:text-lg font-black text-slate-900 font-heading tracking-tight">
                 सर्वकर्मक्षमः<span className="text-[#800020]">.</span>
               </span>
               <span className="rounded-sm bg-emerald-50 text-[9px] font-extrabold text-emerald-800 px-1 py-0.2 border border-emerald-300 uppercase">
                 {t("nav.verified")}
               </span>
             </div>
-            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+            <span className="text-[9px] sm:text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
               Sarvakarmakshamah • People Work Together
             </span>
           </div>
@@ -64,14 +64,14 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       </header>
 
       {/* Main Form Center Area */}
-      <main className="flex-1 flex items-center justify-center px-4 py-6 sm:py-10">
-        <div className="w-full max-w-[430px] rounded-[32px] bg-white border border-slate-100 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.08)] p-7 sm:p-9 transition-all">
+      <main className="flex-1 flex items-center justify-center px-3 sm:px-4 py-3 sm:py-8">
+        <div className="w-full max-w-[440px] rounded-[24px] sm:rounded-[32px] bg-white border border-slate-100 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.08)] p-5 sm:p-8 transition-all">
           {children}
         </div>
       </main>
 
       {/* Footer Info */}
-      <footer className="w-full py-4 text-center text-xs text-slate-400">
+      <footer className="w-full py-2.5 sm:py-4 text-center text-[11px] sm:text-xs text-slate-400">
         <p>© 2026 सर्वकर्मक्षमः (Sarvakarmakshamah). All rights reserved.</p>
       </footer>
     </div>
