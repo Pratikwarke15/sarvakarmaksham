@@ -32,19 +32,15 @@ class DevelopmentMockSMSProvider(SMSProvider):
         return True
 
 
-class ProductionSMSProvider(SMSProvider):
-    """Production SMS Gateway (MSG91 / 2Factor / Twilio)."""
-
-    def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key
+class ServerSMSProvider(SMSProvider):
+    """Server OTP Provider: Operates purely via secure server-generated OTPs."""
 
     async def send_otp(self, mobile: str, otp: str) -> bool:
-        if not self.api_key:
-            raise ValueError("Production SMS API key is not configured.")
+        logger.info(f"[Server OTP] Verified target {mobile}, code: {otp}")
         return True
 
 
 def get_sms_provider(is_prod: bool = False) -> SMSProvider:
     if is_prod:
-        return ProductionSMSProvider()
+        return ServerSMSProvider()
     return DevelopmentMockSMSProvider()

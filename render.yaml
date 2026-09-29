@@ -17,8 +17,6 @@ services:
         value: "*"
       - key: DIGILOCKER_MOCK
         value: "true"
-      - key: SMS_API_KEY
-        sync: false
       - key: RAZORPAY_KEY_ID
         sync: false
       - key: RAZORPAY_KEY_SECRET

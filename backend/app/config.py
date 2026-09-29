@@ -38,6 +38,5 @@ SOCIAL_SECURITY_RATE = float(_optional("SOCIAL_SECURITY_RATE", "0.01"))
 
 RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET")
-SMS_API_KEY = os.environ.get("SMS_API_KEY")
 
 IS_PROD = NODE_ENV == "production"

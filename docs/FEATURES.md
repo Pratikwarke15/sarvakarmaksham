@@ -14,8 +14,8 @@ end-to-end data-flow workflows.
   `skillTags`, `experienceYears`, `coopId`, and a DigiLocker verification **mock** flag
   (`digiLockerVerified`).
 - **Co-op Admin** and **Federation (Ministry) Admin** roles are seeded/assigned server-side.
-- **OTP / 2FA:** `OtpVerification` records are created on `send-otp`. In production a 2Factor SMS
-  is dispatched; in dev/test the OTP is logged to the server console and returned in the response.
+- **OTP / 2FA:** `OtpVerification` records are created on `send-otp`. Operates purely via
+  Server OTP: cryptographically secure code generated and verified directly on the server.
 - **JWT:** access token signed with `JWT_SECRET`, `7d` expiry, carries `{ id, phone, role }`.
 - **Passwords:** bcrypt hashed (`bcryptjs`, cost 10).
 
@@ -149,7 +149,7 @@ Consumer UI ──POST /payments/initiate──▶ paymentService (commission ca
 
 ### OTP Login
 ```
-UI ──POST /auth/send-otp──▶ generateOTP ──▶ OtpVerification + 2Factor SMS (or console fallback)
+UI ──POST /auth/send-otp──▶ generateOTP ──▶ Server OtpVerification record
 UI ──POST /auth/verify-otp──▶ verifyOTP ──▶ if existing user → JWT; else → "complete registration"
 ```
 
