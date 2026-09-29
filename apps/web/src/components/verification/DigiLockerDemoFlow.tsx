@@ -213,6 +213,8 @@ export function DigiLockerDemoFlow({
         aadhaarNumber: aadhaarInput,
         otp: codeToVerify,
         name: initialData?.name,
+        dob: initialData?.dob,
+        address: initialData?.address,
       });
 
       if (res.success && res.data) {
@@ -489,22 +491,22 @@ export function DigiLockerDemoFlow({
               {/* Quick-fill Test Sandbox Personas */}
               <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-2.5 text-xs">
                 <span className="font-bold text-blue-900 block mb-1 text-[11px]">
-                  Quick Select Test Personas (Sandbox):
+                  Quick Select Test Aadhaar (Sandbox):
                 </span>
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => fillQuickAadhaar("999988887777")}
-                    className="rounded-lg border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-blue-950 hover:border-blue-400 hover:bg-blue-50 transition"
-                  >
-                    9999 8888 7777 (Citizen Ramesh)
-                  </button>
                   <button
                     type="button"
                     onClick={() => fillQuickAadhaar("888877776666")}
                     className="rounded-lg border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-blue-950 hover:border-blue-400 hover:bg-blue-50 transition"
                   >
-                    8888 7777 6666 (Sunita Devi)
+                    8888 7777 6666 ({initialData?.name ? `Auto-Fill for ${initialData.name}` : "Test Aadhaar"})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fillQuickAadhaar("999988887777")}
+                    className="rounded-lg border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-blue-950 hover:border-blue-400 hover:bg-blue-50 transition"
+                  >
+                    9999 8888 7777 (Alternate Test Aadhaar)
                   </button>
                 </div>
               </div>
@@ -686,6 +688,18 @@ export function DigiLockerDemoFlow({
                 <div>
                   <span className="text-slate-500">Masked Aadhaar:</span>
                   <p className="font-mono font-bold text-slate-900">{verifiedData.maskedAadhaar}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-slate-100">
+                <div>
+                  <span className="text-slate-500">Date of Birth:</span>
+                  <p className="font-semibold text-slate-900">{verifiedData.dob}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Verified Address:</span>
+                  <p className="font-semibold text-slate-900 truncate" title={verifiedData.address}>
+                    {verifiedData.address}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 font-mono border-t border-slate-100">

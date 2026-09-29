@@ -183,7 +183,12 @@ export async function verifyDigilockerDemoOtp(
   userId: string | undefined,
   aadhaarNumber: string,
   otp: string,
-  requestedName?: string
+  requestedDetails?: {
+    name?: string;
+    dob?: string;
+    address?: string;
+    gender?: string;
+  } | string
 ): Promise<{
   verified: boolean;
   name: string;
@@ -252,26 +257,26 @@ export async function verifyDigilockerDemoOtp(
   const digilockerRef = `DL-DEMO-${Date.now()}-${last4}`;
   const now = new Date().toISOString();
 
-  // Test personas mapping
-  let personName = requestedName || userName || "Aadhaar Verified Citizen";
-  let personDob = "1994-08-15";
-  let personAddress = "Plot 12, Cooperative Housing Society, Ring Road, Sector 7, New Delhi - 110001";
+  // Extract user details passed from the client or user profile
+  const detailsObj = typeof requestedDetails === "string" ? { name: requestedDetails } : (requestedDetails || {});
+  const inputName = detailsObj.name?.trim();
+  const inputDob = detailsObj.dob?.trim();
+  const inputAddress = detailsObj.address?.trim();
+  const inputGender = detailsObj.gender?.trim();
 
-  if (cleanAadhaar.endsWith("7777")) {
-    personName = "Ramesh Kumar Sharma";
-    personDob = "1991-05-14";
-    personAddress = "H-42, Shramik Vihar, Phase 2, Rohini, New Delhi - 110085";
-  } else if (cleanAadhaar.endsWith("6666")) {
-    personName = "Sunita Devi Patel";
-    personDob = "1988-11-23";
-    personAddress = "Flat 304, Sahakar Enclave, Sector 14, Dwarka, New Delhi - 110078";
-  }
+  // PRIORITIZE the actual registering user's details. Only fall back to sandbox names if user provided none.
+  let personName = inputName || userName || (cleanAadhaar.endsWith("6666") ? "Sunita Devi Patel" : "Ramesh Kumar Sharma");
+  let personDob = inputDob || (cleanAadhaar.endsWith("6666") ? "1988-11-23" : "1994-08-15");
+  let personAddress = inputAddress || (cleanAadhaar.endsWith("6666")
+    ? "Flat 304, Sahakar Enclave, Sector 14, Dwarka, New Delhi - 110078"
+    : "Plot 12, Cooperative Housing Society, Ring Road, Sector 7, New Delhi - 110001");
+  let personGender = inputGender || (cleanAadhaar.endsWith("6666") ? "F" : "M");
 
   return {
     verified: true,
     name: personName,
     dob: personDob,
-    gender: cleanAadhaar.endsWith("6666") ? "F" : "M",
+    gender: personGender,
     address: personAddress,
     maskedAadhaar: `XXXX XXXX ${last4}`,
     digilockerRef,

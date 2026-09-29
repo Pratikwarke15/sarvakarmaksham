@@ -55,13 +55,25 @@ const SKILL_OPTIONS = [
   "Transport & Logistics",
 ];
 
-export function EnhancedRegisterFlow() {
+export interface EnhancedRegisterFlowProps {
+  initialRole?: "CONSUMER" | "WORKER";
+}
+
+export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps = {}) {
   const router = useRouter();
   const login = useAuthStore((s) => s.login);
   const { toast } = useToast();
 
   const [step, setStep] = useState<RegisterStep>("role");
-  const [role, setRole] = useState<"CONSUMER" | "WORKER">("CONSUMER");
+  const [role, setRole] = useState<"CONSUMER" | "WORKER">(() => {
+    if (initialRole) return initialRole;
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search).get("role");
+      if (p?.toUpperCase() === "WORKER") return "WORKER";
+      if (p?.toUpperCase() === "CONSUMER") return "CONSUMER";
+    }
+    return "CONSUMER";
+  });
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [mobileOtp, setMobileOtp] = useState("");
@@ -147,6 +159,11 @@ export function EnhancedRegisterFlow() {
 
   const handleRoleSelect = (selectedRole: "CONSUMER" | "WORKER") => {
     setRole(selectedRole);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("role", selectedRole);
+      window.history.replaceState({}, "", url.toString());
+    }
     setStep("name");
   };
 
@@ -471,12 +488,15 @@ export function EnhancedRegisterFlow() {
         role,
         skillTags: role === "WORKER" ? selectedSkills : undefined,
         experienceYears: role === "WORKER" ? experienceYears : undefined,
+        skillCertificate: role === "WORKER" ? skillCertificate : undefined,
         aadhaarNumber: cleanAadhaar,
         aadhaarName: name.trim(),
+        aadhaarDob: dob || undefined,
         digilockerRef: digilockerRef || `DL-UIDAI-${Date.now().toString().slice(-6)}`,
-        latitude: role === "CONSUMER" ? latitude || 28.6145 : undefined,
-        longitude: role === "CONSUMER" ? longitude || 77.2095 : undefined,
+        latitude: latitude || 28.6145,
+        longitude: longitude || 77.2095,
         defaultAddress: role === "CONSUMER" ? fullAddress : undefined,
+        workAddress: role === "WORKER" ? fullAddress : undefined,
       };
 
       const res = await apiPost<{
@@ -556,17 +576,71 @@ export function EnhancedRegisterFlow() {
       {/* STEP 1: ROLE */}
       {step === "role" && (
         <div>
+          {/* Back Button */}
           <Link
             href="/"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-6 shadow-xs"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-4 shadow-xs"
             aria-label="Back to home"
           >
             <ChevronLeft className="h-5 w-5" />
           </Link>
 
+          {/* Top Portal Switcher Tabs */}
+          <div className="mb-5 p-1 rounded-2xl bg-slate-100 border border-slate-200/80 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                setRole("WORKER");
+                if (typeof window !== "undefined") {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("role", "WORKER");
+                  window.history.replaceState({}, "", url.toString());
+                }
+              }}
+              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                role === "WORKER"
+                  ? "bg-[#800020] text-white shadow-md shadow-[#800020]/20"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+              }`}
+            >
+              <span>👷</span>
+              <span>Worker Portal</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRole("CONSUMER");
+                if (typeof window !== "undefined") {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("role", "CONSUMER");
+                  window.history.replaceState({}, "", url.toString());
+                }
+              }}
+              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                role === "CONSUMER"
+                  ? "bg-[#800020] text-white shadow-md shadow-[#800020]/20"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+              }`}
+            >
+              <span>🏡</span>
+              <span>Consumer Portal</span>
+            </button>
+          </div>
+
           <div className="mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider border ${
+                  role === "WORKER"
+                    ? "bg-amber-100 text-amber-900 border-amber-300"
+                    : "bg-emerald-100 text-emerald-900 border-emerald-300"
+                }`}
+              >
+                {role === "WORKER" ? "👷 Worker Registration" : "🏡 Consumer Registration"}
+              </span>
+            </div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
-              Sign up
+              {role === "WORKER" ? "Join as Worker" : "Join as Consumer"}
             </h1>
             <p className="text-xs text-slate-500 mt-2 font-medium leading-relaxed">
               By signing up, you agree to our{" "}
@@ -642,13 +716,16 @@ export function EnhancedRegisterFlow() {
             onClick={() => setStep("name")}
             className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all"
           >
-            Connect
+            Join as {role === "WORKER" ? "Worker" : "Consumer"}
           </button>
 
           <p className="mt-8 text-center text-xs text-slate-500 font-medium">
             Already have an account?{" "}
-            <Link href="/login" className="font-bold text-[#800020] hover:underline">
-              Log in
+            <Link
+              href={role === "WORKER" ? "/login?role=WORKER" : "/login?role=CONSUMER"}
+              className="font-bold text-[#800020] hover:underline"
+            >
+              Log in as {role === "WORKER" ? "Worker" : "Consumer"}
             </Link>
           </p>
         </div>

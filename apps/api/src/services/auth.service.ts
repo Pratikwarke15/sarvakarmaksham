@@ -63,7 +63,8 @@ export async function generateOTP(
 export async function verifyOTP(
   phone: string,
   otp: string,
-  purpose: string = "LOGIN"
+  purpose: string = "LOGIN",
+  expectedRole?: string
 ): Promise<{ verified: boolean; token?: string; user?: any }> {
   const cleanPhone = phone.replace(/\D/g, "").slice(-10);
   const cleanOtp = otp.trim();
@@ -96,6 +97,21 @@ export async function verifyOTP(
       if (purpose === "LOGIN") {
         const existingUser = await prisma.user.findUnique({ where: { phone: cleanPhone } });
         if (existingUser) {
+          if (expectedRole) {
+            const roleUpper = expectedRole.toUpperCase();
+            if (roleUpper === "WORKER" && existingUser.role === "CONSUMER") {
+              throw new AppError(
+                "This account is registered as a Consumer. Please use the Consumer Login page.",
+                403
+              );
+            }
+            if (roleUpper === "CONSUMER" && existingUser.role === "WORKER") {
+              throw new AppError(
+                "This account is registered as a Worker. Please use the Worker Login page.",
+                403
+              );
+            }
+          }
           const token = generateJwtToken(existingUser);
           return {
             verified: true,
@@ -129,6 +145,22 @@ export async function verifyOTP(
     const existingUser = await prisma.user.findUnique({ where: { phone: cleanPhone } });
 
     if (existingUser) {
+      if (expectedRole) {
+        const roleUpper = expectedRole.toUpperCase();
+        if (roleUpper === "WORKER" && existingUser.role === "CONSUMER") {
+          throw new AppError(
+            "This account is registered as a Consumer. Please use the Consumer Login page.",
+            403
+          );
+        }
+        if (roleUpper === "CONSUMER" && existingUser.role === "WORKER") {
+          throw new AppError(
+            "This account is registered as a Worker. Please use the Worker Login page.",
+            403
+          );
+        }
+      }
+
       const token = generateJwtToken(existingUser);
       return {
         verified: true,
@@ -152,6 +184,17 @@ export async function register(data: {
   email?: string;
   password: string;
   role: "CONSUMER" | "WORKER";
+  aadhaarNumber?: string;
+  aadhaarName?: string;
+  aadhaarDob?: string;
+  digilockerRef?: string;
+  defaultAddress?: string;
+  workAddress?: string;
+  latitude?: number;
+  longitude?: number;
+  skillTags?: string[];
+  experienceYears?: number;
+  skillCertificate?: string;
 }): Promise<{ token: string; user: any }> {
   const existingUser = await prisma.user.findUnique({
     where: { phone: data.phone },
@@ -184,9 +227,47 @@ export async function register(data: {
     },
   });
 
+  const maskedAadhaar = data.aadhaarNumber && data.aadhaarNumber.length >= 4
+    ? (data.aadhaarNumber.startsWith("XXXX") ? data.aadhaarNumber : `XXXX-XXXX-${data.aadhaarNumber.slice(-4)}`)
+    : undefined;
+
+  const isVerified = Boolean(data.aadhaarNumber || data.digilockerRef);
+
   if (data.role === "CONSUMER") {
     await prisma.consumerProfile.create({
-      data: { userId: user.id },
+      data: {
+        userId: user.id,
+        defaultAddress: data.defaultAddress,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        phoneVerified: true,
+        aadhaarNumber: maskedAadhaar,
+        aadhaarName: data.aadhaarName || data.name,
+        aadhaarDob: data.aadhaarDob,
+        digilockerRef: data.digilockerRef,
+        aadhaarVerified: isVerified,
+        kycStatus: isVerified ? "VERIFIED" : "PENDING",
+      },
+    });
+  } else if (data.role === "WORKER") {
+    await prisma.workerProfile.create({
+      data: {
+        userId: user.id,
+        workAddress: data.workAddress || data.defaultAddress,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        skillTags: data.skillTags || [],
+        experienceYears: data.experienceYears || 0,
+        phoneVerified: true,
+        aadhaarNumber: maskedAadhaar,
+        aadhaarName: data.aadhaarName || data.name,
+        aadhaarDob: data.aadhaarDob,
+        digilockerRef: data.digilockerRef,
+        aadhaarVerified: isVerified,
+        kycStatus: isVerified ? "VERIFIED" : "PENDING",
+        kycDocumentUrl: data.skillCertificate,
+        status: isVerified ? "VERIFIED" : "PENDING_ADMIN_APPROVAL",
+      },
     });
   }
 
@@ -206,7 +287,8 @@ export async function register(data: {
 
 export async function login(
   phone: string,
-  password: string
+  password: string,
+  expectedRole?: string
 ): Promise<{ token: string; user: any }> {
   const user = await prisma.user.findUnique({ where: { phone } });
 
@@ -216,6 +298,22 @@ export async function login(
 
   if (!user.isActive) {
     throw new AppError("Account is deactivated", 403);
+  }
+
+  if (expectedRole) {
+    const roleUpper = expectedRole.toUpperCase();
+    if (roleUpper === "WORKER" && user.role === "CONSUMER") {
+      throw new AppError(
+        "This account is registered as a Consumer. Please use the Consumer Login page.",
+        403
+      );
+    }
+    if (roleUpper === "CONSUMER" && user.role === "WORKER") {
+      throw new AppError(
+        "This account is registered as a Worker. Please use the Worker Login page.",
+        403
+      );
+    }
   }
 
   const isValidPassword = await bcrypt.compare(password, user.passwordHash);
@@ -327,8 +425,9 @@ export async function isTokenBlacklisted(token: string): Promise<boolean> {
 
 export async function validateCredentials(
   identifier: string,
-  password: string
-): Promise<{ phone: string; otp?: string; expiresAt: Date }> {
+  password: string,
+  expectedRole?: string
+): Promise<{ phone: string; otp?: string; expiresAt: Date; role: string }> {
   const trimmed = identifier.trim();
   const user = await prisma.user.findFirst({
     where: {
@@ -347,6 +446,23 @@ export async function validateCredentials(
     throw new AppError("Account is deactivated", 403);
   }
 
+  // Cross-role login prevention
+  if (expectedRole) {
+    const roleUpper = expectedRole.toUpperCase();
+    if (roleUpper === "WORKER" && user.role === "CONSUMER") {
+      throw new AppError(
+        "This account is registered as a Consumer. Please use the Consumer Login page.",
+        403
+      );
+    }
+    if (roleUpper === "CONSUMER" && user.role === "WORKER") {
+      throw new AppError(
+        "This account is registered as a Worker. Please use the Worker Login page.",
+        403
+      );
+    }
+  }
+
   const isValidPassword = await bcrypt.compare(password, user.passwordHash);
   if (!isValidPassword) {
     throw new AppError("Invalid credentials", 401);
@@ -357,6 +473,7 @@ export async function validateCredentials(
 
   return {
     phone: user.phone,
+    role: user.role,
     expiresAt: otpResult.expiresAt,
     otp: otpResult.otp,
   };

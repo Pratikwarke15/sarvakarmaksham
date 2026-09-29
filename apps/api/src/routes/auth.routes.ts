@@ -22,8 +22,8 @@ router.post("/send-otp", validate(sendOtpSchema), asyncHandler(async (req, res) 
 }));
 
 router.post("/verify-otp", validate(verifyOtpSchema), asyncHandler(async (req, res) => {
-  const { phone, otp } = req.body;
-  const result = await authService.verifyOTP(phone, otp);
+  const { phone, otp, expectedRole, purpose } = req.body;
+  const result = await authService.verifyOTP(phone, otp, purpose || "LOGIN", expectedRole);
   if (result.token) {
     res.json({ success: true, message: "OTP verified and logged in", data: { token: result.token, user: result.user } });
   } else {
@@ -37,19 +37,20 @@ router.post("/register", validate(registerSchema), asyncHandler(async (req, res)
 }));
 
 router.post(["/login-step1", "/login-init"], asyncHandler(async (req, res) => {
-  const { identifier, phone, password } = req.body;
+  const { identifier, phone, password, expectedRole } = req.body;
   const userIdentifier = identifier || phone;
   if (!userIdentifier || !password) {
     res.status(400).json({ success: false, error: "Identifier and password are required" });
     return;
   }
-  const result = await authService.validateCredentials(userIdentifier, password);
+  const result = await authService.validateCredentials(userIdentifier, password, expectedRole);
   res.json({
     success: true,
     message: "Credentials valid. Security verification code generated.",
     data: {
       requiresOtp: true,
       phone: result.phone,
+      role: result.role,
       expiresAt: result.expiresAt,
       otp: result.otp,
     },
@@ -136,8 +137,8 @@ router.post("/check-availability", asyncHandler(async (req, res) => {
 }));
 
 router.post("/login", validate(loginSchema), asyncHandler(async (req, res) => {
-  const { phone, password } = req.body;
-  const result = await authService.login(phone, password);
+  const { phone, password, expectedRole } = req.body;
+  const result = await authService.login(phone, password, expectedRole);
   res.json({ success: true, message: "Login successful", data: result });
 }));
 

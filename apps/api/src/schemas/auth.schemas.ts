@@ -16,6 +16,8 @@ export const verifyOtpSchema = z.object({
     .string()
     .length(6, "OTP must be exactly 6 digits")
     .regex(/^\d{6}$/, "OTP must contain only digits"),
+  expectedRole: z.enum(["CONSUMER", "WORKER"]).optional(),
+  purpose: z.string().optional(),
 });
 
 export const registerSchema = z.object({
@@ -35,6 +37,17 @@ export const registerSchema = z.object({
   role: z.enum(["CONSUMER", "WORKER"], {
     errorMap: () => ({ message: "Role must be CONSUMER or WORKER" }),
   }),
+  aadhaarNumber: z.string().optional(),
+  aadhaarName: z.string().optional(),
+  aadhaarDob: z.string().optional(),
+  digilockerRef: z.string().optional(),
+  defaultAddress: z.string().optional(),
+  workAddress: z.string().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  skillTags: z.array(z.string()).optional(),
+  experienceYears: z.number().optional(),
+  skillCertificate: z.string().optional(),
 });
 
 export const loginSchema = z.object({
@@ -43,6 +56,7 @@ export const loginSchema = z.object({
     .length(10, "Phone number must be exactly 10 digits")
     .regex(/^\d{10}$/, "Phone number must contain only digits"),
   password: z.string().min(1, "Password is required"),
+  expectedRole: z.enum(["CONSUMER", "WORKER"]).optional(),
 });
 
 export type SendOtpInput = z.infer<typeof sendOtpSchema>;

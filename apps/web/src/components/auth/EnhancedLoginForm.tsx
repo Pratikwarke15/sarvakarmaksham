@@ -3,7 +3,19 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Lock, Eye, EyeOff, Sparkles, AlertCircle, X, ShieldCheck } from "lucide-react";
+import {
+  ChevronLeft,
+  Eye,
+  EyeOff,
+  Sparkles,
+  AlertCircle,
+  X,
+  ShieldCheck,
+  ShieldAlert,
+  ArrowRight,
+  Briefcase,
+  Home,
+} from "lucide-react";
 import { OtpInput } from "./OtpInput";
 import { LegalModal } from "@/components/legal/LegalModal";
 import { useAuthStore } from "@/store/authStore";
@@ -11,10 +23,24 @@ import { useToast } from "@/components/providers/ToastProvider";
 import { getRoleDashboardPath } from "@/lib/utils";
 import type { UserRole } from "@/lib/types";
 
-export function EnhancedLoginForm() {
+export interface EnhancedLoginFormProps {
+  initialRole?: "WORKER" | "CONSUMER";
+}
+
+export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) {
   const router = useRouter();
   const login = useAuthStore((s) => s.login);
   const { toast } = useToast();
+
+  const [activeRole, setActiveRole] = useState<"WORKER" | "CONSUMER">(() => {
+    if (initialRole) return initialRole;
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search).get("role");
+      if (p?.toUpperCase() === "WORKER") return "WORKER";
+      if (p?.toUpperCase() === "CONSUMER") return "CONSUMER";
+    }
+    return "CONSUMER";
+  });
 
   const [step, setStep] = useState<"credentials" | "otp">("credentials");
   const [identifier, setIdentifier] = useState("");
@@ -24,6 +50,12 @@ export function EnhancedLoginForm() {
   const [userPhone, setUserPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Role Mismatch Error State for Cross-Login Prevention
+  const [roleMismatch, setRoleMismatch] = useState<{
+    targetRole: "WORKER" | "CONSUMER";
+    message: string;
+  } | null>(null);
 
   // Legal modal state
   const [legalModalOpen, setLegalModalOpen] = useState(false);
@@ -44,6 +76,17 @@ export function EnhancedLoginForm() {
     }
     return () => clearInterval(interval);
   }, [step, countdown]);
+
+  const handleRoleChange = (newRole: "WORKER" | "CONSUMER") => {
+    setActiveRole(newRole);
+    setErrorMessage(null);
+    setRoleMismatch(null);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("role", newRole);
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
 
   const triggerPushNotification = (receivedOtp: string) => {
     setServerOtpNotification(receivedOtp);
@@ -69,6 +112,7 @@ export function EnhancedLoginForm() {
     setIdentifier(userPhone);
     setPassword(userPass);
     setErrorMessage(null);
+    setRoleMismatch(null);
     toast({ title: `Loaded ${label}`, variant: "default" });
   };
 
@@ -76,6 +120,7 @@ export function EnhancedLoginForm() {
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setRoleMismatch(null);
 
     const clean = identifier.trim();
     if (!clean) {
@@ -95,12 +140,17 @@ export function EnhancedLoginForm() {
         data?: {
           requiresOtp: boolean;
           phone: string;
+          role?: string;
           otp?: string;
           expiresAt?: string;
         };
         error?: string;
         message?: string;
-      }>("/auth/login-step1", { identifier: clean, password });
+      }>("/auth/login-step1", {
+        identifier: clean,
+        password,
+        expectedRole: activeRole,
+      });
 
       if (res.success && res.data) {
         setStep("otp");
@@ -117,13 +167,30 @@ export function EnhancedLoginForm() {
           variant: "success",
         });
       } else {
-        setErrorMessage(res.error || res.message || "Invalid mobile number or password");
+        const errorText = res.error || res.message || "Invalid mobile number or password";
+        checkCrossRoleError(errorText);
       }
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || "Invalid credentials. Please try again.";
-      setErrorMessage(msg);
+      checkCrossRoleError(msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkCrossRoleError = (msg: string) => {
+    if (msg.includes("registered as a Consumer") || msg.includes("Consumer Login page")) {
+      setRoleMismatch({
+        targetRole: "CONSUMER",
+        message: "This account is registered as a Consumer. Consumers cannot log in through the Worker Portal.",
+      });
+    } else if (msg.includes("registered as a Worker") || msg.includes("Worker Login page")) {
+      setRoleMismatch({
+        targetRole: "WORKER",
+        message: "This account is registered as a Worker. Workers cannot log in through the Consumer Portal.",
+      });
+    } else {
+      setErrorMessage(msg);
     }
   };
 
@@ -139,6 +206,7 @@ export function EnhancedLoginForm() {
     verifyingOtpRef.current = true;
     setLoading(true);
     setErrorMessage(null);
+    setRoleMismatch(null);
 
     try {
       const { apiPost } = await import("@/lib/api");
@@ -148,7 +216,11 @@ export function EnhancedLoginForm() {
         data?: { user: any; token: string };
         error?: string;
         message?: string;
-      }>("/auth/verify-otp", { phone: targetPhone, otp: codeToVerify });
+      }>("/auth/verify-otp", {
+        phone: targetPhone,
+        otp: codeToVerify,
+        expectedRole: activeRole,
+      });
 
       if (res.success && res.data?.token) {
         login(res.data.user, res.data.token);
@@ -160,11 +232,12 @@ export function EnhancedLoginForm() {
         const target = getRedirectTarget(res.data.user.role);
         router.push(target);
       } else {
-        setErrorMessage(res.error || res.message || "Invalid or expired code. Please try again.");
+        const errorText = res.error || res.message || "Invalid or expired code. Please try again.";
+        checkCrossRoleError(errorText);
       }
     } catch (err: any) {
       const msg = err?.response?.data?.error || "Verification failed. Please check the code.";
-      setErrorMessage(msg);
+      checkCrossRoleError(msg);
     } finally {
       setLoading(false);
       verifyingOtpRef.current = false;
@@ -175,6 +248,7 @@ export function EnhancedLoginForm() {
     if (countdown > 0) return;
     setLoading(true);
     setErrorMessage(null);
+    setRoleMismatch(null);
     setOtp("");
     try {
       const { apiPost } = await import("@/lib/api");
@@ -183,7 +257,11 @@ export function EnhancedLoginForm() {
         success: boolean;
         data?: { otp?: string; expiresAt?: string };
         error?: string;
-      }>("/auth/login-step1", { identifier: clean, password });
+      }>("/auth/login-step1", {
+        identifier: clean,
+        password,
+        expectedRole: activeRole,
+      });
 
       if (res.success && res.data) {
         setCountdown(30);
@@ -266,18 +344,65 @@ export function EnhancedLoginForm() {
           {/* Back Button */}
           <Link
             href="/"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition mb-6 shadow-xs"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition mb-4 shadow-xs"
             aria-label="Back to home"
           >
             <ChevronLeft className="h-5 w-5" />
           </Link>
 
-          {/* Heading & Subtitle */}
+          {/* DEDICATED PORTAL TABS: WORKER vs CONSUMER */}
+          <div className="mb-5 p-1 rounded-2xl bg-slate-100 border border-slate-200/80 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => handleRoleChange("WORKER")}
+              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                activeRole === "WORKER"
+                  ? "bg-[#800020] text-white shadow-md shadow-[#800020]/20"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+              }`}
+            >
+              <Briefcase className="h-3.5 w-3.5" />
+              <span>Worker Login</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRoleChange("CONSUMER")}
+              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                activeRole === "CONSUMER"
+                  ? "bg-[#800020] text-white shadow-md shadow-[#800020]/20"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
+              }`}
+            >
+              <Home className="h-3.5 w-3.5" />
+              <span>Consumer Login</span>
+            </button>
+          </div>
+
+          {/* Role Header Badge & Subtitles */}
           <div className="mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider border ${
+                  activeRole === "WORKER"
+                    ? "bg-amber-100 text-amber-900 border-amber-300"
+                    : "bg-emerald-100 text-emerald-900 border-emerald-300"
+                }`}
+              >
+                {activeRole === "WORKER" ? "👷 Worker & Co-op Portal" : "🏡 Consumer & Household Portal"}
+              </span>
+            </div>
+
             <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
-              Log in
+              {activeRole === "WORKER" ? "Worker Log in" : "Consumer Log in"}
             </h1>
+
             <p className="text-xs text-slate-500 mt-2 font-medium leading-relaxed">
+              {activeRole === "WORKER"
+                ? "Access gig assignments, daily earnings, dividends & social security."
+                : "Book verified fair-trade workers for household repairs & services."}
+            </p>
+
+            <p className="text-[11px] text-slate-400 mt-1">
               By logging in, you agree to our{" "}
               <button
                 type="button"
@@ -304,8 +429,34 @@ export function EnhancedLoginForm() {
             </p>
           </div>
 
-          {/* Error Message */}
-          {errorMessage && (
+          {/* CROSS-ROLE MISMATCH ALERT BANNER */}
+          {roleMismatch ? (
+            <div className="mb-5 rounded-2xl border-2 border-[#800020]/20 bg-rose-50/90 p-4 text-xs text-rose-950 shadow-sm animate-in fade-in duration-200">
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-xl bg-[#800020] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <ShieldAlert className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-sm text-[#800020] font-heading">
+                    Account Role Mismatch
+                  </h4>
+                  <p className="mt-1 text-slate-700 leading-relaxed font-medium">
+                    {roleMismatch.message}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleRoleChange(roleMismatch.targetRole)}
+                    className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#800020] hover:bg-[#66001a] text-white px-3.5 py-2 font-bold text-xs shadow-md transition active:scale-95"
+                  >
+                    <span>
+                      Switch to {roleMismatch.targetRole === "WORKER" ? "Worker Login" : "Consumer Login"} Now
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : errorMessage && (
             <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50/90 p-3.5 text-xs text-red-800">
               <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
               <span className="font-medium">{errorMessage}</span>
@@ -316,7 +467,7 @@ export function EnhancedLoginForm() {
           <form onSubmit={handleCredentialsSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Mobile Number or Email
+                {activeRole === "WORKER" ? "Worker Mobile Number or Email" : "Consumer Mobile Number or Email"}
               </label>
               <input
                 type="text"
@@ -324,8 +475,9 @@ export function EnhancedLoginForm() {
                 onChange={(e) => {
                   setIdentifier(e.target.value);
                   if (errorMessage) setErrorMessage(null);
+                  if (roleMismatch) setRoleMismatch(null);
                 }}
-                placeholder="e.g. 9812345601 or your@email.com"
+                placeholder={activeRole === "WORKER" ? "e.g. 9876543201 or worker@email.com" : "e.g. 9812345601 or consumer@email.com"}
                 className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200/90 py-3.5 px-4 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 outline-none transition"
                 autoFocus
               />
@@ -350,6 +502,7 @@ export function EnhancedLoginForm() {
                   onChange={(e) => {
                     setPassword(e.target.value);
                     if (errorMessage) setErrorMessage(null);
+                    if (roleMismatch) setRoleMismatch(null);
                   }}
                   placeholder="Your password"
                   className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200/90 py-3.5 pl-4 pr-11 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 outline-none transition"
@@ -366,7 +519,7 @@ export function EnhancedLoginForm() {
             </div>
 
             <p className="text-xs text-slate-500 pt-1">
-              We will send you a 6-digit verification code.
+              We will generate a 6-digit verification code for {activeRole === "WORKER" ? "Worker" : "Consumer"} authentication.
             </p>
 
             {/* Connect Button */}
@@ -378,45 +531,84 @@ export function EnhancedLoginForm() {
               {loading ? (
                 <div className="flex items-center justify-center gap-2">
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  <span>Connecting...</span>
+                  <span>Verifying {activeRole === "WORKER" ? "Worker" : "Consumer"} Account...</span>
                 </div>
               ) : (
-                "Connect"
+                `Connect as ${activeRole === "WORKER" ? "Worker" : "Consumer"}`
               )}
             </button>
           </form>
 
-          {/* Divider */}
+          {/* Quick Demo Sign In Options tailored by role */}
           <div className="my-6 flex items-center">
             <div className="flex-1 border-t border-slate-200" />
-            <span className="px-3 text-xs font-medium text-slate-400">Or</span>
+            <span className="px-3 text-xs font-medium text-slate-400">Quick Test Logins</span>
             <div className="flex-1 border-t border-slate-200" />
           </div>
 
-          {/* Quick Demo Sign In Options */}
           <div className="space-y-2.5">
-            <button
-              type="button"
-              onClick={() => fillSeedUser("9812345601", "password123", "Consumer Priya")}
-              className="w-full rounded-2xl border border-slate-200/90 bg-white py-3 px-4 flex items-center justify-center gap-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-xs"
-            >
-              <span>Demo Consumer (Priya)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => fillSeedUser("9876543201", "password123", "Worker Rajesh")}
-              className="w-full rounded-2xl border border-slate-200/90 bg-white py-3 px-4 flex items-center justify-center gap-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition shadow-xs"
-            >
-              <span>Demo Worker (Rajesh)</span>
-            </button>
+            {activeRole === "WORKER" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => fillSeedUser("9876543201", "password123", "Demo Worker Rajesh")}
+                  className="w-full rounded-2xl border-2 border-amber-300 bg-amber-50/50 py-3 px-4 flex items-center justify-between text-xs font-semibold text-amber-950 hover:bg-amber-100/60 transition shadow-xs"
+                >
+                  <span className="flex items-center gap-2 font-bold">
+                    <span>👷</span>
+                    <span>Demo Worker (Rajesh - 9876543201)</span>
+                  </span>
+                  <span className="text-[10px] bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-md font-bold">
+                    Ready
+                  </span>
+                </button>
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleRoleChange("CONSUMER")}
+                    className="text-xs text-slate-500 hover:text-[#800020] font-medium"
+                  >
+                    Need household services? Switch to Consumer Login →
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => fillSeedUser("9812345601", "password123", "Demo Consumer Priya")}
+                  className="w-full rounded-2xl border-2 border-emerald-300 bg-emerald-50/50 py-3 px-4 flex items-center justify-between text-xs font-semibold text-emerald-950 hover:bg-emerald-100/60 transition shadow-xs"
+                >
+                  <span className="flex items-center gap-2 font-bold">
+                    <span>🏡</span>
+                    <span>Demo Consumer (Priya - 9812345601)</span>
+                  </span>
+                  <span className="text-[10px] bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-md font-bold">
+                    Ready
+                  </span>
+                </button>
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleRoleChange("WORKER")}
+                    className="text-xs text-slate-500 hover:text-[#800020] font-medium"
+                  >
+                    Looking for gig jobs? Switch to Worker Login →
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Privacy Note & Sign Up Link */}
           <div className="mt-8 text-center space-y-2">
             <p className="text-xs text-slate-500 font-medium">
               Don&apos;t have an account?{" "}
-              <Link href="/register" className="font-bold text-[#800020] hover:underline">
-                Sign up
+              <Link
+                href={activeRole === "WORKER" ? "/register?role=WORKER" : "/register?role=CONSUMER"}
+                className="font-bold text-[#800020] hover:underline"
+              >
+                Sign up as {activeRole === "WORKER" ? "Worker" : "Consumer"}
               </Link>
             </p>
             <p className="text-[11px] text-slate-400">
@@ -437,6 +629,7 @@ export function EnhancedLoginForm() {
             onClick={() => {
               setStep("credentials");
               setErrorMessage(null);
+              setRoleMismatch(null);
             }}
             className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition mb-6 shadow-xs"
             aria-label="Back to credentials"
@@ -446,6 +639,17 @@ export function EnhancedLoginForm() {
 
           {/* Heading & Subtitle */}
           <div className="mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider border ${
+                  activeRole === "WORKER"
+                    ? "bg-amber-100 text-amber-900 border-amber-300"
+                    : "bg-emerald-100 text-emerald-900 border-emerald-300"
+                }`}
+              >
+                {activeRole === "WORKER" ? "👷 Worker Verification" : "🏡 Consumer Verification"}
+              </span>
+            </div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
               Verify code
             </h1>
@@ -456,7 +660,36 @@ export function EnhancedLoginForm() {
           </div>
 
           {/* Error Message */}
-          {errorMessage && (
+          {roleMismatch ? (
+            <div className="mb-5 rounded-2xl border-2 border-[#800020]/20 bg-rose-50/90 p-4 text-xs text-rose-950 shadow-sm animate-in fade-in duration-200">
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-xl bg-[#800020] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <ShieldAlert className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold text-sm text-[#800020] font-heading">
+                    Account Role Mismatch
+                  </h4>
+                  <p className="mt-1 text-slate-700 leading-relaxed font-medium">
+                    {roleMismatch.message}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep("credentials");
+                      handleRoleChange(roleMismatch.targetRole);
+                    }}
+                    className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#800020] hover:bg-[#66001a] text-white px-3.5 py-2 font-bold text-xs shadow-md transition active:scale-95"
+                  >
+                    <span>
+                      Switch to {roleMismatch.targetRole === "WORKER" ? "Worker Login" : "Consumer Login"} Now
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : errorMessage && (
             <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50/90 p-3.5 text-xs text-red-800">
               <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
               <span className="font-medium">{errorMessage}</span>

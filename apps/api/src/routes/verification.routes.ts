@@ -88,7 +88,7 @@ router.post(
   "/digilocker/verify-otp",
   optionalAuthenticate,
   asyncHandler(async (req, res) => {
-    const { aadhaarNumber, otp, name } = req.body;
+    const { aadhaarNumber, otp, name, dob, address, gender } = req.body;
     if (!aadhaarNumber || !otp) {
       res.status(400).json({ success: false, error: "Aadhaar number and OTP are required" });
       return;
@@ -97,7 +97,7 @@ router.post(
       req.user?.id,
       aadhaarNumber,
       otp,
-      name
+      { name, dob, address, gender }
     );
     res.json({
       success: true,
