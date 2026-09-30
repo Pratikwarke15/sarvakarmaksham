@@ -54,13 +54,15 @@ export function Sidebar({ links }: SidebarProps) {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  active ? "bg-indigo-50 text-indigo-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-150",
+                  active
+                    ? "bg-rose-50 text-[#800020] font-bold border border-rose-200/60 shadow-2xs"
+                    : "text-slate-600 hover:bg-rose-50/50 hover:text-[#800020]",
                   collapsed && "justify-center px-2"
                 )}
                 title={collapsed ? label : undefined}
               >
-                <Icon className="h-5 w-5 shrink-0" />
+                <Icon className={cn("h-5 w-5 shrink-0", active ? "text-[#800020]" : "text-slate-400 group-hover:text-[#800020]")} />
                 {!collapsed && <span>{label}</span>}
               </Link>
             );

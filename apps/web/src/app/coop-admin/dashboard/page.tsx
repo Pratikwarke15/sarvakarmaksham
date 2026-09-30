@@ -78,30 +78,76 @@ export default function CoopAdminDashboard() {
   };
 
   if (loading) {
-    return <div className="flex justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
+    return (
+      <div className="flex flex-col items-center justify-center py-28 gap-3">
+        <Loader2 className="h-10 w-10 animate-spin text-[#800020]" />
+        <p className="text-xs font-semibold text-slate-500 tracking-wider uppercase">Loading Cooperative Hub...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 font-heading">{t("coop.dashboardTitle")}</h1>
-        <p className="text-gray-500 mt-1">{coopName || "Cooperative"}</p>
+    <div className="space-y-7 animate-fade-in max-w-6xl pb-12">
+      {/* Cooperative Header Banner */}
+      <div className="relative overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-sm">
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-rose-50/70 pointer-events-none blur-3xl" />
+        
+        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-50 border border-rose-200/70 text-[#800020] text-xs font-bold tracking-wide uppercase mb-3">
+              <span className="w-2 h-2 rounded-full bg-[#800020] animate-pulse" />
+              सर्वकर्मक्षमः · District Cooperative Hub
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-heading font-black text-slate-900 tracking-tight">
+              {coopName || t("coop.dashboardTitle")}
+            </h1>
+            <p className="text-slate-500 text-sm mt-1 max-w-xl font-medium">
+              Registered Multi-Trade Cooperative Society. Direct member dispatch, transparent peer payouts, and community safety enforcement.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-emerald-50 border border-emerald-200/70 text-emerald-800 text-xs font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              Active Cooperative Status
+            </div>
+            <Link
+              href="/coop-admin/workers"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white text-xs font-bold shadow-sm transition-all hover:shadow-md"
+            >
+              <Users className="w-3.5 h-3.5" />
+              Manage Roster
+            </Link>
+          </div>
+        </div>
       </div>
 
+      {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatsCard icon={Users} label={t("coop.totalWorkers")} value={stats?.totalWorkers ?? 0} color="indigo" />
-        <StatsCard icon={Briefcase} label={t("coop.activeBookings")} value={(stats?.totalBookings ?? 0) - (stats?.completedBookings ?? 0)} color="blue" />
-        <StatsCard icon={DollarSign} label={t("coop.monthlyRevenue")} value={formatCurrency(stats?.monthlyRevenue ?? 0)} color="emerald" />
+        <StatsCard icon={Users} label={t("coop.totalWorkers")} value={stats?.totalWorkers ?? 0} color="maroon" trend={{ value: 8, isUp: true }} />
+        <StatsCard icon={Briefcase} label={t("coop.activeBookings")} value={(stats?.totalBookings ?? 0) - (stats?.completedBookings ?? 0)} color="rose" />
+        <StatsCard icon={DollarSign} label={t("coop.monthlyRevenue")} value={formatCurrency(stats?.monthlyRevenue ?? 0)} color="emerald" trend={{ value: 14, isUp: true }} />
         <StatsCard icon={Percent} label={t("coop.commissionRate")} value={`${commissionRate}%`} color="amber" />
       </div>
 
+      {/* Revenue & Operations Chart */}
       <RevenueChart title={t("coop.coopRevenue")} />
 
-      <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">{t("coop.workers")}</h2>
-          <Link href="/coop-admin/workers" className="text-sm text-indigo-600 hover:text-indigo-500">{t("coop.manageAll")}</Link>
+      {/* Worker Roster Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-heading font-black text-slate-900">{t("coop.workers")}</h2>
+            <p className="text-xs text-slate-500 font-medium">Verified local technicians enrolled in this district cooperative</p>
+          </div>
+          <Link
+            href="/coop-admin/workers"
+            className="text-xs font-bold text-[#800020] hover:text-[#68001a] px-3 py-1.5 rounded-xl hover:bg-rose-50 transition-colors"
+          >
+            {t("coop.manageAll")} →
+          </Link>
         </div>
+
         {workers.length > 0 ? (
           <WorkerGrid
             workers={workers}
@@ -109,7 +155,11 @@ export default function CoopAdminDashboard() {
             onSuspend={handleSuspend}
           />
         ) : (
-          <div className="rounded-xl border bg-white py-10 text-center text-gray-400">{t("coop.noWorkers")}</div>
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white py-14 text-center">
+            <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm font-bold text-slate-700">{t("coop.noWorkers")}</p>
+            <p className="text-xs text-slate-400 mt-1">Technicians enrolled under this society will appear here for verification.</p>
+          </div>
         )}
       </div>
     </div>

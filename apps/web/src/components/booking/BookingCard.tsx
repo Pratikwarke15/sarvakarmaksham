@@ -17,48 +17,54 @@ export function BookingCard({ booking, onCancel }: BookingCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="rounded-xl border bg-white p-5 shadow-sm transition-all hover:shadow-md">
-      <div className="flex items-start justify-between">
+    <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all hover:shadow-md hover:border-slate-300">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-sm font-medium text-gray-900">{booking.bookingRef}</span>
+            <span className="font-mono text-xs font-bold text-[#800020] bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200/60">
+              {booking.bookingRef}
+            </span>
             <Badge className={getStatusColor(booking.status)}>{booking.status.replace("_", " ")}</Badge>
           </div>
-          <p className="mt-1 text-sm text-gray-600">{booking.service?.name || "Service"}</p>
+          <p className="mt-1.5 text-sm font-bold text-slate-900">{booking.service?.name || "Service"}</p>
           {booking.worker && (
-            <p className="text-xs text-gray-500">
-              Worker: {booking.worker.user?.name || "Assigned"}
+            <p className="text-xs text-slate-500 mt-0.5">
+              Assigned Technician: <span className="font-semibold text-slate-800">{booking.worker.user?.name || "Assigned"}</span>
             </p>
           )}
         </div>
         <div className="text-right">
-          <p className="text-lg font-bold text-gray-900">{formatCurrency(booking.quotedPrice)}</p>
-          <p className="text-xs text-gray-400">{formatDateTime(booking.createdAt)}</p>
+          <p className="text-lg font-black text-slate-900">{formatCurrency(booking.quotedPrice)}</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">{formatDateTime(booking.createdAt)}</p>
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-2">
-        {["PENDING", "ACCEPTED"].includes(booking.status) && (
+      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
+        {["PENDING", "ACCEPTED", "EN_ROUTE", "IN_PROGRESS"].includes(booking.status) && (
           <Link href={`/consumer/bookings/${booking.id}`}>
-            <Button size="sm" variant="outline">Track</Button>
+            <Button size="sm" className="bg-[#800020] hover:bg-[#68001a] text-white text-xs font-bold rounded-xl px-4">
+              Live Track
+            </Button>
           </Link>
         )}
         {["PENDING", "ACCEPTED"].includes(booking.status) && onCancel && (
-          <Button size="sm" variant="danger" onClick={() => onCancel(booking.id)}>
+          <Button size="sm" variant="danger" className="rounded-xl text-xs" onClick={() => onCancel(booking.id)}>
             Cancel
           </Button>
         )}
         {booking.status === "COMPLETED" && !booking.rating && (
           <Link href={`/consumer/bookings/${booking.id}`}>
-            <Button size="sm" variant="secondary">Rate</Button>
+            <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold">
+              Rate Service
+            </Button>
           </Link>
         )}
         <button
           onClick={() => setExpanded(!expanded)}
-          className="ml-auto flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+          className="ml-auto flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#800020] transition-colors"
         >
-          Details
-          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {expanded ? "Hide Details" : "View Details"}
+          {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
         </button>
       </div>
 

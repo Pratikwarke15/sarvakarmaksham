@@ -263,145 +263,256 @@ export default function WorkerDashboard() {
   }).length;
   const isOnDuty = profile?.isOnDuty ?? false;
   const rating = earnings?.avgRating ?? profile?.avgRating ?? 0;
+  const workerInitial = (user?.name || profile?.user?.name || "T").charAt(0).toUpperCase();
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-5xl">
+    <div className="space-y-6 sm:space-y-8 animate-fade-in max-w-5xl">
+      {/* Pending / Suspended Alerts */}
       {profile?.status === "PENDING_ADMIN_APPROVAL" && (
-        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <ShieldAlert className="h-5 w-5 text-amber-600" />
-          <div>
-            <p className="font-medium text-amber-800">{t("worker.reviewTitle")}</p>
-            <p className="text-sm text-amber-600">{t("worker.reviewDesc")}</p>
+        <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-2xs">
+          <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-amber-900">{t("worker.reviewTitle")}</p>
+            <p className="text-xs text-amber-700 mt-0.5">{t("worker.reviewDesc")}</p>
           </div>
-          <Link href="/worker/pending-approval" className="ml-auto shrink-0 text-sm font-medium text-amber-700 hover:underline">
+          <Link href="/worker/pending-approval" className="shrink-0 rounded-xl bg-amber-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-amber-700 transition">
             {t("worker.viewStatus")}
           </Link>
         </div>
       )}
 
       {profile?.status === "SUSPENDED" && (
-        <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
-          <ShieldAlert className="h-5 w-5 text-red-600" />
+        <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50/80 p-4 shadow-2xs">
+          <ShieldAlert className="h-5 w-5 text-rose-600 shrink-0" />
           <div>
-            <p className="font-medium text-red-800">{t("worker.suspendedTitle")}</p>
-            <p className="text-sm text-red-600">{t("worker.suspendedDesc")}</p>
+            <p className="text-sm font-bold text-rose-900">{t("worker.suspendedTitle")}</p>
+            <p className="text-xs text-rose-700 mt-0.5">{t("worker.suspendedDesc")}</p>
           </div>
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-heading">{t("worker.dashboardTitle")}</h1>
-          <p className="text-gray-500 mt-1">{t("worker.welcomeBack")}</p>
-        </div>
-        <div className="flex items-center gap-3 rounded-xl border bg-white p-4 shadow-sm">
-          <span className="text-sm font-medium text-gray-700">{t("worker.onDuty")}</span>
-          <Switch checked={isOnDuty} onCheckedChange={toggleOnDuty} />
-          <Badge variant={isOnDuty ? "success" : "default"}>
-            {isOnDuty ? t("worker.online") : t("worker.offline")}
-          </Badge>
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatsCard icon={Briefcase} label={t("worker.jobsToday")} value={jobsToday} color="indigo" />
-        <StatsCard icon={DollarSign} label={t("worker.monthlyEarnings")} value={formatCurrency(earnings?.monthlyEarnings ?? 0)} color="emerald" />
-        <StatsCard icon={Star} label={t("worker.avgRating")} value={rating ? rating.toFixed(1) : "—"} color="amber" />
-        <StatsCard icon={Clock} label={t("worker.totalJobs")} value={earnings?.totalJobs ?? 0} color="blue" />
-      </div>
-
-      {activeJob && (
-        <Card className="border-indigo-200 bg-indigo-50/50">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-base text-indigo-900">
-              {t("worker.activeJob")}
-              <Link href={`/worker/jobs`} className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-                {t("worker.goToJobs")}
-              </Link>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-900">{activeJob.service?.name || "Service"}</p>
-                <p className="text-sm text-gray-500">{activeJob.consumer?.name ? `${activeJob.consumer.name} · ` : ""}{activeJob.address}</p>
-                <p className="text-xs text-gray-400">{activeJob.bookingRef}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-indigo-600">{formatCurrency(activeJob.quotedPrice)}</p>
-                <Badge className={getStatusColor(activeJob.status)}>{activeJob.status.replace("_", " ")}</Badge>
-              </div>
+      {/* Main Artisan Header Card matching Landing Page Maroon Theme */}
+      <div className="rounded-3xl border border-slate-200/90 bg-gradient-to-br from-white via-[#FFFDFB] to-rose-50/30 p-6 sm:p-7 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="flex items-start sm:items-center gap-4">
+            <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-[#800020]/10 text-[#800020] font-black text-2xl border border-[#800020]/20 shadow-2xs shrink-0">
+              {workerInitial}
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="rounded-full bg-rose-50 text-[#800020] border border-rose-200/70 text-[10px] font-bold px-2.5 py-0.5 uppercase tracking-wider">
+                  Technician Cockpit
+                </span>
+                <span className="rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2.5 py-0.5 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                  <span>Aadhaar Verified</span>
+                </span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-heading tracking-tight mt-1">
+                नमस्ते, {user?.name || "Technician"}
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                <span>{profile?.coop?.name || "Jalgaon Cooperative Network"}</span>
+                <span>•</span>
+                <span>0% Commission Worker Escrow</span>
+              </p>
+            </div>
+          </div>
 
-      <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">{t("worker.recentJobs")}</h2>
-          <Link href="/worker/jobs" className="text-sm text-indigo-600 hover:text-indigo-500">
-            {t("consumer.viewAll")}
+          {/* Duty Status Switch with Live Pulse */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs flex items-center gap-3.5 self-start md:self-auto">
+            <div className="relative flex items-center justify-center">
+              <span className={`h-3 w-3 rounded-full ${isOnDuty ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+              {isOnDuty && (
+                <span className="absolute h-4 w-4 rounded-full bg-emerald-400 opacity-75 animate-ping" />
+              )}
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-900 block leading-tight">
+                {isOnDuty ? "Online · Receiving Bookings" : "Offline · Resting"}
+              </span>
+              <span className="text-[11px] text-slate-400 block mt-0.5">
+                {isOnDuty ? "Visible to neighborhood customers" : "Toggle switch to go on duty"}
+              </span>
+            </div>
+            <div className="ml-2">
+              <Switch checked={isOnDuty} onCheckedChange={toggleOnDuty} />
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Action Navigation Strip */}
+        <div className="mt-6 pt-5 border-t border-slate-100 flex flex-wrap items-center gap-2 sm:gap-3">
+          <Link
+            href="/worker/jobs"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 hover:border-[#800020]/40 px-3.5 py-1.5 text-xs font-bold text-slate-800 hover:text-[#800020] shadow-2xs transition-colors"
+          >
+            <Briefcase className="h-3.5 w-3.5 text-[#800020]" />
+            <span>My Jobs ({bookings.length})</span>
+          </Link>
+          <Link
+            href="/worker/earnings"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 hover:border-emerald-300 px-3.5 py-1.5 text-xs font-bold text-slate-800 hover:text-emerald-700 shadow-2xs transition-colors"
+          >
+            <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Wallet & Payout ({formatCurrency(earnings?.walletBalance ?? 0)})</span>
+          </Link>
+          <button
+            type="button"
+            onClick={() => setShowAssessmentModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 border border-rose-200 text-[#800020] hover:bg-rose-100 px-3.5 py-1.5 text-xs font-bold shadow-2xs transition-colors"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-[#800020]" />
+            <span>Skill Quiz Badge</span>
+          </button>
+          <Link
+            href="/worker/profile"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 hover:border-slate-300 px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 shadow-2xs transition-colors ml-auto"
+          >
+            <span>View Full Profile →</span>
           </Link>
         </div>
-        {recentJobs.length > 0 ? (
-          <div className="space-y-2">
-            {recentJobs.map((j) => (
-              <div key={j.id} className="flex items-center justify-between rounded-xl border bg-white p-4">
-                <div>
-                  <p className="font-medium text-gray-900">{j.service?.name || "Service"}</p>
-                  <p className="text-xs text-gray-400">{j.bookingRef}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-gray-900">{formatCurrency(j.quotedPrice)}</p>
-                  <Badge className={getStatusColor(j.status)}>{j.status.replace("_", " ")}</Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-xl border bg-white py-10 text-center text-gray-400">
-            {t("worker.noJobsYet")}
-          </div>
-        )}
       </div>
 
-      {/* Route-Aware & Corridor-Matched Jobs for Worker */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
+      {/* 4 Core KPIs styled with Maroon Brand Tokens */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatsCard
+          icon={Briefcase}
+          label="Jobs Completed Today"
+          value={jobsToday}
+          subtitle="Dispatch activity"
+          color="maroon"
+        />
+        <StatsCard
+          icon={DollarSign}
+          label="Monthly Net Earnings"
+          value={formatCurrency(earnings?.monthlyEarnings ?? 0)}
+          subtitle="100% direct take-home"
+          color="emerald"
+        />
+        <StatsCard
+          icon={Star}
+          label="Customer Rating"
+          value={rating ? rating.toFixed(1) : "5.0"}
+          subtitle={`${earnings?.totalJobs ?? 0} jobs rated`}
+          color="amber"
+        />
+        <StatsCard
+          icon={Clock}
+          label="Escrow Wallet Balance"
+          value={formatCurrency(earnings?.walletBalance ?? 0)}
+          subtitle="Instant withdrawal"
+          color="blue"
+        />
+      </div>
+
+      {/* Active Dispatched Work Order Spotlight */}
+      {activeJob && (
+        <div className="rounded-3xl border border-rose-200/80 bg-gradient-to-r from-rose-50/60 via-white to-amber-50/20 p-6 shadow-xs animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-rose-100">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-3 w-3 rounded-full bg-rose-600 animate-pulse" />
+              <span className="text-xs font-bold text-[#800020] uppercase tracking-wider">
+                Live Dispatched Job in Progress
+              </span>
+              <span className="font-mono text-xs font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                {activeJob.bookingRef}
+              </span>
+            </div>
+            <Link
+              href="/worker/jobs"
+              className="text-xs font-bold text-[#800020] hover:underline inline-flex items-center gap-1"
+            >
+              <span>Manage All Jobs</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          {/* Stepper tracker */}
+          <div className="my-5 grid grid-cols-4 gap-2 text-center text-xs">
+            {["Accepted", "En Route", "In Progress", "Completed"].map((step, idx) => {
+              const currentIdx = activeJob.status === "ACCEPTED" ? 0 : activeJob.status === "EN_ROUTE" ? 1 : activeJob.status === "IN_PROGRESS" ? 2 : 3;
+              const isPassed = idx <= currentIdx;
+              const isCurrent = idx === currentIdx;
+              return (
+                <div key={step} className="flex flex-col items-center">
+                  <div
+                    className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                      isPassed
+                        ? 'bg-[#800020] text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-400'
+                    } ${isCurrent ? 'ring-2 ring-rose-300 ring-offset-2' : ''}`}
+                  >
+                    {idx + 1}
+                  </div>
+                  <span className={`mt-1.5 text-[11px] font-semibold ${isPassed ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
+                    {step}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-2xl p-4 border border-rose-100">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">{activeJob.service?.name || "Service Order"}</h3>
+              <p className="text-xs text-slate-600 mt-0.5 flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5 text-[#800020] shrink-0" />
+                <span>{activeJob.consumer?.name ? `${activeJob.consumer.name} · ` : ""}{activeJob.address}</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-3 self-end sm:self-auto">
+              <div className="text-right">
+                <span className="text-xs text-slate-400 block font-medium">Guaranteed Escrow</span>
+                <span className="text-xl font-black text-[#800020]">{formatCurrency(activeJob.quotedPrice)}</span>
+              </div>
+              <Link href="/worker/jobs">
+                <Button size="sm" className="rounded-xl bg-[#800020] hover:bg-[#68001a] text-white font-bold text-xs px-4">
+                  Open Dispatch Details
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Route-Aware & Corridor-Matched Jobs */}
+      <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Navigation className="h-5 w-5 text-[#ea580c]" />
-              Route-Aware Recommended Jobs (Smart Corridor Fit)
+            <h2 className="text-lg font-bold text-slate-900 font-heading flex items-center gap-2">
+              <Navigation className="h-5 w-5 text-[#800020]" />
+              Route-Aware Neighborhood Opportunities
             </h2>
-            <p className="text-xs text-gray-500">
-              Ranked by travel corridor affinity, minimal detour distance, and trade skill compatibility.
+            <p className="text-xs text-slate-500 mt-0.5">
+              Matched to your current travel corridor and trade specialties with minimal detour.
             </p>
           </div>
-          <span className="rounded-full bg-orange-100 text-orange-800 px-3 py-1 text-xs font-bold">
-            {recommendedJobs.length} Available
+          <span className="rounded-full bg-rose-50 border border-rose-200/80 text-[#800020] px-3 py-1 text-xs font-bold self-start sm:self-auto">
+            {recommendedJobs.length} Available Nearby
           </span>
         </div>
 
         {recommendedJobs.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3.5 sm:grid-cols-2">
             {recommendedJobs.slice(0, 4).map((j: any) => (
               <div
                 key={j.id}
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs hover:border-orange-500 hover:shadow-md transition-all flex flex-col justify-between gap-3"
+                className="rounded-2xl border border-slate-200/90 bg-slate-50/50 hover:bg-white p-4 shadow-2xs hover:border-[#800020]/40 hover:shadow-md transition-all flex flex-col justify-between gap-3 group"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="text-xs font-bold text-orange-600 uppercase tracking-wider font-mono">
+                      <span className="text-[10px] font-bold text-[#800020] bg-rose-50 px-2 py-0.5 rounded border border-rose-200 font-mono">
                         {j.bookingRef}
                       </span>
-                      <h3 className="text-sm font-bold text-slate-900 mt-0.5">{j.serviceName}</h3>
+                      <h3 className="text-sm font-bold text-slate-900 mt-1">{j.serviceName}</h3>
                     </div>
                     <div className="text-right">
                       <span className="text-base font-black text-slate-900">
                         {formatCurrency(j.quotedPrice || j.basePrice || 500)}
                       </span>
-                      <span className="block text-[10px] font-bold text-emerald-600">
+                      <span className="block text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 mt-0.5">
                         {j.affinityScore}% Match
                       </span>
                     </div>
@@ -423,7 +534,7 @@ export default function WorkerDashboard() {
                     {j.recommendationReasons?.map((r: string, idx: number) => (
                       <span
                         key={idx}
-                        className="rounded-md bg-orange-50 border border-orange-200 px-2 py-0.5 text-[10px] font-bold text-orange-800"
+                        className="rounded-md bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 shadow-2xs"
                       >
                         ✓ {r}
                       </span>
@@ -431,12 +542,12 @@ export default function WorkerDashboard() {
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-xs text-slate-500 font-medium">
-                    Consumer: {j.consumerName || "Verified Resident"}
+                <div className="pt-2.5 border-t border-slate-200/80 flex items-center justify-between">
+                  <span className="text-xs text-slate-500 font-medium truncate max-w-[55%]">
+                    {j.consumerName || "Verified Resident"}
                   </span>
-                  <Link href={`/worker/jobs`}>
-                    <Button size="sm" className="bg-[#ea580c] hover:bg-[#c2410c] text-white text-xs h-8">
+                  <Link href="/worker/jobs">
+                    <Button size="sm" className="bg-[#800020] hover:bg-[#68001a] text-white text-xs h-8 rounded-xl font-bold px-3">
                       Accept Job <ArrowRight className="ml-1 h-3.5 w-3.5" />
                     </Button>
                   </Link>
@@ -445,95 +556,33 @@ export default function WorkerDashboard() {
             ))}
           </div>
         ) : (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500">
-            No pending jobs along your current corridor right now. Stand by for instant dispatch.
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center text-xs text-slate-500">
+            No pending work orders along your direct corridor at this exact minute. New jobs appear automatically when booked by consumers.
           </div>
         )}
       </div>
 
-      {/* Verification & Skill Assessment Hub */}
-      <Card className="border-indigo-100 bg-gradient-to-r from-slate-50 via-white to-indigo-50/40 shadow-sm">
+      {/* Multi-Job Route Optimizer (OR-Tools & OSRM) */}
+      <Card className="rounded-3xl border border-slate-200/90 shadow-xs">
         <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <CardTitle className="flex items-center gap-2 text-base text-gray-900">
-                <Award className="h-5 w-5 text-indigo-600" />
-                Verified Worker Credentials & Badges
+              <CardTitle className="flex items-center gap-2 text-base text-slate-900 font-heading font-bold">
+                <Navigation className="h-5 w-5 text-[#800020]" />
+                Daily Multi-Job Route Optimizer (OR-Tools + OSRM)
               </CardTitle>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Two-path verification: Government DigiLocker certificates or Platform Skill Assessments.
+              <p className="text-xs text-slate-500 mt-0.5">
+                Calculates the mathematically optimal sequence for multiple bookings to minimize travel time and fuel cost.
               </p>
             </div>
             <Button
               size="sm"
-              onClick={() => setShowAssessmentModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
-            >
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Take Skill Assessment (Path B)
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {/* Identity Badge */}
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                <span className="text-xs font-bold text-emerald-900">Identity Verified</span>
-              </div>
-              <p className="text-[11px] font-semibold text-emerald-700 mt-1">Aadhaar e-KYC Verified</p>
-              <p className="text-[11px] text-gray-500 mt-0.5">Offline XML Document Certified</p>
-            </div>
-
-            {/* Path A Government Skill Badge */}
-            <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-blue-600 shrink-0" />
-                <span className="text-xs font-bold text-blue-900">Path A: Gov Trade Certified</span>
-              </div>
-              <p className="text-[11px] font-semibold text-blue-700 mt-1">DigiLocker Partner Verified</p>
-              <p className="text-[11px] text-gray-500 mt-0.5">NCVT / ITI Electrician Certificate</p>
-            </div>
-
-            {/* Path B Assessment Badge */}
-            <div className={`rounded-xl border p-3.5 ${assessmentPassed ? 'border-purple-200 bg-purple-50/60' : 'border-dashed border-gray-300 bg-gray-50/50'}`}>
-              <div className="flex items-center gap-2">
-                <Zap className={`h-4 w-4 ${assessmentPassed ? 'text-purple-600' : 'text-gray-400'} shrink-0`} />
-                <span className={`text-xs font-bold ${assessmentPassed ? 'text-purple-900' : 'text-gray-600'}`}>
-                  Path B: Skill Assessment
-                </span>
-              </div>
-              <p className={`text-[11px] font-semibold mt-1 ${assessmentPassed ? 'text-purple-700' : 'text-gray-500'}`}>
-                {assessmentPassed ? "Platform Certified · 90%+ Score" : "Available to Take Now"}
-              </p>
-              <p className="text-[11px] text-gray-400 mt-0.5">Automated Scenario MCQs Quiz</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Multi-Job Route Optimizer */}
-      <Card className="border-indigo-100 shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base text-gray-900">
-                <Navigation className="h-5 w-5 text-indigo-600" />
-                Multi-Job Daily Route Optimizer (Google OR-Tools + OSRM)
-              </CardTitle>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Calculates the mathematically optimal sequence for multiple bookings to minimize travel time and lateness.
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
               onClick={handleOptimizeRoutes}
               disabled={optimizingRoute}
-              className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              className="rounded-xl bg-[#800020] hover:bg-[#68001a] text-white font-bold text-xs"
             >
               {optimizingRoute ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Navigation className="mr-1.5 h-3.5 w-3.5" />}
-              {optimizingRoute ? "Optimizing..." : "Optimize Daily Multi-Job Route"}
+              {optimizingRoute ? "Optimizing..." : "Optimize Daily Route"}
             </Button>
           </div>
         </CardHeader>
@@ -541,42 +590,42 @@ export default function WorkerDashboard() {
           {optimizedRouteData ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="rounded-lg bg-indigo-50/70 p-3 border border-indigo-100">
-                  <p className="text-[11px] text-indigo-600 font-medium">Optimization Engine</p>
-                  <p className="text-sm font-bold text-indigo-900">{optimizedRouteData.engine}</p>
+                <div className="rounded-xl bg-rose-50/60 p-3 border border-rose-100">
+                  <p className="text-[11px] text-[#800020] font-medium">Optimization Engine</p>
+                  <p className="text-sm font-bold text-slate-900">{optimizedRouteData.engine}</p>
                 </div>
-                <div className="rounded-lg bg-indigo-50/70 p-3 border border-indigo-100">
-                  <p className="text-[11px] text-indigo-600 font-medium">Total Stops</p>
-                  <p className="text-sm font-bold text-indigo-900">{optimizedRouteData.total_jobs} bookings</p>
+                <div className="rounded-xl bg-rose-50/60 p-3 border border-rose-100">
+                  <p className="text-[11px] text-[#800020] font-medium">Total Stops</p>
+                  <p className="text-sm font-bold text-slate-900">{optimizedRouteData.total_jobs} bookings</p>
                 </div>
-                <div className="rounded-lg bg-indigo-50/70 p-3 border border-indigo-100">
-                  <p className="text-[11px] text-indigo-600 font-medium">Total Travel Time</p>
-                  <p className="text-sm font-bold text-indigo-900">{optimizedRouteData.total_travel_time_minutes} mins</p>
+                <div className="rounded-xl bg-rose-50/60 p-3 border border-rose-100">
+                  <p className="text-[11px] text-[#800020] font-medium">Est. Travel Time</p>
+                  <p className="text-sm font-bold text-slate-900">{optimizedRouteData.total_travel_time_minutes} mins</p>
                 </div>
-                <div className="rounded-lg bg-indigo-50/70 p-3 border border-indigo-100">
-                  <p className="text-[11px] text-indigo-600 font-medium">Total Distance</p>
-                  <p className="text-sm font-bold text-indigo-900">{optimizedRouteData.total_distance_km} km</p>
+                <div className="rounded-xl bg-emerald-50/60 p-3 border border-emerald-100">
+                  <p className="text-[11px] text-emerald-800 font-medium">Fuel Saved</p>
+                  <p className="text-sm font-bold text-emerald-900">~₹{optimizedRouteData.fuel_saved_estimate_inr || 45}</p>
                 </div>
               </div>
 
               {/* Steps timeline */}
               <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Optimized Sequence</h4>
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Optimized Sequencing</h4>
                 <div className="space-y-2">
                   {optimizedRouteData.optimized_schedule?.map((item: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between rounded-lg border bg-white p-3 text-sm">
+                    <div key={idx} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 text-xs">
                       <div className="flex items-center gap-3">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#800020] text-xs font-bold text-white shadow-2xs">
                           {item.step}
                         </span>
                         <div>
-                          <p className="font-semibold text-gray-900">{item.service_name || item.booking_ref || `Job ${item.step}`}</p>
-                          <p className="text-xs text-gray-500">{item.address}</p>
+                          <p className="font-bold text-slate-900">{item.service_name || item.booking_ref || `Job ${item.step}`}</p>
+                          <p className="text-slate-500 text-[11px]">{item.address}</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-semibold text-indigo-700">Arrival: {item.estimated_arrival}</p>
-                        <p className="text-[11px] text-gray-400">+{item.travel_time_from_prev_minutes}m travel · {item.distance_from_prev_km}km</p>
+                        <p className="text-xs font-bold text-[#800020]">Arrival: {item.estimated_arrival}</p>
+                        <p className="text-[10px] text-slate-400">+{item.travel_time_from_prev_minutes}m travel · {item.distance_from_prev_km}km</p>
                       </div>
                     </div>
                   ))}
@@ -588,21 +637,121 @@ export default function WorkerDashboard() {
                 lat={profile?.latitude || 28.6139}
                 lng={profile?.longitude || 77.209}
                 zoom={12}
-                className="h-64 rounded-xl border"
+                className="h-64 rounded-2xl border border-slate-200"
               />
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed p-6 text-center text-gray-500">
-              <Navigation className="mx-auto h-8 w-8 text-indigo-400 mb-2" />
-              <p className="text-sm font-medium text-gray-800">Multi-Job Route Scheduling Ready</p>
-              <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
-                Click &quot;Optimize Daily Multi-Job Route&quot; to calculate the most efficient route sequence for all your jobs today with dynamic arrival times.
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center text-slate-500">
+              <Navigation className="mx-auto h-8 w-8 text-[#800020]/60 mb-2" />
+              <p className="text-sm font-bold text-slate-800">Multi-Job Route Scheduling Ready</p>
+              <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                Click &quot;Optimize Daily Route&quot; to calculate the most fuel-efficient sequence for your day with precise estimated arrival times.
               </p>
             </div>
           )}
         </CardContent>
       </Card>
 
+      {/* Verification & Skill Badges Hub */}
+      <Card className="rounded-3xl border border-slate-200/90 shadow-xs">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base text-slate-900 font-heading font-bold">
+                <Award className="h-5 w-5 text-[#800020]" />
+                Technician Credentials & Cooperative Badges
+              </CardTitle>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Two-path verification: Government DigiLocker certificates or Platform Skill Assessments.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setShowAssessmentModal(true)}
+              className="rounded-xl bg-[#800020] hover:bg-[#68001a] text-white text-xs font-bold shadow-2xs"
+            >
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Take Skill Assessment
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {/* Identity Badge */}
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span className="text-xs font-bold text-emerald-950">Identity Verified</span>
+              </div>
+              <p className="text-xs font-semibold text-emerald-800 mt-1">UIDAI Aadhaar Verified</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">DigiLocker Authenticated Record</p>
+            </div>
+
+            {/* Path A Government Skill Badge */}
+            <div className="rounded-2xl border border-rose-200 bg-rose-50/60 p-4">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-[#800020] shrink-0" />
+                <span className="text-xs font-bold text-rose-950">Path A: Gov Trade Certified</span>
+              </div>
+              <p className="text-xs font-semibold text-[#800020] mt-1">DigiLocker Partner Verified</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">NCVT / ITI Electrician Certificate</p>
+            </div>
+
+            {/* Path B Assessment Badge */}
+            <div className={`rounded-2xl border p-4 ${assessmentPassed ? 'border-purple-200 bg-purple-50/60' : 'border-dashed border-slate-200 bg-slate-50/50'}`}>
+              <div className="flex items-center gap-2">
+                <Zap className={`h-4 w-4 ${assessmentPassed ? 'text-purple-600' : 'text-slate-400'} shrink-0`} />
+                <span className={`text-xs font-bold ${assessmentPassed ? 'text-purple-950' : 'text-slate-700'}`}>
+                  Path B: Skill Assessment
+                </span>
+              </div>
+              <p className={`text-xs font-semibold mt-1 ${assessmentPassed ? 'text-purple-800' : 'text-slate-500'}`}>
+                {assessmentPassed ? "Platform Certified · 90%+ Score" : "Available to Take Now"}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Audio/Visual Scenario Quiz</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recent Jobs History List */}
+      <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 font-heading">{t("worker.recentJobs")}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Your most recent customer service assignments</p>
+          </div>
+          <Link href="/worker/jobs" className="text-xs font-bold text-[#800020] hover:underline">
+            {t("consumer.viewAll")}
+          </Link>
+        </div>
+        {recentJobs.length > 0 ? (
+          <div className="space-y-2.5">
+            {recentJobs.map((j) => (
+              <div key={j.id} className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-4 hover:bg-white hover:border-slate-200 transition-colors">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-[#800020] bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                      {j.bookingRef}
+                    </span>
+                    <Badge className={getStatusColor(j.status)}>{j.status.replace("_", " ")}</Badge>
+                  </div>
+                  <p className="font-bold text-slate-900 text-sm mt-1">{j.service?.name || "Service"}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-black text-slate-900 text-base">{formatCurrency(j.quotedPrice)}</p>
+                  <p className="text-[11px] text-emerald-700 font-bold mt-0.5">100% Payout</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-10 text-center text-slate-400 text-xs">
+            {t("worker.noJobsYet")}
+          </div>
+        )}
+      </div>
+
+      {/* Revenue & Growth Trajectory Chart */}
       <RevenueChart title={t("worker.yourEarnings")} />
 
       <SkillAssessmentModal

@@ -37,7 +37,7 @@ export default function WorkerLayout({ children }: { children: React.ReactNode }
 
   return (
     <AuthGuard allowedRoles={["WORKER"]}>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[#FCFBFA]">
         <Navbar />
         <div className="flex">
           <Sidebar links={sidebarLinks} />
