@@ -245,36 +245,6 @@ async function seedConsumers(): Promise<ConsumerSeed[]> {
   return consumers;
 }
 
-async function seedCoopAdmins(coops: CoopSeed[]) {
-  console.log('Seeding coop admins...');
-  const passwordHash = await bcrypt.hash('password123', 10);
-  const admins = [
-    { name: 'Rajesh Kumar', phone: '9890000001' },
-    { name: 'Sunita Bhatt', phone: '9890000002' },
-    { name: 'Venkat Rao', phone: '9890000003' },
-    { name: 'Harish Meena', phone: '9890000004' },
-  ];
-  for (let i = 0; i < coops.length; i++) {
-    const userId = uuid();
-    await prisma.user.create({
-      data: { id: userId, phone: admins[i].phone, name: `${admins[i].name} (Admin)`, role: 'COOP_ADMIN', passwordHash, isActive: true },
-    });
-    await prisma.coopAdminProfile.create({
-      data: { id: uuid(), userId, coopId: coops[i].id, designation: 'Coop Administrator' },
-    });
-  }
-  console.log(`  Created ${admins.length} coop admins.`);
-}
-
-async function seedMinistryAdmin() {
-  console.log('Seeding ministry super admin...');
-  const passwordHash = await bcrypt.hash('admin123', 10);
-  await prisma.user.create({
-    data: { id: uuid(), phone: '9999999999', name: 'Dr. Priya Sharma', role: 'MINISTRY_SUPER_ADMIN', passwordHash, isActive: true },
-  });
-  console.log('  Created ministry super admin.');
-}
-
 interface BookingSeed {
   id: string;
   bookingRef: string;
@@ -458,8 +428,6 @@ async function main() {
   const serviceMap = await seedServices(coops);
   const workers = await seedWorkers(coops);
   const consumers = await seedConsumers();
-  await seedCoopAdmins(coops);
-  await seedMinistryAdmin();
   const bookings = await seedBookings(coops, consumers, workers, serviceMap);
   await seedWalletTransactions(workers, bookings);
   await seedReviews(consumers, workers, bookings);
@@ -468,8 +436,6 @@ async function main() {
   console.log('\n=== Seed completed! ===');
   console.log('Workers: 98765432XX / password123');
   console.log('Consumers: 98123456XX / password123');
-  console.log('Coop Admins: 989000000X / password123');
-  console.log('Ministry Admin: 9999999999 / admin123');
 }
 
 main().catch(e => { console.error('Seed failed:', e); process.exit(1); }).finally(() => prisma.$disconnect());

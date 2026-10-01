@@ -597,45 +597,6 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
                 </div>
               </>
             )}
-
-            {/* Admin Quick Test Logins */}
-            <div className="pt-3 border-t border-dashed border-slate-200 mt-2">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">
-                Administrative Portals
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => fillSeedUser("9999999999", "admin123", "Ministry Super Admin")}
-                  className="rounded-xl border border-rose-200 bg-rose-50/70 p-2.5 flex flex-col items-start hover:bg-rose-100/70 transition text-left group"
-                >
-                  <div className="flex items-center gap-1.5 w-full justify-between">
-                    <span className="text-xs font-bold text-[#800020] flex items-center gap-1">
-                      <span>🏛️</span> Super Admin
-                    </span>
-                    <span className="text-[9px] font-bold bg-[#800020] text-white px-1.5 py-0.5 rounded">
-                      Apex
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-500 font-mono mt-0.5">9999999999</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillSeedUser("9890000001", "password123", "Cooperative Admin")}
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 flex flex-col items-start hover:bg-slate-100 transition text-left group"
-                >
-                  <div className="flex items-center gap-1.5 w-full justify-between">
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                      <span>🏢</span> Co-op Admin
-                    </span>
-                    <span className="text-[9px] font-bold bg-slate-700 text-white px-1.5 py-0.5 rounded">
-                      District
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-500 font-mono mt-0.5">9890000001</span>
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Privacy Note & Sign Up Link */}

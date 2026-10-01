@@ -52,18 +52,6 @@ const navConfig: Record<string, NavLinkItem[]> = {
     { href: "/worker/earnings", label: "Earnings", key: "earnings", icon: DollarSign },
     { href: "/worker/profile", label: "Profile", key: "profile", icon: Settings },
   ],
-  MINISTRY_SUPER_ADMIN: [
-    { href: "/admin/dashboard", label: "Command Center", key: "dashboard", icon: LayoutDashboard },
-    { href: "/admin/coops", label: "Cooperatives", key: "coops", icon: Building2 },
-    { href: "/admin/workers", label: "Nationwide Roster", key: "workers", icon: Users },
-  ],
-  COOP_ADMIN: [
-    { href: "/coop-admin/dashboard", label: "Dashboard", key: "dashboard", icon: LayoutDashboard },
-    { href: "/coop-admin/workers", label: "Workers", key: "workers", icon: Users },
-    { href: "/coop-admin/services", label: "Services", key: "services", icon: Settings },
-    { href: "/coop-admin/disputes", label: "Disputes", key: "disputes", icon: Gavel },
-    { href: "/coop-admin/dividends", label: "Dividends", key: "dividends", icon: Coins },
-  ],
 };
 
 export function Navbar() {

@@ -57,13 +57,11 @@ export function getStatusColor(status: BookingStatus | PaymentStatus | string): 
 }
 
 export function getRoleDashboardPath(role: UserRole): string {
-  const map: Record<UserRole, string> = {
+  const map: Partial<Record<UserRole, string>> = {
     CONSUMER: "/consumer/dashboard",
     WORKER: "/worker/dashboard",
-    COOP_ADMIN: "/coop-admin/dashboard",
-    MINISTRY_SUPER_ADMIN: "/admin/dashboard",
   };
-  return map[role] || "/login";
+  return map[role] || "/unauthorized";
 }
 
 export function generateBookingRef(): string {

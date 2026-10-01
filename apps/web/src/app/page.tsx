@@ -64,8 +64,6 @@ export default function HomePage() {
       const target =
         user.role === "WORKER"
           ? "/worker/dashboard"
-          : user.role === "COOP_ADMIN" || user.role === "MINISTRY_SUPER_ADMIN"
-          ? "/admin/dashboard"
           : "/consumer/dashboard";
       router.replace(target);
     }
