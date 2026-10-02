@@ -19,6 +19,7 @@ COPY --from=builder /app/packages/db ./packages/db
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/src/lib/models ./apps/api/dist/lib/models
 COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
+RUN mkdir -p /app/apps/api/public/uploads && chown -R apiuser:nodejs /app
 WORKDIR /app/apps/api
 USER apiuser
 EXPOSE 4000

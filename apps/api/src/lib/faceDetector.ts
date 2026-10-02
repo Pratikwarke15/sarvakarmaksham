@@ -281,21 +281,21 @@ export function validateHumanFace(imageBuffer: Buffer, mimeType: string): FaceVa
 
     const clustered = clusterDetections(detections, 0.2);
 
-    // Filter detections with face score >= 3.0 (standard for Pico face detector)
-    const validFaceDetections = clustered.filter((d) => d[3] >= 3.0);
+    // Filter detections with face score >= 1.5 (robust for mobile cameras/low-light)
+    const validFaceDetections = clustered.filter((d) => d[3] >= 1.5);
 
-    logger.debug(`Face detection result: total=${detections.length}, clustered=${clustered.length}, valid=${validFaceDetections.length}`);
+    logger.info(`Face detection result: total=${detections.length}, clustered=${clustered.length}, valid=${validFaceDetections.length}`);
 
     if (validFaceDetections.length === 0) {
-      // Secondary check: Natural skin tone distribution across center region
+      // Secondary check: Natural skin tone distribution across center region (both RGB and YCbCr color spaces)
       // Rejects plain walls, landscapes, screenshot text, solid colors, but accepts authentic selfies in varied lighting
       let skinPixels = 0;
       let centerSkinPixels = 0;
       const totalPixels = width * height;
-      const midXStart = Math.floor(width * 0.25);
-      const midXEnd = Math.floor(width * 0.75);
-      const midYStart = Math.floor(height * 0.2);
-      const midYEnd = Math.floor(height * 0.8);
+      const midXStart = Math.floor(width * 0.20);
+      const midXEnd = Math.floor(width * 0.80);
+      const midYStart = Math.floor(height * 0.15);
+      const midYEnd = Math.floor(height * 0.85);
       let centerTotal = 0;
 
       for (let y = 0; y < height; y++) {
@@ -305,8 +305,15 @@ export function validateHumanFace(imageBuffer: Buffer, mimeType: string): FaceVa
           const g = data[idx + 1];
           const b = data[idx + 2];
 
-          // Natural human skin tone detection rule:
-          const isSkin = r > 50 && g > 30 && b > 20 && r > g && r > b && (r - g) >= 8 && Math.abs(r - b) >= 12;
+          // 1. Standard RGB skin heuristic (Kovac et al.)
+          const isRgbSkin = r > 40 && g > 25 && b > 15 && r > g && (r - g) >= 4 && (r - b) >= 4;
+
+          // 2. Standard YCbCr illumination-invariant skin segmentation
+          const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+          const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+          const isYCbCrSkin = cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173;
+
+          const isSkin = isRgbSkin || isYCbCrSkin;
           if (isSkin) {
             skinPixels++;
           }
@@ -320,8 +327,8 @@ export function validateHumanFace(imageBuffer: Buffer, mimeType: string): FaceVa
       const centerSkinRatio = centerTotal > 0 ? centerSkinPixels / centerTotal : 0;
       const overallSkinRatio = skinPixels / totalPixels;
 
-      // If center contains substantial human skin tones (>= 15%), accept with confidence
-      if (centerSkinRatio >= 0.15 && overallSkinRatio >= 0.08) {
+      // If center contains substantial human skin tones (>= 10%), accept with confidence
+      if (centerSkinRatio >= 0.10 && overallSkinRatio >= 0.05) {
         logger.info(`Human skin chrominance fallback match: centerRatio=${centerSkinRatio.toFixed(2)}, overallRatio=${overallSkinRatio.toFixed(2)}`);
         return {
           hasFace: true,

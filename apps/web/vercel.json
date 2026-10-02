@@ -4,6 +4,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://coopgig.onrender.com/api/:path*"
+    },
+    {
+      "source": "/uploads/:path*",
+      "destination": "https://coopgig.onrender.com/uploads/:path*"
     }
   ]
 }
