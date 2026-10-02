@@ -17,6 +17,7 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/db ./packages/db
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/src/lib/models ./apps/api/dist/lib/models
 COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
 WORKDIR /app/apps/api
 USER apiuser
