@@ -83,34 +83,76 @@ router.post("/consumer-kyc", authenticate, authorize("CONSUMER"), kycUpload.sing
  * Public route for profile photo capture during registration (no token required).
  * Validates human face presence before storing to profile-photos bucket.
  */
-router.post("/register-photo", photoUpload.single("file"), asyncHandler(async (req, res) => {
+router.post("/register-photo", (req, res, next) => {
+  photoUpload.single("file")(req, res, (err) => {
+    if (err) {
+      res.status(400).json({ success: false, error: `Upload parse error: ${err.message}` });
+      return;
+    }
+    next();
+  });
+}, asyncHandler(async (req, res) => {
   if (!req.file) {
     res.status(400).json({ success: false, error: "No photo provided. Please capture your photo." });
     return;
   }
 
-  // 1. Server-side face presence validation
-  const faceCheck = validateHumanFace(req.file.buffer, req.file.mimetype);
-  if (!faceCheck.hasFace) {
-    res.status(400).json({
-      success: false,
-      error: faceCheck.reason || "No detectable human face found. Please take a clear photo of yourself.",
+  try {
+    // 1. Server-side face presence validation
+    let faceCheck;
+    try {
+      faceCheck = validateHumanFace(req.file.buffer, req.file.mimetype);
+    } catch (faceErr: any) {
+      res.status(500).json({
+        success: false,
+        error: `Face detector internal error: ${faceErr?.message}`,
+        stack: faceErr?.stack,
+      });
+      return;
+    }
+
+    if (!faceCheck.hasFace) {
+      res.status(400).json({
+        success: false,
+        error: faceCheck.reason || "No detectable human face found. Please take a clear photo of yourself.",
+      });
+      return;
+    }
+
+    // 2. Upload to storage
+    let uploadResult;
+    try {
+      uploadResult = await uploadFile(
+        "profile-photos",
+        req.file.buffer,
+        req.file.originalname || "profile.jpg",
+        req.file.mimetype || "image/jpeg"
+      );
+    } catch (storageErr: any) {
+      res.status(500).json({
+        success: false,
+        error: `Storage upload internal error: ${storageErr?.message}`,
+        stack: storageErr?.stack,
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      message: "Photo validated and uploaded successfully",
+      data: {
+        url: uploadResult.url,
+        faceDetected: true,
+        confidence: faceCheck.confidence,
+      },
     });
-    return;
+  } catch (outerErr: any) {
+    res.status(500).json({
+      success: false,
+      error: `Unexpected error: ${outerErr?.message}`,
+      stack: outerErr?.stack,
+    });
   }
-
-  // 2. Upload to storage
-  const { url } = await uploadFile("profile-photos", req.file.buffer, req.file.originalname, req.file.mimetype);
-
-  res.json({
-    success: true,
-    message: "Photo validated and uploaded successfully",
-    data: {
-      url,
-      faceDetected: true,
-      confidence: faceCheck.confidence,
-    },
-  });
 }));
 
 /**
