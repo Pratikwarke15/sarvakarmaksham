@@ -10,7 +10,10 @@
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:web": "npm run dev --workspace=apps/web",
-    "build": "npm run build --workspace=apps/web",
+    "build": "npm run db:generate && npm run build --workspace=apps/api && npm run build --workspace=apps/web",
+    "build:api": "npm run db:generate && npm run build --workspace=apps/api",
+    "build:web": "npm run build --workspace=apps/web",
+    "start": "node apps/api/dist/index.js",
     "db:generate": "npm run generate --workspace=packages/db",
     "db:push": "npm run push --workspace=packages/db",
     "db:seed": "npm run seed --workspace=packages/db",
@@ -21,6 +24,7 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
+    "puppeteer-core": "^25.12.0",
     "typescript": "5.5.4"
   },
   "engines": {
