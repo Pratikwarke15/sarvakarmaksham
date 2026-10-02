@@ -58,7 +58,7 @@ app.get("/", (_req, res) => {
     success: true,
     message: "सर्वकर्मक्षमः (Sarvakarmakshamah) API Server",
     status: "healthy",
-    version: "1.1.1-debug-diag",
+    version: "1.2.0-verified-face",
     endpoints: {
       health: "/api/v1/health",
       docs: "/api/docs",
@@ -72,7 +72,7 @@ app.get("/api/v1/health", (_req, res) => {
   res.json({
     success: true,
     message: "SIH26089 Shramik Co API is running",
-    version: "1.1.1-debug-diag",
+    version: "1.2.0-verified-face",
     timestamp: new Date().toISOString(),
   });
 });

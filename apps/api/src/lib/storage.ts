@@ -1,9 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
+import WebSocket from "ws";
 import fs from "fs/promises";
 import path from "path";
 import { v4 as uuid } from "uuid";
 import { env } from "../config/env";
 import { logger } from "./logger";
+
+if (typeof globalThis.WebSocket === "undefined") {
+  (globalThis as any).WebSocket = WebSocket;
+}
 
 let supabase: ReturnType<typeof createClient> | null = null;
 
@@ -19,8 +24,18 @@ function getSupabase() {
   if (!url || !key) {
     return null;
   }
-  supabase = createClient(url, key);
-  return supabase;
+  try {
+    if (typeof globalThis.WebSocket === "undefined") {
+      (globalThis as any).WebSocket = WebSocket;
+    }
+    supabase = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    return supabase;
+  } catch (err: any) {
+    logger.warn(`Supabase client initialization warning: ${err?.message}`);
+    return null;
+  }
 }
 
 async function uploadFileLocally(
