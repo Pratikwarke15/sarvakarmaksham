@@ -353,7 +353,7 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
       return;
     }
     setErrorMessage(null);
-    setStep("identity");
+    setStep("profile_photo");
   };
 
   // Personalized Greeting & Guidance Note Banner
@@ -456,6 +456,16 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
     }
   };
 
+  const handleProfilePhotoSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!avatarUrl) {
+      setErrorMessage("Please capture or upload a verified profile photo of yourself before continuing.");
+      return;
+    }
+    setErrorMessage(null);
+    setStep("identity");
+  };
+
   const handleIdentitySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -475,8 +485,7 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
       return;
     }
 
-    // Move to mandatory profile photo capture step
-    setStep("profile_photo");
+    handleFinalRegistration(avatarUrl || undefined);
   };
 
   const handleFinalRegistration = async (customAvatar?: string) => {
@@ -1232,19 +1241,78 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
               type="submit"
               className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 text-sm sm:text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all flex items-center justify-center gap-2"
             >
-              <span>Next: DigiLocker Verification</span>
+              <span>Next: Profile Photo & Face Verification</span>
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </form>
       )}
 
-      {/* STEP 7: IDENTITY & DIGILOCKER AUTHORIZATION (Fits cleanly on mobile screen!) */}
+      {/* STEP 7: PROFILE PHOTO & FACE VALIDATION (Before DigiLocker) */}
+      {step === "profile_photo" && (
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setStep("location")}
+            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-4 sm:mb-6 shadow-xs"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading">
+              Take Profile Photo
+            </h1>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              Take a clear photo of yourself for your {role === "WORKER" ? "Worker" : "Consumer"} profile before DigiLocker identity verification.
+            </p>
+          </div>
+
+          {renderGuidanceBanner(
+            "Face Verification",
+            "Take a clear photo of yourself. Automated face validation ensures authenticity before government DigiLocker authorization."
+          )}
+
+          <ProfilePhotoCapture
+            onPhotoCaptured={(url) => {
+              setAvatarUrl(url);
+              setErrorMessage(null);
+            }}
+            initialPhotoUrl={avatarUrl || undefined}
+            isPublicRegistration={true}
+          />
+
+          <div className="pt-2">
+            <button
+              type="button"
+              disabled={!avatarUrl}
+              onClick={handleProfilePhotoSubmit}
+              className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 sm:py-4 text-sm sm:text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {avatarUrl ? (
+                <>
+                  <span>Next: DigiLocker Verification</span>
+                  <ChevronRight className="h-5 w-5" />
+                </>
+              ) : (
+                <span>Take Photo to Continue</span>
+              )}
+            </button>
+            {!avatarUrl && (
+              <p className="text-center text-[10px] text-slate-400 mt-1.5 font-medium">
+                A verified human photo is required to ensure trust across the platform.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* STEP 8: IDENTITY & DIGILOCKER AUTHORIZATION (With Verified Face Display) */}
       {step === "identity" && (
         <form onSubmit={handleIdentitySubmit}>
           <button
             type="button"
-            onClick={() => setStep("location")}
+            onClick={() => setStep("profile_photo")}
             className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-4 sm:mb-6 shadow-xs"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -1265,7 +1333,7 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
           )}
 
           <div className="space-y-4">
-            {/* 1. Submitted Member Profile Card */}
+            {/* 1. Submitted Member Profile Card with Captured Face */}
             <div className="rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 space-y-2.5 shadow-xs">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
@@ -1277,21 +1345,40 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Legal Name</span>
-                  <span className="font-bold text-slate-900 truncate block">{name || "Not specified"}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Date of Birth</span>
-                  <span className="font-bold text-slate-900">{dob}</span>
+              <div className="flex items-center gap-3">
+                {avatarUrl && (
+                  <div className="relative h-14 w-14 rounded-2xl overflow-hidden border-2 border-[#800020]/20 shrink-0 shadow-xs">
+                    <img
+                      src={avatarUrl}
+                      alt="Captured Face"
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute bottom-0 inset-x-0 bg-[#800020] text-[7px] text-white text-center font-bold py-0.5 leading-none">
+                      SELFIE
+                    </div>
+                  </div>
+                )}
+                <div className="min-w-0 flex-1 grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Legal Name</span>
+                    <span className="font-bold text-slate-900 truncate block">{name || "Not specified"}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Date of Birth</span>
+                    <span className="font-bold text-slate-900">{dob}</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="text-xs pt-1.5 border-t border-slate-100">
-                <span className="text-slate-400 block text-[10px]">Colony & Location</span>
-                <span className="font-semibold text-slate-800 text-[11px] truncate block">
-                  {[streetAddress, city, pincode].filter(Boolean).join(", ")}
+              <div className="text-xs pt-1.5 border-t border-slate-100 flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <span className="text-slate-400 block text-[10px]">Colony & Location</span>
+                  <span className="font-semibold text-slate-800 text-[11px] truncate block">
+                    {[streetAddress, city, pincode].filter(Boolean).join(", ")}
+                  </span>
+                </div>
+                <span className="shrink-0 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  ✓ Photo Verified
                 </span>
               </div>
             </div>
@@ -1336,15 +1423,15 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
                       setErrorMessage(null);
                       setDigilockerModalOpen(true);
                     }}
-                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#002F6C] hover:bg-[#00224d] text-white py-3 text-xs sm:text-sm font-bold shadow-md shadow-[#002F6C]/20 transition"
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#002F6C] hover:bg-[#00224d] text-white py-3.5 text-xs sm:text-sm font-bold shadow-md shadow-[#002F6C]/20 transition active:scale-[0.99]"
                   >
-                    <span>Connect with DigiLocker</span>
+                    <span>Connect with DigiLocker Gateway</span>
                     <ChevronRight className="h-4 w-4" />
                   </button>
                 </div>
               ) : (
                 <div className="space-y-2.5">
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 space-y-1 text-xs text-emerald-900">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 space-y-2.5 text-xs text-emerald-900">
                     <div className="flex items-center justify-between font-bold">
                       <span className="flex items-center gap-1.5">
                         <Check className="h-4 w-4 text-emerald-600" />
@@ -1352,112 +1439,97 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
                       </span>
                       <span className="font-mono text-[10px] text-emerald-700">{digilockerRef}</span>
                     </div>
-                    <p className="text-[10px] text-emerald-800">
-                      Masked UID: <span className="font-mono font-bold">{aadhaarInput ? `XXXX-XXXX-${aadhaarInput.replace(/\D/g, "").slice(-4)}` : "XXXX-XXXX-7777"}</span> • UIDAI Audit Match Confirmed
-                    </p>
+
+                    {/* DigiLocker Account Face & Bio Card */}
+                    <div className="flex items-start gap-3 bg-white/95 rounded-xl p-3 border border-emerald-200 shadow-2xs">
+                      {/* DigiLocker Face */}
+                      <div className="flex flex-col items-center shrink-0">
+                        <div className="relative h-16 w-16 sm:h-18 sm:w-18 rounded-xl overflow-hidden border-2 border-emerald-600 shadow-xs">
+                          {avatarUrl ? (
+                            <img
+                              src={avatarUrl}
+                              alt="DigiLocker Account Face"
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-full w-full bg-slate-100 flex items-center justify-center">
+                              <User className="h-8 w-8 text-slate-400" />
+                            </div>
+                          )}
+                          <div className="absolute bottom-0 inset-x-0 bg-[#002F6C] text-[7px] text-white text-center font-bold py-0.5 leading-none">
+                            UIDAI FACE
+                          </div>
+                        </div>
+                        <span className="text-[9px] text-emerald-700 font-bold mt-1 flex items-center gap-0.5">
+                          <Check className="h-2.5 w-2.5" /> Face Matched
+                        </span>
+                      </div>
+
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="font-bold text-slate-900 text-xs flex items-center gap-1">
+                          <span>DigiLocker Account Face Verified</span>
+                          <span className="text-emerald-600">✓</span>
+                        </p>
+                        <p className="text-[11px] text-slate-700">
+                          Aadhaar Holder: <span className="font-semibold text-slate-900">{name}</span>
+                        </p>
+                        <p className="text-[11px] text-emerald-800">
+                          Masked UID: <span className="font-mono font-bold">{aadhaarInput ? `XXXX-XXXX-${aadhaarInput.replace(/\D/g, "").slice(-4)}` : "XXXX-XXXX-7777"}</span>
+                        </p>
+                        <p className="text-[10px] text-slate-500 leading-tight">
+                          Biometric facial contours matched with UIDAI DigiLocker database.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setDigilockerModalOpen(true)}
+                      className="text-[11px] font-bold text-[#002F6C] hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Re-verify or change persona</span>
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setDigilockerModalOpen(true)}
-                    className="text-[11px] font-bold text-[#002F6C] hover:underline inline-flex items-center gap-1"
-                  >
-                    <span>Re-verify or change persona</span>
-                  </button>
                 </div>
               )}
             </div>
 
-            {/* 3. Next: Photo Button */}
+            {/* 3. Final Submit Button in DigiLocker step */}
             <div>
-              <button
-                type="submit"
-                disabled={loading || !isAadhaarVerified}
-                className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 sm:py-4 text-sm sm:text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isAadhaarVerified ? (
-                  <>
-                    <span>Next: Take Profile Photo</span>
-                    <ChevronRight className="h-5 w-5" />
-                  </>
-                ) : (
+              {isAadhaarVerified ? (
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 sm:py-4 text-sm sm:text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span>Creating Account...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <span>Complete Registration & Join</span>
+                      <Check className="h-5 w-5" />
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDigilockerModalOpen(true)}
+                  className="w-full rounded-2xl bg-[#002F6C] hover:bg-[#00224d] text-white py-3.5 sm:py-4 text-sm sm:text-base font-bold shadow-md shadow-[#002F6C]/20 hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                >
                   <span>Connect with DigiLocker to Continue</span>
-                )}
-              </button>
-              {!isAadhaarVerified && (
-                <p className="text-center text-[10px] text-slate-400 mt-1.5 font-medium">
-                  Please click &quot;Connect with DigiLocker&quot; above to authorize your credentials.
-                </p>
+                  <ChevronRight className="h-5 w-5" />
+                </button>
               )}
             </div>
           </div>
         </form>
       )}
 
-      {/* STEP 8: PROFILE PHOTO & FACE VALIDATION */}
-      {step === "profile_photo" && (
-        <div className="space-y-4">
-          <button
-            type="button"
-            onClick={() => setStep("identity")}
-            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-4 sm:mb-6 shadow-xs"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-
-          <div className="mb-4 sm:mb-6">
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading">
-              Take Profile Photo
-            </h1>
-            <p className="text-xs text-slate-500 mt-1 font-medium">
-              Take a clear photo of yourself for your {role === "WORKER" ? "Worker" : "Consumer"} profile.
-            </p>
-          </div>
-
-          {renderGuidanceBanner(
-            "Face Verification",
-            "Take a clear photo of yourself. Automated face validation ensures community trust and authentic credentials."
-          )}
-
-          <ProfilePhotoCapture
-            onPhotoCaptured={(url) => {
-              setAvatarUrl(url);
-              setErrorMessage(null);
-            }}
-            initialPhotoUrl={avatarUrl || undefined}
-            isPublicRegistration={true}
-          />
-
-          <div className="pt-2">
-            <button
-              type="button"
-              disabled={loading || !avatarUrl}
-              onClick={() => handleFinalRegistration(avatarUrl || undefined)}
-              className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 sm:py-4 text-sm sm:text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Creating Account...</span>
-                </div>
-              ) : avatarUrl ? (
-                <>
-                  <span>Complete Registration & Join</span>
-                  <Check className="h-5 w-5" />
-                </>
-              ) : (
-                <span>Take Photo to Continue</span>
-              )}
-            </button>
-            {!avatarUrl && (
-              <p className="text-center text-[10px] text-slate-400 mt-1.5 font-medium">
-                A verified human photo is required to ensure trust across the platform.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* STEP 8: COMPLETE */}
+      {/* STEP 9: COMPLETE */}
       {step === "complete" && (
         <div className="py-8 sm:py-10 text-center">
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 mb-4 shadow-sm">
@@ -1495,6 +1567,7 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
                   .replace(", -", " -"),
                 skills: selectedSkills,
                 skillCertificate,
+                avatarUrl: avatarUrl || undefined,
               }}
               onSuccess={handleDigiLockerSuccess}
               onCancel={() => setDigilockerModalOpen(false)}

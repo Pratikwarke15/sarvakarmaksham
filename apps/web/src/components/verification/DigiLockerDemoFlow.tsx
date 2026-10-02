@@ -27,6 +27,7 @@ export interface DigiLockerInitialData {
   aadhaarNumber?: string;
   skillCertificate?: string;
   skills?: string[];
+  avatarUrl?: string;
 }
 
 interface DigiLockerDemoFlowProps {
@@ -289,6 +290,7 @@ export function DigiLockerDemoFlow({
             dob: finalDob,
             address: finalAddress,
             skillCertificate: finalSkillCert,
+            avatarUrl: initialData?.avatarUrl,
           });
         }
       } else {
@@ -514,23 +516,25 @@ export function DigiLockerDemoFlow({
                 By clicking Next, you consent to receive an authentication OTP on your UIDAI-registered mobile number.
               </div>
 
-              <button
-                type="submit"
-                disabled={loading || aadhaarInput.length !== 12}
-                className="w-full rounded-xl bg-[#006699] hover:bg-[#005580] text-white py-3 text-sm font-bold shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    <span>Contacting UIDAI Server...</span>
-                  </div>
-                ) : (
-                  <>
-                    <span>Next / Send Aadhaar OTP</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
-              </button>
+              <div className="pt-1">
+                <button
+                  type="submit"
+                  disabled={loading || aadhaarInput.length !== 12}
+                  className="w-full rounded-xl bg-[#006699] hover:bg-[#005580] text-white py-3.5 px-4 text-xs sm:text-sm font-bold shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      <span>Contacting UIDAI Server...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <span>Send Aadhaar OTP</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
 
             <div className="pt-1 text-center text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
@@ -585,6 +589,27 @@ export function DigiLockerDemoFlow({
                 onResend={handleResendOtp}
                 loading={loading}
               />
+            </div>
+
+            <div className="pt-1">
+              <button
+                type="button"
+                disabled={loading || otpValue.length !== 6}
+                onClick={() => handleVerifyOtp(otpValue)}
+                className="w-full rounded-xl bg-[#006699] hover:bg-[#005580] text-white py-3.5 px-4 text-xs sm:text-sm font-bold shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    <span>Verifying Code...</span>
+                  </div>
+                ) : (
+                  <>
+                    <span>Verify Code & Continue</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
             </div>
 
             <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
@@ -667,41 +692,70 @@ export function DigiLockerDemoFlow({
               )}
             </div>
 
-            {/* Official UIDAI Aadhaar Verification Record */}
-            <div className="rounded-xl border border-slate-300 bg-white p-3 space-y-1.5 text-xs shadow-xs">
+            {/* Official UIDAI Aadhaar Verification Record with DigiLocker Account Face */}
+            <div className="rounded-xl border border-slate-300 bg-white p-3 space-y-2 text-xs shadow-xs">
               <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
                 <span className="font-bold text-slate-900 flex items-center gap-1.5 text-[11px]">
                   <User className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>UIDAI Aadhaar Verified Record</span>
+                  <span>UIDAI Aadhaar Official Account</span>
                 </span>
                 <span className="rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-bold px-2 py-0.5 flex items-center gap-1">
                   <Check className="h-3 w-3" />
                   <span>Authenticated</span>
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div>
-                  <span className="text-slate-500">Aadhaar Name:</span>
-                  <p className="font-semibold text-slate-900">{verifiedData.name}</p>
+
+              {/* Citizen Photo & Aadhaar Details */}
+              <div className="flex items-start gap-3 pt-1">
+                {/* Official Face Photo */}
+                <div className="flex flex-col items-center shrink-0">
+                  <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-xl overflow-hidden border-2 border-[#002F6C]/40 bg-slate-100 shadow-xs">
+                    {initialData?.avatarUrl ? (
+                      <img
+                        src={initialData.avatarUrl}
+                        alt="DigiLocker Official Face"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="h-full w-full flex flex-col items-center justify-center bg-slate-100 text-slate-400">
+                        <User className="h-8 w-8 text-slate-400" />
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 inset-x-0 bg-[#002F6C]/90 text-[7px] sm:text-[8px] text-white text-center font-bold py-0.5 leading-none">
+                      UIDAI PHOTO
+                    </div>
+                  </div>
+                  <span className="text-[9px] text-emerald-700 font-bold mt-1 flex items-center gap-0.5">
+                    <Check className="h-2.5 w-2.5" /> Face Match
+                  </span>
                 </div>
-                <div>
-                  <span className="text-slate-500">Masked Aadhaar:</span>
-                  <p className="font-mono font-bold text-slate-900">{verifiedData.maskedAadhaar}</p>
+
+                {/* Details */}
+                <div className="flex-1 min-w-0 space-y-1 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 text-[10px] block">Aadhaar Name</span>
+                    <p className="font-bold text-slate-900 truncate">{verifiedData.name}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    <div>
+                      <span className="text-slate-400 text-[10px] block">Masked UID</span>
+                      <p className="font-mono font-bold text-slate-900">{verifiedData.maskedAadhaar}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] block">DOB / Age</span>
+                      <p className="font-semibold text-slate-900">{verifiedData.dob}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[10px] block">Verified Address</span>
+                    <p className="font-medium text-slate-800 text-[10px] leading-snug line-clamp-2" title={verifiedData.address}>
+                      {verifiedData.address}
+                    </p>
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-slate-100">
-                <div>
-                  <span className="text-slate-500">Date of Birth:</span>
-                  <p className="font-semibold text-slate-900">{verifiedData.dob}</p>
-                </div>
-                <div>
-                  <span className="text-slate-500">Verified Address:</span>
-                  <p className="font-semibold text-slate-900 truncate" title={verifiedData.address}>
-                    {verifiedData.address}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 font-mono border-t border-slate-100">
+
+              <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1.5 font-mono border-t border-slate-100">
                 <span>Source: UIDAI e-KYC Gateway</span>
                 <span>Ref: {verifiedData.digilockerRef}</span>
               </div>
@@ -784,12 +838,29 @@ export function DigiLockerDemoFlow({
               </p>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 max-w-sm mx-auto text-left text-xs space-y-1.5">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Name:</span>
-                <span className="font-bold text-slate-900">{verifiedData?.name}</span>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 max-w-sm mx-auto text-left text-xs space-y-2">
+              <div className="flex items-center gap-3">
+                {initialData?.avatarUrl && (
+                  <div className="relative h-14 w-14 rounded-xl overflow-hidden border border-emerald-300 shrink-0">
+                    <img
+                      src={initialData.avatarUrl}
+                      alt="Verified Face"
+                      className="h-full w-full object-cover"
+                    />
+                    <div className="absolute bottom-0 inset-x-0 bg-emerald-700 text-[7px] text-white text-center font-bold py-0.5">
+                      VERIFIED
+                    </div>
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-slate-900 text-sm truncate">{verifiedData?.name}</p>
+                  <p className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                    <Check className="h-3 w-3" /> DigiLocker Face & Aadhaar Verified
+                  </p>
+                  <p className="font-mono text-slate-500 text-[10px] truncate">{verifiedData?.digilockerRef}</p>
+                </div>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between border-t border-slate-200/60 pt-1.5">
                 <span className="text-slate-500">Identity Status:</span>
                 <span className="text-emerald-700 font-bold">✓ Aadhaar Verified</span>
               </div>
@@ -799,10 +870,6 @@ export function DigiLockerDemoFlow({
                   <span className="text-emerald-700 font-bold">✓ Verified</span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <span className="text-slate-500">Gateway Ref:</span>
-                <span className="font-mono text-slate-600 text-[11px]">{verifiedData?.digilockerRef}</span>
-              </div>
             </div>
 
             <button
@@ -810,9 +877,10 @@ export function DigiLockerDemoFlow({
               onClick={() => {
                 if (onCancel) onCancel();
               }}
-              className="w-full sm:w-auto px-8 rounded-xl bg-[#006699] hover:bg-[#005580] text-white py-2.5 text-xs font-bold shadow-md transition"
+              className="w-full sm:w-auto px-8 rounded-xl bg-[#006699] hover:bg-[#005580] text-white py-3 text-xs sm:text-sm font-bold shadow-md transition flex items-center justify-center gap-2 mx-auto"
             >
-              Return to Registration
+              <span>Return to Complete Registration</span>
+              <Check className="h-4 w-4" />
             </button>
           </div>
         )}
@@ -820,11 +888,11 @@ export function DigiLockerDemoFlow({
 
       {/* STICKY BOTTOM ACTIONS FOR CONSENT_AUTHORIZE (Never overflows off screen!) */}
       {step === "CONSENT_AUTHORIZE" && (
-        <div className="flex-shrink-0 p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex items-center gap-3">
+        <div className="flex-shrink-0 p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={onCancel ? onCancel : () => setStep("SIGN_IN")}
-            className="flex-1 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 py-2.5 sm:py-3 text-xs font-bold text-slate-700 transition"
+            className="w-24 sm:w-28 shrink-0 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 py-3 text-xs font-bold text-slate-700 transition shadow-2xs"
           >
             Deny
           </button>
@@ -832,17 +900,17 @@ export function DigiLockerDemoFlow({
             type="button"
             disabled={loading}
             onClick={handleAuthorize}
-            className="flex-2 rounded-xl bg-[#006699] hover:bg-[#005580] text-white py-2.5 sm:py-3 text-xs font-bold shadow-md transition flex items-center justify-center gap-2 disabled:opacity-60"
+            className="flex-1 min-w-0 rounded-xl bg-[#006699] hover:bg-[#005580] text-white py-3 px-3 text-xs sm:text-sm font-bold shadow-md transition flex items-center justify-center gap-1.5 sm:gap-2 disabled:opacity-60"
           >
             {loading ? (
               <div className="flex items-center gap-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                <span>Authorizing...</span>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent shrink-0" />
+                <span className="truncate">Authorizing...</span>
               </div>
             ) : (
               <>
-                <span>Allow (Authorize & Continue)</span>
-                <Check className="h-4 w-4" />
+                <span className="truncate">Allow & Authorize</span>
+                <Check className="h-4 w-4 shrink-0" />
               </>
             )}
           </button>
