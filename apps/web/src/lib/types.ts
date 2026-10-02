@@ -234,8 +234,364 @@ export interface ServiceCategory {
   id: string;
   name: string;
   slug: string;
-  icon?: string;
-  description?: string;
-  isActive: boolean;
+  hindiName?: string | null;
+  icon?: string | null;
+  description?: string | null;
+  active?: boolean;
+  isActive?: boolean;
   sortOrder: number;
+  subcategories?: ServiceSubCategory[];
+  problems?: ServiceProblem[];
+  _count?: {
+    subcategories: number;
+    problems: number;
+  };
 }
+
+export interface ServiceSubCategory {
+  id: string;
+  categoryId: string;
+  slug: string;
+  name: string;
+  hindiName?: string | null;
+  icon?: string | null;
+  description?: string | null;
+  active: boolean;
+  sortOrder: number;
+  problems?: ServiceProblem[];
+  _count?: {
+    problems: number;
+  };
+}
+
+export interface ServiceProblem {
+  id: string;
+  categoryId: string;
+  subcategoryId: string;
+  name: string;
+  hindiName?: string | null;
+  description?: string | null;
+  estimatedDuration: number; // in minutes
+  basePrice: number | string;
+  minimumPrice: number | string;
+  maximumPrice: number | string;
+  workerPriceCeiling: number | string;
+  pricingUnit?: string;
+  labourCostMin?: number | string;
+  labourCostMax?: number | string;
+  inspectionFee?: number | string;
+  platformFeeRate?: number | string;
+  materialCostMin?: number | string;
+  materialCostMax?: number | string;
+  materialNote?: string | null;
+  benchmarkSource?: string | null;
+  active: boolean;
+  sortOrder: number;
+  category?: ServiceCategory;
+  subcategory?: ServiceSubCategory;
+}
+
+export interface WorkerQuote {
+  id: string;
+  problemRequestId: string;
+  workerId: string;
+  quotedAmount: number | string;
+  labourAmount: number | string;
+  materialAmount: number | string;
+  notes?: string | null;
+  hasAdditionalWork: boolean;
+  additionalWorkReason?: string | null;
+  status: string;
+  createdAt: string;
+  worker?: {
+    user: {
+      name: string;
+      avatarUrl?: string | null;
+      phone?: string | null;
+    };
+    coop?: {
+      name: string;
+    };
+  };
+}
+
+export interface MatchingWorker {
+  workerId: string;
+  userId: string;
+  name: string;
+  avatarUrl?: string | null;
+  coopName: string;
+  city: string;
+  experienceYears: number;
+  rating: number;
+  totalJobs: number;
+  trade: string;
+  skills?: string[];
+  baseQuote: number;
+  priceCeiling: number;
+  isAvailable: boolean;
+  isOnDuty: boolean;
+  dutyState: "OFF_DUTY" | "AVAILABLE" | "BUSY" | "TRAVELLING" | "ON_JOB";
+  isAvailableNow: boolean;
+  approxDistanceKm?: number;
+  distanceDisplay?: string;
+}
+
+export type ProblemRequestStatus = "DRAFT" | "SUBMITTED" | "CANCELLED";
+
+export interface ProblemRequest {
+  id: string;
+  requestRef: string;
+  consumerId: string;
+  categoryId: string;
+  category: ServiceCategory;
+  subcategoryId: string;
+  subcategory: ServiceSubCategory;
+  problemId: string;
+  problem: ServiceProblem;
+  textDescription?: string | null;
+  audioUrl?: string | null;
+  audioDuration?: number | null;
+  photos: string[];
+  videoUrl?: string | null;
+  additionalNotes?: string | null;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  estimatedPriceMin: number | string;
+  estimatedPriceMax: number | string;
+  estimatedDuration: number;
+  status: ProblemRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+  consumer?: {
+    id: string;
+    name: string;
+    phone: string;
+    avatarUrl?: string | null;
+  };
+}
+
+export type OrderStatus =
+  | "DRAFT"
+  | "REQUESTED"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "NEGOTIATION"
+  | "CONFIRMED"
+  | "TRAVELLING"
+  | "ARRIVED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "PAYMENT_PENDING"
+  | "PAID";
+
+export type BookingMode = "IMMEDIATE" | "SCHEDULED";
+
+export interface Order {
+  id: string;
+  orderRef: string;
+  consumerId: string;
+  consumer?: {
+    id: string;
+    name: string;
+    phone?: string;
+    avatarUrl?: string | null;
+    locale?: string;
+  };
+  workerId?: string | null;
+  worker?: MatchingWorker | any;
+  problemRequestId?: string | null;
+  problemRequest?: ProblemRequest;
+  categoryId: string;
+  category?: ServiceCategory;
+  subcategoryId: string;
+  subcategory?: ServiceSubCategory;
+  problemId: string;
+  problem?: ServiceProblem;
+  status: OrderStatus;
+  bookingMode: BookingMode;
+  scheduledAt?: string | null;
+  address: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  approxDistanceKm?: number | null;
+  approxArea?: string | null;
+  isAddressMasked?: boolean;
+  liveLocationActive?: boolean;
+  problemTitle: string;
+  textDescription?: string | null;
+  audioUrl?: string | null;
+  audioDuration?: number | null;
+  photos: string[];
+  videoUrl?: string | null;
+  additionalNotes?: string | null;
+  basePrice: number | string;
+  estimatedPriceMin: number | string;
+  estimatedPriceMax: number | string;
+  workerPriceCeiling: number | string;
+  quotedPrice?: number | string | null;
+  finalPrice?: number | string | null;
+  isPriceLocked?: boolean;
+  priceConfirmedAt?: string | null;
+  priceConfirmedById?: string | null;
+  priceProposals?: OrderPriceProposal[];
+  paymentStatus?: OrderPaymentStatus;
+  grossAmount?: number | string | null;
+  platformFee?: number | string;
+  workerEarnings?: number | string | null;
+  taxAmount?: number | string;
+  otherDeductions?: number | string;
+  workCompletedAt?: string | null;
+  paymentCompletedAt?: string | null;
+  paymentMethod?: string | null;
+  razorpayOrderId?: string | null;
+  razorpayPaymentId?: string | null;
+  razorpaySignature?: string | null;
+  rejectionReason?: string | null;
+  rejectionCustomNote?: string | null;
+  rejectionNote?: string | null;
+  rejectedAt?: string | null;
+  acceptedAt?: string | null;
+  cancelledAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  statusHistory?: Array<{
+    id: string;
+    fromStatus: OrderStatus;
+    toStatus: OrderStatus;
+    reason?: string | null;
+    createdAt: string;
+  }>;
+}
+
+export type OrderPaymentStatus =
+  | "NOT_DUE"
+  | "PAYMENT_PENDING"
+  | "PAYMENT_PROCESSING"
+  | "PAID"
+  | "PAYMENT_FAILED"
+  | "REFUNDED";
+
+export interface OrderPaymentReceipt {
+  orderId: string;
+  orderRef: string;
+  serviceTitle: string;
+  workerName: string;
+  workerAvatarUrl?: string | null;
+  workerTrade?: string | null;
+  consumerName: string;
+  finalAmount: number;
+  grossAmount: number;
+  workerEarnings: number;
+  platformFee: number;
+  paymentStatus: OrderPaymentStatus;
+  paymentMethod: string;
+  paymentRef: string;
+  razorpayPaymentId?: string | null;
+  paidAt: string;
+  completedAt: string;
+}
+
+export type ProposalParty = "WORKER" | "CONSUMER";
+export type ProposalStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "COUNTERED";
+
+export interface OrderPriceProposal {
+  id: string;
+  orderId: string;
+  proposer: ProposalParty;
+  proposerRole?: ProposalParty;
+  proposerId?: string;
+  amount: number;
+  reason?: string | null;
+  status: ProposalStatus;
+  timestamp?: string;
+  createdAt?: string;
+}
+
+export interface PriceHistoryResponse {
+  orderId: string;
+  orderRef: string;
+  basePrice: number;
+  estimatedPriceMin: number;
+  estimatedPriceMax: number;
+  workerPriceCeiling: number;
+  quotedPrice?: number | null;
+  finalPrice?: number | null;
+  isPriceLocked: boolean;
+  priceConfirmedAt?: string | null;
+  proposals: Array<{
+    id: string;
+    proposer: ProposalParty;
+    amount: number;
+    reason?: string | null;
+    status: ProposalStatus;
+    timestamp: string;
+  }>;
+}
+
+export type ActiveOperationalState =
+  | "AVAILABLE"
+  | "REQUEST_RECEIVED"
+  | "ACCEPTED"
+  | "TRAVELLING"
+  | "ARRIVED"
+  | "WORKING"
+  | "COMPLETED"
+  | "OFF_DUTY";
+
+export interface LiveTrackingDestination {
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  isMasked: boolean;
+  approxArea?: string | null;
+  approxDistanceKm?: number | null;
+}
+
+export interface LiveTrackingWorker {
+  id: string;
+  name: string;
+  avatarUrl?: string | null;
+  phone?: string;
+  rating?: number;
+  dutyState?: string;
+  vehicleType?: "SCOOTER" | "BIKE" | "CAR" | "WALK";
+}
+
+export interface LiveTrackingCurrentLocation {
+  latitude: number;
+  longitude: number;
+  heading?: number;
+  speed?: number;
+  accuracy?: number;
+  updatedAt: string;
+  isStale?: boolean;
+}
+
+export interface LiveTrackingRoute {
+  coordinates: [number, number][];
+  distanceKm: number;
+  etaMinutes: number;
+  etaTimestamp?: string;
+  source: "OSRM" | "LOCAL_HAVERSINE";
+}
+
+export interface LiveTrackingData {
+  orderId: string;
+  orderRef: string;
+  status: OrderStatus;
+  bookingMode: BookingMode;
+  scheduledAt: string | null;
+  trackingActive: boolean;
+  trackingReason?: string;
+  destination: LiveTrackingDestination;
+  worker?: LiveTrackingWorker | null;
+  currentLocation?: LiveTrackingCurrentLocation | null;
+  route?: LiveTrackingRoute | null;
+}
+
+
+

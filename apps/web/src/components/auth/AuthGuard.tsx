@@ -13,7 +13,10 @@ interface AuthGuardProps {
 
 export function AuthGuard({ allowedRoles, children }: AuthGuardProps) {
   const router = useRouter();
-  const { isAuthenticated, isLoading, user, loadFromStorage } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const loadFromStorage = useAuthStore((s) => s.loadFromStorage);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -22,8 +25,8 @@ export function AuthGuard({ allowedRoles, children }: AuthGuardProps) {
   }, [loadFromStorage]);
 
   useEffect(() => {
-    if (!hydrated || isLoading) return;
-    if (!isAuthenticated) {
+    if (!hydrated) return;
+    if (!isLoading && !isAuthenticated) {
       const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
       router.replace(currentPath ? `/login?redirect=${encodeURIComponent(currentPath)}` : "/login");
       return;
@@ -33,7 +36,8 @@ export function AuthGuard({ allowedRoles, children }: AuthGuardProps) {
     }
   }, [hydrated, isLoading, isAuthenticated, user, allowedRoles, router]);
 
-  if (!hydrated || isLoading) {
+  const isReady = hydrated && (!isLoading || (isAuthenticated && user));
+  if (!isReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <Loader2 className="h-8 w-8 animate-spin text-orange-600" />

@@ -15,6 +15,19 @@ enum UserRole {
   MINISTRY_SUPER_ADMIN
 }
 
+enum WorkerDutyState {
+  OFF_DUTY
+  AVAILABLE
+  REQUEST_RECEIVED
+  ACCEPTED
+  TRAVELLING
+  ARRIVED
+  WORKING
+  COMPLETED
+  BUSY
+  ON_JOB
+}
+
 enum WorkerStatus {
   PENDING_ADMIN_APPROVAL
   PENDING_VERIFICATION
@@ -39,6 +52,48 @@ enum PaymentStatus {
   COMPLETED
   REFUNDED
   FAILED
+}
+
+enum OrderPaymentStatus {
+  NOT_DUE
+  PAYMENT_PENDING
+  PAYMENT_PROCESSING
+  PAID
+  PAYMENT_FAILED
+  REFUNDED
+}
+
+enum OrderStatus {
+  DRAFT
+  REQUESTED
+  ACCEPTED
+  REJECTED
+  NEGOTIATION
+  CONFIRMED
+  TRAVELLING
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  PAYMENT_PENDING
+  PAID
+}
+
+enum BookingMode {
+  IMMEDIATE
+  SCHEDULED
+}
+
+enum ProposalParty {
+  WORKER
+  CONSUMER
+}
+
+enum ProposalStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COUNTERED
 }
 
 enum TransactionType {
@@ -94,6 +149,8 @@ model User {
   reviewsGiven     Review[]         @relation("ReviewAuthor")
   notifications    Notification[]
   fileUploads      FileUpload[]
+  problemRequests  ProblemRequest[] @relation("ConsumerProblemRequests")
+  ordersAsConsumer Order[]          @relation("ConsumerOrders")
 
   @@index([phone])
   @@index([role])
@@ -136,6 +193,7 @@ model WorkerProfile {
   workAddress       String?
   isAvailable       Boolean      @default(true)
   isOnDuty          Boolean      @default(false)
+  dutyState         WorkerDutyState @default(OFF_DUTY)
   avgRating         Float        @default(0)
   totalJobs         Int          @default(0)
   totalEarnings     Decimal      @default(0) @db.Decimal(12, 2)
@@ -156,6 +214,8 @@ model WorkerProfile {
   walletTransactions WalletTransaction[]
   socialSecurity    SocialSecurityVault[]
   dividends         Dividend[]
+  quotes            WorkerQuote[]
+  orders            Order[]          @relation("WorkerOrders")
 
   @@index([coopId])
   @@index([status])
@@ -287,6 +347,8 @@ model WalletTransaction {
   worker        WorkerProfile   @relation(fields: [workerId], references: [id])
   bookingId     String?
   booking       Booking?        @relation(fields: [bookingId], references: [id])
+  orderId       String?
+  order         Order?          @relation(fields: [orderId], references: [id])
   type          TransactionType
   amount        Decimal         @db.Decimal(12, 2)
   balanceAfter  Decimal         @db.Decimal(12, 2)
@@ -295,6 +357,7 @@ model WalletTransaction {
   createdAt     DateTime        @default(now())
 
   @@index([workerId])
+  @@index([orderId])
   @@index([type])
   @@index([createdAt])
 }
@@ -386,14 +449,144 @@ model OtpVerification {
   @@index([email, purpose])
 }
 
+enum ProblemRequestStatus {
+  DRAFT
+  SUBMITTED
+  CANCELLED
+}
+
 model ServiceCategory {
-  id          String  @id @default(uuid())
-  name        String  @unique
-  slug        String  @unique
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  name        String   @unique
+  hindiName   String?
   icon        String?
   description String?
-  isActive    Boolean @default(true)
-  sortOrder   Int     @default(0)
+  active      Boolean  @default(true) @map("isActive")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  subcategories   ServiceSubCategory[]
+  problems        ServiceProblem[]
+  problemRequests ProblemRequest[]
+  orders          Order[]
+
+  @@index([slug])
+  @@index([active])
+}
+
+model ServiceSubCategory {
+  id          String          @id @default(uuid())
+  categoryId  String
+  category    ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  slug        String
+  name        String
+  hindiName   String?
+  icon        String?
+  description String?
+  active      Boolean         @default(true)
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @default(now()) @updatedAt
+
+  problems        ServiceProblem[]
+  problemRequests ProblemRequest[]
+  orders          Order[]
+
+  @@unique([categoryId, slug])
+  @@index([categoryId])
+  @@index([active])
+}
+
+model ServiceProblem {
+  id                 String             @id @default(uuid())
+  categoryId         String
+  category           ServiceCategory    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subcategoryId      String
+  subcategory        ServiceSubCategory @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
+  name               String
+  hindiName          String?
+  description        String?
+  estimatedDuration  Int                @default(60) // in minutes
+  basePrice          Decimal            @db.Decimal(10, 2)
+  minimumPrice       Decimal            @db.Decimal(10, 2)
+  maximumPrice       Decimal            @db.Decimal(10, 2)
+  workerPriceCeiling Decimal            @db.Decimal(10, 2)
+  pricingUnit        String             @default("per_job")
+  labourCostMin      Decimal            @default(99.00) @db.Decimal(10, 2)
+  labourCostMax      Decimal            @default(199.00) @db.Decimal(10, 2)
+  inspectionFee      Decimal            @default(99.00) @db.Decimal(10, 2)
+  platformFeeRate    Decimal            @default(5.00) @db.Decimal(5, 2)
+  materialCostMin    Decimal            @default(0.00) @db.Decimal(10, 2)
+  materialCostMax    Decimal            @default(0.00) @db.Decimal(10, 2)
+  materialNote       String             @default("Additional material cost may apply after inspection.")
+  benchmarkSource    String             @default("CPWD DSR 2023 & Indian Urban Gig Benchmarks")
+  active             Boolean            @default(true)
+  sortOrder          Int                @default(0)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @default(now()) @updatedAt
+
+  problemRequests    ProblemRequest[]
+  pricingConfigs     ProblemPricingConfig[]
+  quotes             WorkerQuote[]
+  orders             Order[]
+
+  @@index([categoryId])
+  @@index([subcategoryId])
+  @@index([active])
+}
+
+model ProblemRequest {
+  id                 String               @id @default(uuid())
+  requestRef         String               @unique // e.g. "PR-123456"
+  consumerId         String
+  consumer           User                 @relation("ConsumerProblemRequests", fields: [consumerId], references: [id], onDelete: Cascade)
+  categoryId         String
+  category           ServiceCategory      @relation(fields: [categoryId], references: [id])
+  subcategoryId      String
+  subcategory        ServiceSubCategory   @relation(fields: [subcategoryId], references: [id])
+  problemId          String
+  problem            ServiceProblem       @relation(fields: [problemId], references: [id])
+  
+  // Explanation: text OR audio mandatory
+  textDescription    String?
+  audioUrl           String?
+  audioDuration      Int?                 // in seconds
+  
+  // Optional attachments
+  photos             String[]             @default([])
+  videoUrl           String?
+  additionalNotes    String?
+
+  // Location information if available
+  address            String?
+  latitude           Float?
+  longitude          Float?
+
+  // Estimate snapshot from selected problem
+  estimatedPriceMin  Decimal              @db.Decimal(10, 2)
+  estimatedPriceMax  Decimal              @db.Decimal(10, 2)
+  estimatedDuration  Int                  @default(60)
+  pricingUnit        String?              @default("per_job")
+  labourCostMin      Decimal?             @db.Decimal(10, 2)
+  labourCostMax      Decimal?             @db.Decimal(10, 2)
+  inspectionFee      Decimal?             @db.Decimal(10, 2)
+  platformFeeRate    Decimal?             @db.Decimal(5, 2)
+  materialNote       String?
+  workerPriceCeiling Decimal?             @db.Decimal(10, 2)
+  selectedWorkerId   String?
+
+  quotes             WorkerQuote[]
+  orders             Order[]
+
+  status             ProblemRequestStatus @default(DRAFT)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @default(now()) @updatedAt
+
+  @@index([consumerId])
+  @@index([status])
+  @@index([categoryId])
 }
 
 model Notification {
@@ -427,3 +620,231 @@ model FileUpload {
   @@index([userId])
   @@index([purpose])
 }
+
+model ProblemPricingConfig {
+  id                 String         @id @default(uuid())
+  problemId          String
+  problem            ServiceProblem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  city               String?        // null for national/default, or "DELHI", "MUMBAI", "BENGALURU"
+  skillLevel         String?        // null for standard, or "APPRENTICE", "SKILLED", "MASTER"
+  basePrice          Decimal        @db.Decimal(10, 2)
+  minimumPrice       Decimal        @db.Decimal(10, 2)
+  maximumPrice       Decimal        @db.Decimal(10, 2)
+  workerPriceCeiling Decimal        @db.Decimal(10, 2)
+  labourCostMin      Decimal        @db.Decimal(10, 2)
+  labourCostMax      Decimal        @db.Decimal(10, 2)
+  inspectionFee      Decimal        @default(99.00) @db.Decimal(10, 2)
+  platformFeeRate    Decimal        @default(5.00) @db.Decimal(5, 2)
+  materialNote       String         @default("Additional material cost may apply after inspection.")
+  benchmarkSource    String?
+  isActive           Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @default(now()) @updatedAt
+
+  @@unique([problemId, city, skillLevel])
+  @@index([problemId])
+  @@index([city])
+}
+
+model WorkerQuote {
+  id                   String         @id @default(uuid())
+  problemRequestId     String
+  problemRequest       ProblemRequest @relation(fields: [problemRequestId], references: [id], onDelete: Cascade)
+  problemId            String?
+  problem              ServiceProblem? @relation(fields: [problemId], references: [id])
+  workerId             String
+  worker               WorkerProfile  @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  quotedAmount         Decimal        @db.Decimal(10, 2)
+  labourAmount         Decimal        @db.Decimal(10, 2)
+  materialAmount       Decimal        @default(0.00) @db.Decimal(10, 2)
+  notes                String?
+  hasAdditionalWork    Boolean        @default(false)
+  additionalWorkReason String?
+  status               String         @default("PENDING") // PENDING, ACCEPTED, REJECTED, EXPIRED
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @default(now()) @updatedAt
+
+  @@index([problemRequestId])
+  @@index([workerId])
+}
+
+model Order {
+  id                 String           @id @default(uuid())
+  orderRef           String           @unique // e.g. "ORD-261001-XXXX"
+  consumerId         String
+  consumer           User             @relation("ConsumerOrders", fields: [consumerId], references: [id], onDelete: Cascade)
+  workerId           String?
+  worker             WorkerProfile?   @relation("WorkerOrders", fields: [workerId], references: [id])
+  problemRequestId   String?
+  problemRequest     ProblemRequest?  @relation(fields: [problemRequestId], references: [id])
+  categoryId         String
+  category           ServiceCategory  @relation(fields: [categoryId], references: [id])
+  subcategoryId      String
+  subcategory        ServiceSubCategory @relation(fields: [subcategoryId], references: [id])
+  problemId          String
+  problem            ServiceProblem   @relation(fields: [problemId], references: [id])
+  
+  status             OrderStatus      @default(REQUESTED)
+  bookingMode        BookingMode      @default(IMMEDIATE)
+  scheduledAt        DateTime?
+
+  // Location & Privacy
+  address            String           // Full consumer address (private before acceptance)
+  latitude           Float?
+  longitude          Float?
+  approxDistanceKm   Float?           // Approximate distance for worker before acceptance
+  approxArea         String?          // e.g. "Near Saket / South Delhi"
+
+  // Problem Snapshot
+  problemTitle       String
+  textDescription    String?
+  audioUrl           String?
+  audioDuration      Int?
+  photos             String[]         @default([])
+  videoUrl           String?
+  additionalNotes    String?
+
+  // Price Snapshot Grounded in Researched Estimates
+  basePrice          Decimal          @db.Decimal(10, 2)
+  estimatedPriceMin  Decimal          @db.Decimal(10, 2)
+  estimatedPriceMax  Decimal          @db.Decimal(10, 2)
+  workerPriceCeiling Decimal          @db.Decimal(10, 2)
+  quotedPrice        Decimal?         @db.Decimal(10, 2)
+  finalPrice         Decimal?         @db.Decimal(10, 2)
+
+  // Price Negotiation & Locking
+  isPriceLocked      Boolean          @default(false)
+  priceConfirmedAt   DateTime?
+  priceConfirmedById String?
+  negotiationConsent Boolean          @default(true)
+
+  // In-PWA Voice Communication Consent & Calls (Phase 7)
+  communicationConsent   Boolean          @default(false)
+  consumerConsentGranted Boolean          @default(false)
+  workerConsentGranted   Boolean          @default(false)
+  communicationConsentAt DateTime?
+
+  calls                  CallSession[]
+
+  priceProposals     OrderPriceProposal[] @relation("OrderPriceProposals")
+
+  // Rejection handling
+  rejectionReason    String?          // e.g. "Too far", "Not available", "Outside my skill", "Price not suitable", "Other"
+  rejectionCustomNote String?
+  rejectedAt         DateTime?
+  acceptedAt         DateTime?
+  cancelledAt        DateTime?
+  completedAt        DateTime?
+
+  // Post-Completion Payment & Earnings (Phase 8)
+  paymentStatus        OrderPaymentStatus   @default(NOT_DUE)
+  grossAmount          Decimal?             @db.Decimal(10, 2)
+  platformFee          Decimal              @default(0) @db.Decimal(10, 2)
+  workerEarnings       Decimal?             @db.Decimal(10, 2)
+  taxAmount            Decimal              @default(0) @db.Decimal(10, 2)
+  otherDeductions      Decimal              @default(0) @db.Decimal(10, 2)
+  workCompletedAt      DateTime?
+  paymentCompletedAt   DateTime?
+  paymentMethod        String?
+  razorpayOrderId      String?
+  razorpayPaymentId    String?
+  razorpaySignature    String?
+
+  payments             OrderPayment[]
+  walletTransactions   WalletTransaction[]
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  statusHistory      OrderStatusHistory[]
+
+  @@index([consumerId])
+  @@index([workerId])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([bookingMode])
+  @@index([createdAt])
+}
+
+model OrderPayment {
+  id                String             @id @default(uuid())
+  orderId           String
+  order             Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentRef        String             @unique
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  amount            Decimal            @db.Decimal(10, 2)
+  grossAmount       Decimal            @db.Decimal(10, 2)
+  platformFee       Decimal            @default(0) @db.Decimal(10, 2)
+  workerEarnings    Decimal            @db.Decimal(10, 2)
+  taxAmount         Decimal            @default(0) @db.Decimal(10, 2)
+  status            OrderPaymentStatus @default(PAYMENT_PENDING)
+  paymentMethod     String             @default("RAZORPAY")
+  failureReason     String?
+  paidAt            DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([orderId])
+  @@index([razorpayOrderId])
+  @@index([razorpayPaymentId])
+}
+
+model OrderStatusHistory {
+  id         String      @id @default(uuid())
+  orderId    String
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus OrderStatus
+  toStatus   OrderStatus
+  changedById String?
+  reason     String?
+  createdAt  DateTime    @default(now())
+
+  @@index([orderId])
+}
+
+model OrderPriceProposal {
+  id           String         @id @default(uuid())
+  orderId      String
+  order        Order          @relation("OrderPriceProposals", fields: [orderId], references: [id], onDelete: Cascade)
+  proposerRole ProposalParty
+  proposerId   String
+  amount       Decimal        @db.Decimal(10, 2)
+  reason       String?
+  status       ProposalStatus @default(PENDING)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+}
+
+enum CallStatus {
+  RINGING
+  CONNECTED
+  REJECTED
+  MISSED
+  ENDED
+  FAILED
+}
+
+model CallSession {
+  id          String     @id @default(uuid())
+  orderId     String
+  order       Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  callerId    String
+  receiverId  String
+  callerRole  String     // "CONSUMER" | "WORKER"
+  status      CallStatus @default(RINGING)
+  startedAt   DateTime?
+  endedAt     DateTime?
+  durationSec Int        @default(0)
+  endReason   String?    // "normal", "declined", "timeout", "network_error"
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([orderId])
+  @@index([callerId])
+  @@index([receiverId])
+}
+

@@ -17,6 +17,29 @@ function generateJwtToken(user: { id: string; phone: string; role: UserRole }): 
   );
 }
 
+async function withDbRetry<T>(fn: () => Promise<T>, retries = 3, delayMs = 500): Promise<T> {
+  let lastError: any;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastError = err;
+      const isConnectionError =
+        err.code === "P1001" ||
+        err.name === "PrismaClientInitializationError" ||
+        (err.name === "PrismaClientKnownRequestError" && err.code === "P1001") ||
+        err.message?.includes("Can't reach database") ||
+        err.message?.includes("connection pool");
+      if (attempt < retries - 1 && isConnectionError) {
+        await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError;
+}
+
 export async function generateOTP(
   phone: string,
   purpose: string = "LOGIN"
@@ -27,30 +50,34 @@ export async function generateOTP(
   }
 
   // Invalidate any previous unverified OTP for this phone and purpose immediately
-  await prisma.otpVerification.updateMany({
-    where: {
-      phone: cleanPhone,
-      purpose,
-      verified: false,
-    },
-    data: {
-      verified: true,
-      expiresAt: new Date(0),
-    },
-  });
+  await withDbRetry(() =>
+    prisma.otpVerification.updateMany({
+      where: {
+        phone: cleanPhone,
+        purpose,
+        verified: false,
+      },
+      data: {
+        verified: true,
+        expiresAt: new Date(0),
+      },
+    })
+  );
 
   const otp = crypto.randomInt(100000, 1000000).toString();
   const expiresAt = new Date(Date.now() + env.OTP_EXPIRY_MINUTES * 60 * 1000);
 
-  await prisma.otpVerification.create({
-    data: {
-      phone: cleanPhone,
-      otp,
-      purpose,
-      expiresAt,
-      verified: false,
-    },
-  });
+  await withDbRetry(() =>
+    prisma.otpVerification.create({
+      data: {
+        phone: cleanPhone,
+        otp,
+        purpose,
+        expiresAt,
+        verified: false,
+      },
+    })
+  );
 
   const sent = await sendOTPSms(cleanPhone, otp);
   if (!sent) {
@@ -70,15 +97,17 @@ export async function verifyOTP(
   const cleanOtp = otp.trim();
 
   // Query only the latest active, unverified, and non-expired OTP record
-  const record = await prisma.otpVerification.findFirst({
-    where: {
-      phone: cleanPhone,
-      purpose,
-      verified: false,
-      expiresAt: { gte: new Date() },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const record = await withDbRetry(() =>
+    prisma.otpVerification.findFirst({
+      where: {
+        phone: cleanPhone,
+        purpose,
+        verified: false,
+        expiresAt: { gte: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    })
+  );
 
   if (!record) {
     // Idempotency check: if verified within last 10 minutes with the same OTP, return success
@@ -121,6 +150,7 @@ export async function verifyOTP(
               phone: existingUser.phone,
               name: existingUser.name,
               role: existingUser.role,
+              avatarUrl: existingUser.avatarUrl,
             },
           };
         }
@@ -195,6 +225,7 @@ export async function register(data: {
   skillTags?: string[];
   experienceYears?: number;
   skillCertificate?: string;
+  avatarUrl?: string;
 }): Promise<{ token: string; user: any }> {
   const existingUser = await prisma.user.findUnique({
     where: { phone: data.phone },
@@ -224,6 +255,7 @@ export async function register(data: {
       email: email,
       passwordHash,
       role: data.role as UserRole,
+      avatarUrl: data.avatarUrl,
     },
   });
 
@@ -281,6 +313,7 @@ export async function register(data: {
       name: user.name,
       email: user.email,
       role: user.role,
+      avatarUrl: user.avatarUrl,
     },
   };
 }
@@ -290,7 +323,7 @@ export async function login(
   password: string,
   expectedRole?: string
 ): Promise<{ token: string; user: any }> {
-  const user = await prisma.user.findUnique({ where: { phone } });
+  const user = await withDbRetry(() => prisma.user.findUnique({ where: { phone } }));
 
   if (!user) {
     throw new AppError("Invalid phone or password", 401);
@@ -331,6 +364,7 @@ export async function login(
       name: user.name,
       email: user.email,
       role: user.role,
+      avatarUrl: user.avatarUrl,
     },
   };
 }
@@ -363,6 +397,7 @@ export async function refreshToken(
         name: user.name,
         email: user.email,
         role: user.role,
+        avatarUrl: user.avatarUrl,
       },
     };
   } catch (error) {
@@ -429,14 +464,16 @@ export async function validateCredentials(
   expectedRole?: string
 ): Promise<{ phone: string; otp?: string; expiresAt: Date; role: string }> {
   const trimmed = identifier.trim();
-  const user = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { phone: trimmed },
-        { email: trimmed.toLowerCase() },
-      ],
-    },
-  });
+  const user = await withDbRetry(() =>
+    prisma.user.findFirst({
+      where: {
+        OR: [
+          { phone: trimmed },
+          { email: trimmed.toLowerCase() },
+        ],
+      },
+    })
+  );
 
   if (!user) {
     throw new AppError("Invalid credentials", 401);

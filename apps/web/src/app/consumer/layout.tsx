@@ -11,13 +11,13 @@ import type { SidebarLink } from "@/components/layout/Sidebar";
 
 const sidebarLinks: SidebarLink[] = [
   { href: "/consumer/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/consumer/book", label: "Book Service", icon: CalendarCheck },
+  { href: "/consumer/problem-selection", label: "Select Problem", icon: CalendarCheck },
   { href: "/consumer/bookings", label: "My Bookings", icon: Briefcase },
   { href: "/consumer/wallet", label: "Wallet", icon: Wallet },
   { href: "/consumer/profile", label: "My Profile", icon: User },
 ];
 
-const publicExplainerRoutes = ["/consumer/bookings", "/consumer/wallet", "/consumer/book"];
+const publicExplainerRoutes = ["/consumer/bookings", "/consumer/wallet", "/consumer/book", "/consumer/problem-selection"];
 
 export default function ConsumerLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

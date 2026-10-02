@@ -48,6 +48,7 @@ export const registerSchema = z.object({
   skillTags: z.array(z.string()).optional(),
   experienceYears: z.number().optional(),
   skillCertificate: z.string().optional(),
+  avatarUrl: z.string().optional(),
 });
 
 export const loginSchema = z.object({

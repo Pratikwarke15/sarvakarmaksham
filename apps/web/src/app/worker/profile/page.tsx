@@ -3,18 +3,29 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ShieldCheck, CheckCircle2, Award, RefreshCw, X } from "lucide-react";
+import { Loader2, ShieldCheck, CheckCircle2, Award, RefreshCw, X, Camera, Activity, Briefcase } from "lucide-react";
 import { Rating } from "@/components/ui/rating";
 import { formatCurrency } from "@/lib/utils";
-import { apiGet } from "@/lib/api";
+import { apiGet, apiPatch } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
 import type { WorkerStatus } from "@/lib/types";
 import { DigiLockerDemoFlow } from "@/components/verification/DigiLockerDemoFlow";
+import { ProfilePhotoCapture } from "@/components/profile/ProfilePhotoCapture";
 import { useAuthStore } from "@/store/authStore";
 
 interface ProfileResp {
   id: string;
   status: WorkerStatus;
+  dutyState?: "OFF_DUTY" | "AVAILABLE" | "BUSY" | "TRAVELLING" | "ON_JOB";
+  isOnDuty?: boolean;
+  isAvailable?: boolean;
+  currentJob?: {
+    id: string;
+    bookingRef: string;
+    status: string;
+    scheduledAt?: string;
+    service?: { name: string; categoryName: string };
+  } | null;
   skillTags: string[];
   bio?: string;
   experienceYears: number;
@@ -34,6 +45,46 @@ interface ProfileResp {
   reviewsReceived?: { id: string; rating: number; comment?: string; author: { name: string } }[];
 }
 
+function dutyBadge(dutyState?: string) {
+  switch (dutyState) {
+    case "AVAILABLE":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2.5 py-0.5 shadow-xs">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>Available Now</span>
+        </span>
+      );
+    case "BUSY":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold px-2.5 py-0.5">
+          <span className="h-2 w-2 rounded-full bg-amber-500" />
+          <span>Busy</span>
+        </span>
+      );
+    case "TRAVELLING":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-bold px-2.5 py-0.5">
+          <span className="h-2 w-2 rounded-full bg-blue-500" />
+          <span>Travelling to Client</span>
+        </span>
+      );
+    case "ON_JOB":
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 text-purple-800 border border-purple-200 text-[10px] font-bold px-2.5 py-0.5 shadow-xs">
+          <span className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" />
+          <span>On Job • Active Service</span>
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-bold px-2.5 py-0.5">
+          <span className="h-2 w-2 rounded-full bg-slate-400" />
+          <span>Off Duty</span>
+        </span>
+      );
+  }
+}
+
 function statusBadge(status: WorkerStatus) {
   if (status === "VERIFIED") return <Badge variant="success">Verified Member</Badge>;
   if (status === "PENDING_ADMIN_APPROVAL") return <Badge variant="warning">Pending Approval</Badge>;
@@ -45,6 +96,8 @@ export default function WorkerProfilePage() {
   const [profile, setProfile] = useState<ProfileResp | null>(null);
   const [loading, setLoading] = useState(true);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [togglingDuty, setTogglingDuty] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -57,9 +110,13 @@ export default function WorkerProfilePage() {
         if (meRes.success && meRes.data) {
           const u = meRes.data;
           const wp = u.workerProfile || {};
+          const duty: "OFF_DUTY" | "AVAILABLE" = wp.isOnDuty && wp.isAvailable ? "AVAILABLE" : "OFF_DUTY";
           setProfile({
             id: wp.id || u.id,
             status: wp.status || "VERIFIED",
+            dutyState: wp.dutyState || duty,
+            isOnDuty: wp.isOnDuty,
+            isAvailable: wp.isAvailable,
             skillTags: wp.skillTags || ["General Services"],
             bio: wp.bio,
             experienceYears: wp.experienceYears || 1,
@@ -87,6 +144,7 @@ export default function WorkerProfilePage() {
         setProfile({
           id: authUser.id,
           status: "VERIFIED",
+          dutyState: "OFF_DUTY",
           skillTags: ["Skilled Member"],
           experienceYears: 1,
           avgRating: 5,
@@ -94,7 +152,7 @@ export default function WorkerProfilePage() {
           totalEarnings: 0,
           walletBalance: 0,
           aadhaarVerified: false,
-          user: { name: authUser.name, phone: authUser.phone },
+          user: { name: authUser.name, phone: authUser.phone, avatarUrl: authUser.avatarUrl },
           reviewsReceived: [],
         });
       }
@@ -106,6 +164,58 @@ export default function WorkerProfilePage() {
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
+
+  const handleToggleDuty = async () => {
+    if (!profile) return;
+    const isCurrentlyActive = profile.dutyState === "AVAILABLE" || profile.dutyState === "BUSY" || profile.dutyState === "TRAVELLING" || profile.dutyState === "ON_JOB";
+    const nextOnDuty = !isCurrentlyActive;
+    setTogglingDuty(true);
+    try {
+      const res = await apiPatch<{ success: boolean; data: any }>("/workers/availability", {
+        isOnDuty: nextOnDuty,
+        isAvailable: nextOnDuty,
+      });
+      if (res.success) {
+        toast({
+          title: nextOnDuty ? "You are now Available for Jobs" : "You are now Off Duty",
+          variant: "success",
+        });
+        fetchProfile();
+      } else {
+        toast({ title: "Could not update duty state", variant: "danger" });
+      }
+    } catch (err: any) {
+      toast({ title: err?.message || "Duty state change failed", variant: "danger" });
+    } finally {
+      setTogglingDuty(false);
+    }
+  };
+
+  const handlePhotoCaptured = (url: string) => {
+    if (profile?.user) {
+      setProfile({
+        ...profile,
+        user: {
+          ...profile.user,
+          avatarUrl: url,
+        },
+      });
+    }
+    const store = useAuthStore.getState();
+    if (store.user) {
+      store.setUser({
+        ...store.user,
+        avatarUrl: url,
+      });
+    }
+    setShowPhotoModal(false);
+    toast({
+      title: "Profile Photo Verified & Saved!",
+      description: "Human face detected. Your profile photograph is now active.",
+      variant: "success",
+    });
+    fetchProfile();
+  };
 
   if (loading) {
     return (
@@ -158,16 +268,69 @@ export default function WorkerProfilePage() {
         </div>
       )}
 
-      {/* Main Profile Header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#800020]/10 text-2xl font-bold text-[#800020]">
-              {initial}
+      {/* Profile Photo Capture Modal */}
+      {showPhotoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md bg-white rounded-3xl p-5 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200 space-y-4 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 font-heading">
+                  Update Profile Photo
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Take a clear photo of yourself. Facial detection validates authenticity.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPhotoModal(false)}
+                className="rounded-xl p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <CardTitle>{profile.user?.name}</CardTitle>
+
+            <ProfilePhotoCapture
+              onPhotoCaptured={handlePhotoCaptured}
+              initialPhotoUrl={profile.user?.avatarUrl}
+              isPublicRegistration={false}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Main Profile Header */}
+      <Card className="overflow-hidden border border-slate-200/90 shadow-xs">
+        <div className="h-2 bg-[#800020]" />
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            {/* Real Profile Photo with Camera Trigger */}
+            <div className="relative group shrink-0">
+              {profile.user?.avatarUrl ? (
+                <img
+                  src={profile.user.avatarUrl}
+                  alt={profile.user?.name || "Worker"}
+                  className="h-20 w-20 rounded-2xl object-cover border-2 border-[#800020]/30 shadow-md shadow-[#800020]/10"
+                />
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[#800020]/10 text-2xl font-bold text-[#800020] border border-[#800020]/20">
+                  {initial}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowPhotoModal(true)}
+                className="absolute -bottom-1.5 -right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#800020] text-white hover:bg-[#68001a] shadow-md border-2 border-white transition"
+                title="Update Profile Photo"
+              >
+                <Camera className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <CardTitle className="text-xl font-bold text-slate-900">{profile.user?.name}</CardTitle>
+                {dutyBadge(profile.dutyState)}
                 {profile.aadhaarVerified && (
                   <span className="rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 flex items-center gap-1">
                     <CheckCircle2 className="h-3 w-3 text-emerald-600" />
@@ -175,13 +338,69 @@ export default function WorkerProfilePage() {
                   </span>
                 )}
               </div>
-              <p className="text-sm text-gray-500">{profile.user?.phone}</p>
-              {profile.coop?.name && <p className="text-xs text-gray-400">{profile.coop.name}</p>}
+              <p className="text-xs text-slate-500 mt-1">{profile.user?.phone}</p>
+              {profile.coop?.name && <p className="text-xs text-slate-400 mt-0.5">{profile.coop.name}</p>}
+
+              {/* Skills Tags */}
+              {profile.skillTags?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {profile.skillTags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-block rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Dynamic Duty Toggle Button */}
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={togglingDuty || profile.status !== "VERIFIED"}
+                  onClick={handleToggleDuty}
+                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition shadow-xs ${
+                    profile.dutyState === "AVAILABLE"
+                      ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
+                  } disabled:opacity-50`}
+                >
+                  {togglingDuty ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : profile.dutyState === "AVAILABLE" ? (
+                    <span>Go Off Duty</span>
+                  ) : (
+                    <span>Go Available Now</span>
+                  )}
+                </button>
+              </div>
             </div>
-            {statusBadge(profile.status)}
+            <div className="self-start sm:self-center">
+              {statusBadge(profile.status)}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Active Job Notice if working right now */}
+          {profile.currentJob && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-900 flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="font-bold flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-blue-500 animate-ping" />
+                  <span>Active Job In Progress</span>
+                </span>
+                <p className="text-[11px] text-blue-700">
+                  {profile.currentJob.service?.name || "Gig Service"} • Ref: #{profile.currentJob.bookingRef}
+                </p>
+              </div>
+              <span className="rounded-md bg-blue-100 px-2 py-0.5 font-mono text-[10px] font-bold text-blue-800">
+                {profile.currentJob.status}
+              </span>
+            </div>
+          )}
+
           {profile.bio && <p className="text-sm text-gray-600">{profile.bio}</p>}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>

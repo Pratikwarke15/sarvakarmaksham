@@ -19,10 +19,13 @@ import {
   AlertCircle,
   ExternalLink,
   Edit3,
+  Camera,
+  X,
 } from "lucide-react";
 import { apiGet, apiPatch } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
 import { DigiLockerDemoFlow } from "@/components/verification/DigiLockerDemoFlow";
+import { ProfilePhotoCapture } from "@/components/profile/ProfilePhotoCapture";
 import { detectLiveLocation } from "@/lib/location";
 import { useAuthStore } from "@/store/authStore";
 
@@ -57,6 +60,7 @@ export default function ConsumerProfilePage() {
   const [profile, setProfile] = useState<ConsumerProfileResp | null>(null);
   const [loading, setLoading] = useState(true);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   // Address edit state
   const [editingAddress, setEditingAddress] = useState(false);
@@ -113,6 +117,7 @@ export default function ConsumerProfilePage() {
             name: authUser.name,
             phone: authUser.phone,
             email: authUser.email,
+            avatarUrl: authUser.avatarUrl,
           },
         });
       }
@@ -120,6 +125,32 @@ export default function ConsumerProfilePage() {
       setLoading(false);
     }
   }, [authUser]);
+
+  const handlePhotoCaptured = (url: string) => {
+    if (profile?.user) {
+      setProfile({
+        ...profile,
+        user: {
+          ...profile.user,
+          avatarUrl: url,
+        },
+      });
+    }
+    const store = useAuthStore.getState();
+    if (store.user) {
+      store.setUser({
+        ...store.user,
+        avatarUrl: url,
+      });
+    }
+    setShowPhotoModal(false);
+    toast({
+      title: "Profile Photo Verified & Saved!",
+      description: "Human face detected. Your profile photograph is now active.",
+      variant: "success",
+    });
+    fetchProfile();
+  };
 
   useEffect(() => {
     fetchProfile();
@@ -216,14 +247,65 @@ export default function ConsumerProfilePage() {
         </div>
       )}
 
+      {/* Profile Photo Capture Modal */}
+      {showPhotoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-md bg-white rounded-3xl p-5 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200 space-y-4 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 font-heading">
+                  Update Consumer Profile Photo
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Take a clear photo of yourself. Automated face validation ensures authenticity.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPhotoModal(false)}
+                className="rounded-xl p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <ProfilePhotoCapture
+              onPhotoCaptured={handlePhotoCaptured}
+              initialPhotoUrl={profile?.user?.avatarUrl || authUser?.avatarUrl}
+              isPublicRegistration={false}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Main Profile Identity Card */}
       <Card className="border border-slate-200/90 shadow-xs overflow-hidden">
         <div className="h-2 bg-[#800020]" />
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#800020]/10 text-2xl font-bold text-[#800020] border border-[#800020]/20 shrink-0">
-              {initial}
+            {/* Real Profile Photo with Camera Trigger */}
+            <div className="relative group shrink-0">
+              {profile?.user?.avatarUrl || authUser?.avatarUrl ? (
+                <img
+                  src={profile?.user?.avatarUrl || authUser?.avatarUrl}
+                  alt={userName}
+                  className="h-20 w-20 rounded-2xl object-cover border-2 border-[#800020]/30 shadow-md shadow-[#800020]/10"
+                />
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[#800020]/10 text-2xl font-bold text-[#800020] border border-[#800020]/20">
+                  {initial}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowPhotoModal(true)}
+                className="absolute -bottom-1.5 -right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#800020] text-white hover:bg-[#68001a] shadow-md border-2 border-white transition"
+                title="Update Profile Photo"
+              >
+                <Camera className="h-3.5 w-3.5" />
+              </button>
             </div>
+
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <CardTitle className="text-xl font-bold text-slate-900">{userName}</CardTitle>

@@ -110,17 +110,28 @@ export async function updateLocation(workerId: string, lat: number, lng: number)
   return formatWorker(updated);
 }
 
-export async function setAvailability(workerId: string, data: { isAvailable: boolean; isOnDuty: boolean }): Promise<any> {
+export async function setAvailability(workerId: string, data: { isAvailable: boolean; isOnDuty: boolean; dutyState?: any }): Promise<any> {
   const profile = await prisma.workerProfile.findUnique({ where: { id: workerId } });
   if (!profile) throw new AppError("Worker profile not found", 404);
   if (data.isOnDuty && profile.status !== "VERIFIED") {
     throw new AppError("Worker must be approved before going on duty", 403);
   }
   if (data.isOnDuty && !data.isAvailable) throw new AppError("Cannot be on duty if not available", 400);
+
+  const calculatedDutyState = !data.isOnDuty
+    ? "OFF_DUTY"
+    : !data.isAvailable
+    ? "BUSY"
+    : "AVAILABLE";
+
   const updated = await prisma.workerProfile.update({
     where: { id: workerId },
-    data: { isAvailable: data.isAvailable, isOnDuty: data.isOnDuty },
-    include: { user: { select: { id: true, name: true } } },
+    data: {
+      isAvailable: data.isAvailable,
+      isOnDuty: data.isOnDuty,
+      dutyState: calculatedDutyState,
+    },
+    include: { user: { select: { id: true, name: true, phone: true, avatarUrl: true } } },
   });
   return formatWorker(updated);
 }
@@ -141,7 +152,73 @@ export async function getWorkerProfile(workerId: string): Promise<any> {
     },
   });
   if (!profile) throw new AppError("Worker profile not found", 404);
-  return formatWorker(profile);
+
+  // Check for active job in realtime from Order and Booking
+  const activeOrder = await prisma.order.findFirst({
+    where: {
+      workerId,
+      status: {
+        in: [
+          "REQUESTED",
+          "ACCEPTED",
+          "NEGOTIATION",
+          "CONFIRMED",
+          "TRAVELLING",
+          "ARRIVED",
+          "IN_PROGRESS",
+        ],
+      },
+    },
+    select: {
+      id: true,
+      orderRef: true,
+      status: true,
+      scheduledAt: true,
+      problemTitle: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const activeBooking = !activeOrder ? await prisma.booking.findFirst({
+    where: {
+      workerId,
+      status: { in: ["ACCEPTED", "EN_ROUTE", "IN_PROGRESS"] },
+    },
+    select: {
+      id: true,
+      bookingRef: true,
+      status: true,
+      scheduledAt: true,
+      service: { select: { name: true, categoryName: true } },
+    },
+  }) : null;
+
+  let dynamicDutyState: string = "OFF_DUTY";
+  if (activeOrder) {
+    if (activeOrder.status === "TRAVELLING") dynamicDutyState = "TRAVELLING";
+    else if (activeOrder.status === "ARRIVED") dynamicDutyState = "ARRIVED";
+    else if (activeOrder.status === "IN_PROGRESS") dynamicDutyState = "WORKING";
+    else if (activeOrder.status === "REQUESTED") dynamicDutyState = "REQUEST_RECEIVED";
+    else dynamicDutyState = "ACCEPTED";
+  } else if (activeBooking) {
+    if (activeBooking.status === "IN_PROGRESS") {
+      dynamicDutyState = "ON_JOB";
+    } else if (activeBooking.status === "EN_ROUTE") {
+      dynamicDutyState = "TRAVELLING";
+    } else {
+      dynamicDutyState = "BUSY";
+    }
+  } else if (profile.isOnDuty && profile.isAvailable) {
+    dynamicDutyState = "AVAILABLE";
+  } else {
+    dynamicDutyState = "OFF_DUTY";
+  }
+
+  return {
+    ...formatWorker(profile),
+    dutyState: dynamicDutyState,
+    currentJob: activeOrder || activeBooking || null,
+  };
 }
 
 export async function getWorkerEarnings(workerId: string): Promise<any> {
@@ -222,13 +299,14 @@ export async function searchWorkers(
   const where: any = { status: "VERIFIED", latitude: { not: null }, longitude: { not: null }, user: { isActive: true } };
   if (coopId) where.coopId = coopId;
   const candidates = await prisma.workerProfile.findMany({
-    where, include: { user: { select: { id: true, name: true } }, coop: { select: { name: true } } }, take: 100,
+    where, include: { user: { select: { id: true, name: true, avatarUrl: true } }, coop: { select: { name: true } } }, take: 100,
   });
   return candidates
     .map(w => ({
-      workerId: w.id, workerName: w.user.name, coopName: w.coop?.name || null,
+      workerId: w.id, workerName: w.user.name, avatarUrl: w.user.avatarUrl || null, coopName: w.coop?.name || null,
       skillTags: w.skillTags, avgRating: Number(w.avgRating), totalJobs: w.totalJobs,
       bio: w.bio, experienceYears: w.experienceYears, isAvailable: w.isAvailable, isOnDuty: w.isOnDuty,
+      dutyState: w.dutyState || (w.isOnDuty && w.isAvailable ? "AVAILABLE" : "OFF_DUTY"),
       distanceKm: Math.round(haversineDistance(lat, lng, w.latitude!, w.longitude!) * 100) / 100,
     }))
     .filter(w => matchesSkills(w.skillTags, skillTags))

@@ -25,6 +25,7 @@ import {
 import { PhoneInput } from "./PhoneInput";
 import { OtpInput } from "./OtpInput";
 import { DigiLockerDemoFlow } from "@/components/verification/DigiLockerDemoFlow";
+import { ProfilePhotoCapture } from "@/components/profile/ProfilePhotoCapture";
 import { LegalModal } from "@/components/legal/LegalModal";
 import { detectLiveLocation } from "@/lib/location";
 import { useAuthStore } from "@/store/authStore";
@@ -42,6 +43,7 @@ type RegisterStep =
   | "password"
   | "location"
   | "identity"
+  | "profile_photo"
   | "complete";
 
 const SKILL_OPTIONS = [
@@ -91,9 +93,10 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
   const [digilockerModalOpen, setDigilockerModalOpen] = useState(false);
   const [digilockerVerifying, setDigilockerVerifying] = useState(false);
 
-  // Profile Details (DOB, Location, Skills)
+  // Profile Details (DOB, Location, Skills, Photo)
   const [dob, setDob] = useState("1994-08-15");
   const [skillCertificate, setSkillCertificate] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   // Legal Modal
   const [legalModalOpen, setLegalModalOpen] = useState(false);
@@ -453,7 +456,7 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
     }
   };
 
-  const handleFinalSubmit = async (e: React.FormEvent) => {
+  const handleIdentitySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -472,7 +475,19 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
       return;
     }
 
+    // Move to mandatory profile photo capture step
+    setStep("profile_photo");
+  };
+
+  const handleFinalRegistration = async (customAvatar?: string) => {
+    const finalAvatar = customAvatar || avatarUrl;
+    if (!finalAvatar) {
+      setErrorMessage("Please capture a verified profile photo of yourself before joining.");
+      return;
+    }
+
     setLoading(true);
+    setErrorMessage(null);
 
     try {
       const { apiPost } = await import("@/lib/api");
@@ -497,6 +512,7 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
         longitude: longitude || 77.2095,
         defaultAddress: role === "CONSUMER" ? fullAddress : undefined,
         workAddress: role === "WORKER" ? fullAddress : undefined,
+        avatarUrl: finalAvatar,
       };
 
       const res = await apiPost<{
@@ -1225,7 +1241,7 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
 
       {/* STEP 7: IDENTITY & DIGILOCKER AUTHORIZATION (Fits cleanly on mobile screen!) */}
       {step === "identity" && (
-        <form onSubmit={handleFinalSubmit}>
+        <form onSubmit={handleIdentitySubmit}>
           <button
             type="button"
             onClick={() => setStep("location")}
@@ -1245,7 +1261,7 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
 
           {renderGuidanceBanner(
             "DigiLocker Authorization",
-            "Final step! Authorize your official government Aadhaar credentials securely via DigiLocker."
+            "Authorize your official government Aadhaar credentials securely via DigiLocker."
           )}
 
           <div className="space-y-4">
@@ -1351,22 +1367,17 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
               )}
             </div>
 
-            {/* 3. Final Submission Button */}
+            {/* 3. Next: Photo Button */}
             <div>
               <button
                 type="submit"
                 disabled={loading || !isAadhaarVerified}
                 className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 sm:py-4 text-sm sm:text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {loading ? (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Creating Account...</span>
-                  </div>
-                ) : isAadhaarVerified ? (
+                {isAadhaarVerified ? (
                   <>
-                    <span>Complete Registration & Join</span>
-                    <Check className="h-5 w-5" />
+                    <span>Next: Take Profile Photo</span>
+                    <ChevronRight className="h-5 w-5" />
                   </>
                 ) : (
                   <span>Connect with DigiLocker to Continue</span>
@@ -1380,6 +1391,70 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
             </div>
           </div>
         </form>
+      )}
+
+      {/* STEP 8: PROFILE PHOTO & FACE VALIDATION */}
+      {step === "profile_photo" && (
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setStep("identity")}
+            className="inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-4 sm:mb-6 shadow-xs"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight font-heading">
+              Take Profile Photo
+            </h1>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              Take a clear photo of yourself for your {role === "WORKER" ? "Worker" : "Consumer"} profile.
+            </p>
+          </div>
+
+          {renderGuidanceBanner(
+            "Face Verification",
+            "Take a clear photo of yourself. Automated face validation ensures community trust and authentic credentials."
+          )}
+
+          <ProfilePhotoCapture
+            onPhotoCaptured={(url) => {
+              setAvatarUrl(url);
+              setErrorMessage(null);
+            }}
+            initialPhotoUrl={avatarUrl || undefined}
+            isPublicRegistration={true}
+          />
+
+          <div className="pt-2">
+            <button
+              type="button"
+              disabled={loading || !avatarUrl}
+              onClick={() => handleFinalRegistration(avatarUrl || undefined)}
+              className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 sm:py-4 text-sm sm:text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Creating Account...</span>
+                </div>
+              ) : avatarUrl ? (
+                <>
+                  <span>Complete Registration & Join</span>
+                  <Check className="h-5 w-5" />
+                </>
+              ) : (
+                <span>Take Photo to Continue</span>
+              )}
+            </button>
+            {!avatarUrl && (
+              <p className="text-center text-[10px] text-slate-400 mt-1.5 font-medium">
+                A verified human photo is required to ensure trust across the platform.
+              </p>
+            )}
+          </div>
+        </div>
       )}
 
       {/* STEP 8: COMPLETE */}

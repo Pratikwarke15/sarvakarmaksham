@@ -27,7 +27,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
 import { LanguageSelector } from "@/components/i18n/LanguageSelector";
-import { Avatar, AvatarFallback } from "@radix-ui/react-avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@radix-ui/react-avatar";
 
 import { useI18n } from "@/i18n/I18nProvider";
 
@@ -177,8 +177,15 @@ export function Navbar() {
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center gap-2 rounded-lg px-3 py-1.5 hover:bg-gray-50"
               >
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="flex h-full w-full items-center justify-center rounded-full bg-indigo-100 text-sm font-medium text-indigo-700">
+                <Avatar className="h-8 w-8 rounded-full overflow-hidden shrink-0 border border-slate-200">
+                  {user?.avatarUrl && (
+                    <AvatarImage
+                      src={user.avatarUrl}
+                      alt={user?.name || "User"}
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+                  <AvatarFallback className="flex h-full w-full items-center justify-center rounded-full bg-[#800020]/10 text-xs font-bold text-[#800020]">
                     {user?.name?.charAt(0) || "U"}
                   </AvatarFallback>
                 </Avatar>
@@ -189,9 +196,18 @@ export function Navbar() {
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
                   <div className="absolute right-0 top-full z-50 mt-2 w-48 rounded-lg border bg-white py-1 shadow-lg animate-fade-in">
-                    <div className="border-b px-4 py-2">
-                      <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-                      <p className="text-xs text-gray-500">{user?.role?.replace("_", " ")}</p>
+                    <div className="border-b px-4 py-2 flex items-center gap-2.5">
+                      {user?.avatarUrl ? (
+                        <img
+                          src={user.avatarUrl}
+                          alt={user?.name || "User"}
+                          className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
+                        />
+                      ) : null}
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-900 truncate">{user?.name}</p>
+                        <p className="text-[10px] text-gray-500 uppercase font-semibold">{user?.role?.replace("_", " ")}</p>
+                      </div>
                     </div>
                     {user?.role && (
                       <Link

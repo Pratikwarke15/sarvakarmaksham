@@ -23,7 +23,14 @@ app.use(helmet({
   contentSecurityPolicy: false,
 }));
 app.use(cors({
-  origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN,
+  origin: (requestOrigin, callback) => {
+    if (!requestOrigin) return callback(null, true);
+    const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(requestOrigin);
+    if (env.CORS_ORIGIN === "*" || isLocalhost || requestOrigin === env.CORS_ORIGIN) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,

@@ -65,17 +65,14 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
   loadFromStorage: () => {
     if (typeof window === "undefined") return;
     try {
-      // In regular website mode (browser tab), ensure any old persistent localStorage tokens are wiped
-      // so exiting the website logs the user out upon reopening.
-      if (!isPwaMode()) {
-        localStorage.removeItem("coopgig_token");
-        localStorage.removeItem("coopgig_user");
-      }
       const token = getStoredToken();
       const userStr = getStoredUser();
       if (token && userStr) {
-        const user = JSON.parse(userStr) as User;
-        set({ user, token, isAuthenticated: true, isLoading: false });
+        let user = typeof userStr === "object" ? userStr : JSON.parse(userStr);
+        if (typeof user === "string") {
+          try { user = JSON.parse(user); } catch {}
+        }
+        set({ user: user as User, token, isAuthenticated: true, isLoading: false });
       } else {
         set({ user: null, token: null, isAuthenticated: false, isLoading: false });
       }

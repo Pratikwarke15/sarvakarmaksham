@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   CalendarCheck,
@@ -19,91 +19,169 @@ import {
   Clock,
   CheckCircle2,
   Sparkles,
+  RefreshCw,
+  ExternalLink,
+  Receipt,
 } from "lucide-react";
+import { io, Socket } from "socket.io-client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store/authStore";
-import { Card, CardContent } from "@/components/ui/card";
-import { BookingCard } from "@/components/booking/BookingCard";
 import { StatsCard } from "@/components/dashboard/StatsCard";
+import { ConsumerActiveOrderCard } from "@/components/consumer/ConsumerActiveOrderCard";
+import { OrderPaymentReceiptModal } from "@/components/payment/OrderPaymentReceiptModal";
 import { apiGet } from "@/lib/api";
+import { getStoredToken } from "@/lib/storage";
 import { formatCurrency } from "@/lib/utils";
 import { useI18n } from "@/i18n/I18nProvider";
-import type { Booking } from "@/lib/types";
-
-const ACTIVE_STATUSES = ["PENDING", "ACCEPTED", "EN_ROUTE", "IN_PROGRESS"];
-
-const tradeShortcuts = [
-  {
-    slug: "electrician",
-    title: "Electrician",
-    icon: Zap,
-    startPrice: "₹50",
-    bg: "bg-amber-500/10 text-amber-600 border-amber-200/60",
-    hoverBg: "hover:border-amber-400",
-  },
-  {
-    slug: "plumber",
-    title: "Plumber",
-    icon: Droplets,
-    startPrice: "₹50",
-    bg: "bg-sky-500/10 text-sky-600 border-sky-200/60",
-    hoverBg: "hover:border-sky-400",
-  },
-  {
-    slug: "carpenter",
-    title: "Carpenter",
-    icon: Hammer,
-    startPrice: "₹50",
-    bg: "bg-orange-500/10 text-orange-600 border-orange-200/60",
-    hoverBg: "hover:border-orange-400",
-  },
-  {
-    slug: "painter",
-    title: "Painter",
-    icon: Paintbrush,
-    startPrice: "₹50",
-    bg: "bg-emerald-500/10 text-emerald-600 border-emerald-200/60",
-    hoverBg: "hover:border-emerald-400",
-  },
-  {
-    slug: "construction",
-    title: "Construction",
-    icon: HardHat,
-    startPrice: "₹50",
-    bg: "bg-[#800020]/10 text-[#800020] border-[#800020]/20",
-    hoverBg: "hover:border-[#800020]/50",
-  },
-];
+import type { Order, OrderPaymentReceipt } from "@/lib/types";
 
 export default function ConsumerDashboard() {
   const { user } = useAuth();
   const { t } = useI18n();
   const loadFromStorage = useAuthStore((s) => s.loadFromStorage);
-  const [bookings, setBookings] = useState<Booking[]>([]);
+
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<OrderPaymentReceipt | null>(null);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null);
+
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
     loadFromStorage();
   }, [loadFromStorage]);
 
-  const fetchBookings = useCallback(async () => {
+  const handleOpenReceipt = async (orderId: string) => {
     try {
-      const res = await apiGet<{ success: boolean; data: Booking[] }>("/bookings");
-      if (res.success) setBookings(res.data || []);
-    } catch {
-      setBookings([]);
+      setLoadingReceiptId(orderId);
+      const res = await apiGet<{ success: boolean; data: OrderPaymentReceipt }>(
+        `/orders/${orderId}/payment/receipt`
+      );
+      if (res.success && res.data) {
+        setSelectedReceipt(res.data);
+        setIsReceiptOpen(true);
+      }
+    } catch (err: any) {
+      console.warn("Could not fetch receipt:", err.message);
+    } finally {
+      setLoadingReceiptId(null);
+    }
+  };
+
+  // Fetch active order & all orders from backend
+  const fetchDashboardData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setRefreshing(true);
+    try {
+      const [activeRes, allRes] = await Promise.allSettled([
+        apiGet<{ success: boolean; data: Order | null }>("/orders/consumer/active"),
+        apiGet<{ success: boolean; data: Order[] }>("/orders/consumer"),
+      ]);
+
+      if (activeRes.status === "fulfilled" && activeRes.value.success) {
+        setActiveOrder(activeRes.value.data || null);
+      }
+
+      if (allRes.status === "fulfilled" && allRes.value.success) {
+        const list = allRes.value.data || [];
+        setOrders(list);
+
+        // Fallback: if activeOrder endpoint didn't find one, check the list for active statuses
+        if (activeRes.status === "rejected" || !activeRes.value.data) {
+          const activeStatuses = [
+            "REQUESTED",
+            "ACCEPTED",
+            "NEGOTIATION",
+            "CONFIRMED",
+            "TRAVELLING",
+            "ARRIVED",
+            "IN_PROGRESS",
+            "PAYMENT_PENDING",
+          ];
+          const found = list.find((o) => activeStatuses.includes(o.status));
+          if (found) {
+            setActiveOrder(found);
+          } else {
+            // Also check for recently settled order (completed within last 30 minutes)
+            const recentSettled = list.find(
+              (o) =>
+                (o.status === "COMPLETED" || o.paymentStatus === "PAID") &&
+                Date.now() - new Date(o.updatedAt || o.createdAt).getTime() < 30 * 60 * 1000
+            );
+            if (recentSettled) {
+              setActiveOrder(recentSettled);
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn("Failed to fetch consumer orders:", err.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
-  const recentBookings = bookings.slice(0, 4);
-  const active = bookings.find((b) => ACTIVE_STATUSES.includes(b.status));
-  const completedCount = bookings.filter((b) => b.status === "COMPLETED").length;
+  // Realtime Socket.IO synchronization on consumer user room
+  useEffect(() => {
+    const token = getStoredToken();
+    if (!token) return;
+
+    const socketUrl =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1")
+        ? "http://localhost:4000"
+        : "";
+
+    const socket = io(socketUrl, {
+      path: "/ws",
+      auth: { token },
+      transports: ["websocket", "polling"],
+      reconnectionAttempts: 8,
+      reconnectionDelay: 2000,
+    });
+
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      if (user?.id) {
+        socket.emit("join:user", user.id);
+      }
+      if (activeOrder?.id) {
+        socket.emit("join:order", activeOrder.id);
+      }
+    });
+
+    socket.on("order:status_update", (payload: any) => {
+      // Refresh dashboard data on any status change
+      fetchDashboardData(true);
+    });
+
+    socket.on("orders:update", () => {
+      fetchDashboardData(true);
+    });
+
+    // Background poll every 8 seconds to ensure sync
+    const pollInterval = setInterval(() => {
+      fetchDashboardData(true);
+    }, 8000);
+
+    return () => {
+      clearInterval(pollInterval);
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [user?.id, activeOrder?.id, fetchDashboardData]);
+
+  const completedOrders = orders.filter((o) => o.status === "COMPLETED" || o.status === "PAID");
+  const completedCount = completedOrders.length;
   const initial = (user?.name || "C").charAt(0).toUpperCase();
 
   return (
@@ -138,11 +216,11 @@ export default function ConsumerDashboard() {
 
           <div className="flex items-center gap-2.5 self-start md:self-auto">
             <Link
-              href="/consumer/book"
+              href="/consumer/problem-selection"
               className="inline-flex items-center gap-2 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white px-5 py-2.5 text-xs font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all active:scale-98"
             >
               <Plus className="h-4 w-4" />
-              <span>Book a Service</span>
+              <span>Select Problem</span>
             </Link>
             <Link
               href="/consumer/wallet"
@@ -157,11 +235,18 @@ export default function ConsumerDashboard() {
         {/* Quick Nav Strip */}
         <div className="mt-6 pt-5 border-t border-slate-100 flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
           <Link
-            href="/consumer/bookings"
+            href="/consumer/problem-selection"
+            className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 border border-rose-200 hover:border-[#800020] px-3.5 py-1.5 font-bold text-[#800020] shadow-2xs transition-colors"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-[#800020]" />
+            <span>Problem Selection Flow</span>
+          </Link>
+          <Link
+            href="#recent-orders"
             className="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 hover:border-[#800020]/40 px-3.5 py-1.5 font-bold text-slate-700 hover:text-[#800020] shadow-2xs transition-colors"
           >
             <Briefcase className="h-3.5 w-3.5 text-[#800020]" />
-            <span>My Bookings ({bookings.length})</span>
+            <span>All Orders ({orders.length})</span>
           </Link>
           <Link
             href="/consumer/profile"
@@ -177,48 +262,108 @@ export default function ConsumerDashboard() {
             <ShieldCheck className="h-3.5 w-3.5 text-[#800020]" />
             <span>DigiLocker KYC</span>
           </Link>
-          <Link
-            href="/consumer/profile"
-            className="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 hover:border-slate-300 px-3.5 py-1.5 font-bold text-slate-500 hover:text-slate-900 shadow-2xs transition-colors ml-auto"
-          >
-            <span>My Profile →</span>
-          </Link>
         </div>
       </div>
 
-      {/* Quick Trade Booking Carousel (Matching Landing Page Services) */}
+      {/* ========================================================================= */}
+      {/* 1. ACTIVE ORDER SPOTLIGHT CARD (REQUIREMENTS 1, 2, 3, 5, 6)               */}
+      {/* ========================================================================= */}
+      {activeOrder && (
+        <section className="space-y-3 animate-fade-in" id="active-service">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading flex items-center gap-2">
+              <span className="flex h-2.5 w-2.5 rounded-full bg-[#800020] animate-pulse" />
+              <span>Active Service Dispatch</span>
+            </h2>
+            <Link
+              href={`/consumer/problem-selection?orderId=${activeOrder.id}`}
+              className="text-xs font-bold text-[#800020] hover:underline flex items-center gap-1"
+            >
+              <span>Full Screen Cockpit</span>
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+
+          <ConsumerActiveOrderCard
+            initialOrder={activeOrder}
+            onOrderUpdated={(updated) => {
+              if (["CANCELLED"].includes(updated.status)) {
+                setActiveOrder(null);
+              } else {
+                setActiveOrder(updated);
+              }
+              fetchDashboardData(true);
+            }}
+          />
+        </section>
+      )}
+
+      {/* Quick Trade Problem Selection Carousel */}
       <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading">
-              Instant Verified Services
+              Select Problem by Category
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Select a trade to instantly request a local background-checked artisan.
+              Select your service to browse specific issues, explain with text or voice, and get fair estimates.
             </p>
           </div>
-          <Link href="/consumer/book" className="text-xs font-bold text-[#800020] hover:underline">
-            All Services →
+          <Link href="/consumer/problem-selection" className="text-xs font-bold text-[#800020] hover:underline">
+            All Categories →
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-          {tradeShortcuts.map((trade) => {
-            const Icon = trade.icon;
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            {
+              slug: "plumbing",
+              title: "Plumbing",
+              icon: Droplets,
+              desc: "Taps, toilets, sinks, drains",
+              bg: "bg-sky-500/10 text-sky-600 border-sky-200/60",
+              hoverBg: "hover:border-sky-400",
+            },
+            {
+              slug: "electrical",
+              title: "Electrical",
+              icon: Zap,
+              desc: "Switches, fans, MCB, wiring",
+              bg: "bg-amber-500/10 text-amber-600 border-amber-200/60",
+              hoverBg: "hover:border-amber-400",
+            },
+            {
+              slug: "carpentry",
+              title: "Carpentry",
+              icon: Hammer,
+              desc: "Doors, locks, drawers, drilling",
+              bg: "bg-orange-500/10 text-orange-600 border-orange-200/60",
+              hoverBg: "hover:border-orange-400",
+            },
+            {
+              slug: "appliance-repair",
+              title: "Appliance Repair",
+              icon: Sparkles,
+              desc: "AC, washing machine, geyser, RO",
+              bg: "bg-emerald-500/10 text-emerald-600 border-emerald-200/60",
+              hoverBg: "hover:border-emerald-400",
+            },
+          ].map((cat) => {
+            const Icon = cat.icon;
             return (
               <Link
-                key={trade.slug}
-                href={`/consumer/book?service=${trade.slug}`}
-                className={`flex flex-col items-center justify-center p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 hover:bg-white ${trade.hoverBg} hover:shadow-md transition-all group text-center`}
+                key={cat.slug}
+                href={`/consumer/problem-selection?category=${cat.slug}`}
+                className={`flex flex-col items-center justify-center p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 hover:bg-white ${cat.hoverBg} hover:shadow-md transition-all group text-center`}
               >
-                <div className={`h-11 w-11 rounded-2xl flex items-center justify-center mb-2.5 border transition-transform group-hover:scale-110 duration-200 ${trade.bg}`}>
+                <div className={`h-11 w-11 rounded-2xl flex items-center justify-center mb-2.5 border transition-transform group-hover:scale-110 duration-200 ${cat.bg}`}>
                   <Icon className="h-5 w-5" />
                 </div>
                 <span className="text-xs font-bold text-slate-900 group-hover:text-[#800020] transition-colors">
-                  {trade.title}
+                  {cat.title}
                 </span>
-                <span className="text-[10px] font-semibold text-slate-400 mt-0.5">
-                  Starts at {trade.startPrice}
+                <span className="text-[10px] font-semibold text-slate-400 mt-0.5 line-clamp-1">
+                  {cat.desc}
                 </span>
               </Link>
             );
@@ -226,97 +371,20 @@ export default function ConsumerDashboard() {
         </div>
       </div>
 
-      {/* Active Booking Live Tracker Spotlight */}
-      {active && (
-        <div className="rounded-3xl border border-rose-200/80 bg-gradient-to-r from-rose-50/60 via-white to-amber-50/20 p-6 shadow-xs animate-fade-in">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-rose-100">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-3 w-3 rounded-full bg-rose-600 animate-pulse" />
-              <span className="text-xs font-bold text-[#800020] uppercase tracking-wider">
-                Active Service Dispatch in Progress
-              </span>
-              <span className="font-mono text-xs font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                {active.bookingRef}
-              </span>
-            </div>
-            <Link
-              href={`/consumer/bookings/${active.id}`}
-              className="text-xs font-bold text-[#800020] hover:underline inline-flex items-center gap-1"
-            >
-              <span>Live Tracking Map</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-
-          <div className="my-5 grid grid-cols-4 gap-2 text-center text-xs">
-            {["Requested", "Assigned", "En Route", "In Progress"].map((step, idx) => {
-              const currentIdx = active.status === "PENDING" ? 0 : active.status === "ACCEPTED" ? 1 : active.status === "EN_ROUTE" ? 2 : 3;
-              const isPassed = idx <= currentIdx;
-              const isCurrent = idx === currentIdx;
-              return (
-                <div key={step} className="flex flex-col items-center">
-                  <div
-                    className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                      isPassed
-                        ? 'bg-[#800020] text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-400'
-                    } ${isCurrent ? 'ring-2 ring-rose-300 ring-offset-2' : ''}`}
-                  >
-                    {idx + 1}
-                  </div>
-                  <span className={`mt-1.5 text-[11px] font-semibold ${isPassed ? 'text-slate-900 font-bold' : 'text-slate-400'}`}>
-                    {step}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-2xl p-4 border border-rose-100">
-            <div>
-              <h3 className="text-base font-bold text-slate-900">{active.service?.name || "Service Order"}</h3>
-              <p className="text-xs text-slate-600 mt-0.5 flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5 text-[#800020] shrink-0" />
-                <span>{active.address}</span>
-              </p>
-              {active.worker && (
-                <p className="text-xs text-emerald-800 font-semibold mt-1">
-                  Assigned Artisan: {active.worker.user?.name || "Local Verified Specialist"}
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-3 self-end sm:self-auto">
-              <div className="text-right">
-                <span className="text-xs text-slate-400 block font-medium">Protected Escrow</span>
-                <span className="text-xl font-black text-[#800020]">{formatCurrency(active.quotedPrice)}</span>
-              </div>
-              <Link href={`/consumer/bookings/${active.id}`}>
-                <button
-                  type="button"
-                  className="rounded-xl bg-[#800020] hover:bg-[#68001a] text-white font-bold text-xs px-4 py-2 transition"
-                >
-                  Track Dispatch
-                </button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Household Vital Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-3">
         <StatsCard
           icon={Briefcase}
           label="Total Services Completed"
           value={completedCount}
-          subtitle="Household repairs & tasks"
+          subtitle="Finished cooperative orders"
           color="maroon"
         />
         <StatsCard
           icon={Clock}
-          label="Active Bookings"
-          value={active ? 1 : 0}
-          subtitle="Real-time dispatch status"
+          label="Active Dispatches"
+          value={activeOrder ? 1 : 0}
+          subtitle={activeOrder ? activeOrder.status : "No active job"}
           color="amber"
         />
         <StatsCard
@@ -328,35 +396,116 @@ export default function ConsumerDashboard() {
         />
       </div>
 
-      {/* Recent Bookings Activity */}
-      <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs">
+      {/* Recent Orders Activity */}
+      <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs" id="recent-orders">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading">
-              Recent Service Activity
+              Recent Service Orders
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Your past work orders and receipts</p>
+            <p className="text-xs text-slate-500 mt-0.5">Your work orders, dispatch history and receipts</p>
           </div>
-          <Link href="/consumer/bookings" className="text-xs font-bold text-[#800020] hover:underline">
-            View All ({bookings.length})
-          </Link>
+          <button
+            type="button"
+            onClick={() => fetchDashboardData()}
+            disabled={refreshing}
+            className="text-xs font-bold text-[#800020] hover:underline flex items-center gap-1"
+          >
+            <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </button>
         </div>
 
         {loading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-7 w-7 animate-spin text-[#800020]" />
           </div>
-        ) : recentBookings.length > 0 ? (
+        ) : orders.length > 0 ? (
           <div className="space-y-3">
-            {recentBookings.map((b) => (
-              <BookingCard key={b.id} booking={b} />
+            {orders.map((o) => (
+              <div
+                key={o.id}
+                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs hover:border-[#800020]/30 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs font-bold text-slate-800">
+                      {o.orderRef}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                        o.status === "COMPLETED" || o.status === "PAID"
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                          : o.status === "TRAVELLING"
+                          ? "bg-purple-50 text-purple-800 border-purple-200"
+                          : o.status === "ACCEPTED"
+                          ? "bg-blue-50 text-blue-800 border-blue-200"
+                          : o.status === "REJECTED" || o.status === "CANCELLED"
+                          ? "bg-rose-50 text-rose-800 border-rose-200"
+                          : "bg-amber-50 text-amber-800 border-amber-200"
+                      }`}
+                    >
+                      {o.status}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      {new Date(o.createdAt).toLocaleDateString("en-IN", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+
+                  <h4 className="text-sm font-bold text-slate-900">
+                    {o.problem?.name || o.problemTitle || "Home Service"}
+                  </h4>
+                  <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                    <span>Technician: {o.worker?.user?.name || "Assigned Cooperative Member"}</span>
+                    <span>•</span>
+                    <span>{o.category?.name || "Service"}</span>
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <div className="text-right">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                      Price
+                    </span>
+                    <span className="text-sm font-black text-[#800020]">
+                      {formatCurrency(Number(o.finalPrice || o.quotedPrice || o.basePrice))}
+                    </span>
+                  </div>
+
+                  {(o.status === "COMPLETED" || o.paymentStatus === "PAID") && (
+                    <button
+                      type="button"
+                      id="view-receipt-btn"
+                      onClick={() => handleOpenReceipt(o.id)}
+                      disabled={loadingReceiptId === o.id}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <Receipt className="h-3 w-3" />
+                      <span>{loadingReceiptId === o.id ? "Loading..." : "Receipt"}</span>
+                    </button>
+                  )}
+
+                  <Link
+                    href={`/consumer/problem-selection?orderId=${o.id}`}
+                    className="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center gap-1"
+                  >
+                    <span>View</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </Link>
+                </div>
+              </div>
             ))}
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-12 text-center text-slate-400 text-xs">
             <CalendarCheck className="mx-auto h-8 w-8 text-slate-300 mb-2" />
-            <p className="font-semibold text-slate-600">No bookings yet</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Click &quot;Book a Service&quot; above to hire an electrician, plumber, or carpenter.</p>
+            <p className="font-semibold text-slate-600">No service orders yet</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Click &quot;Select Problem&quot; above to hire an electrician, plumber, or carpenter.</p>
           </div>
         )}
       </div>
@@ -376,12 +525,20 @@ export default function ConsumerDashboard() {
           </p>
         </div>
         <Link
-          href="/consumer/book"
+          href="/consumer/problem-selection"
           className="rounded-full bg-[#800020] hover:bg-[#68001a] text-white px-6 py-2.5 text-xs font-bold shadow-md transition-all active:scale-98 shrink-0 self-start md:self-auto"
         >
           Book Verified Artisan
         </Link>
       </div>
+
+      {/* Official Payment Receipt Modal */}
+      <OrderPaymentReceiptModal
+        isOpen={isReceiptOpen}
+        receipt={selectedReceipt}
+        onClose={() => setIsReceiptOpen(false)}
+        viewerRole="CONSUMER"
+      />
     </div>
   );
 }

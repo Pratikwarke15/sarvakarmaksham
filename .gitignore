@@ -18,3 +18,4 @@ venv/
 /public/
 .vercel
 .env*
+apps/api/public/uploads/

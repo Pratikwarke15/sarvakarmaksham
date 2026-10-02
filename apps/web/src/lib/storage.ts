@@ -19,17 +19,17 @@ export function isPwaMode(): boolean {
 export function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
   if (isPwaMode()) {
-    return localStorage.getItem("coopgig_token");
+    return localStorage.getItem("coopgig_token") || sessionStorage.getItem("coopgig_token");
   }
-  return sessionStorage.getItem("coopgig_token");
+  return sessionStorage.getItem("coopgig_token") || localStorage.getItem("coopgig_token");
 }
 
 export function getStoredUser(): string | null {
   if (typeof window === "undefined") return null;
   if (isPwaMode()) {
-    return localStorage.getItem("coopgig_user");
+    return localStorage.getItem("coopgig_user") || sessionStorage.getItem("coopgig_user");
   }
-  return sessionStorage.getItem("coopgig_user");
+  return sessionStorage.getItem("coopgig_user") || localStorage.getItem("coopgig_user");
 }
 
 export function setStoredSession(token: string, user: any): void {

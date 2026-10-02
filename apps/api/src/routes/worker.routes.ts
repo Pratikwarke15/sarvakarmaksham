@@ -4,9 +4,28 @@ import { validate } from "../middleware/validate";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { registerWorkerSchema, updateWorkerLocationSchema, updateAvailabilitySchema } from "../schemas/worker.schemas";
 import * as workerService from "../services/worker.service";
+import { OrderService } from "../services/order.service";
 import prisma from "../lib/prisma";
 
 const router = Router();
+
+/**
+ * GET /api/v1/workers/dashboard-summary
+ * Comprehensive worker dashboard cockpit aggregator (10 core modules)
+ */
+router.get("/dashboard-summary", authenticate, authorize("WORKER"), asyncHandler(async (req, res) => {
+  const summary = await OrderService.getWorkerDashboardSummary(req.user!.id);
+  res.json({ success: true, data: summary });
+}));
+
+/**
+ * PATCH /api/v1/workers/duty-status
+ * Toggle dynamic duty: AVAILABLE <-> OFF_DUTY
+ */
+router.patch("/duty-status", authenticate, authorize("WORKER"), asyncHandler(async (req, res) => {
+  const result = await OrderService.updateDutyStatus(req.user!.id, req.body.dutyState);
+  res.json(result);
+}));
 
 router.post("/register", authenticate, authorize("WORKER"), validate(registerWorkerSchema), asyncHandler(async (req, res) => {
   const profile = await workerService.registerWorker(req.user!.id, req.body);

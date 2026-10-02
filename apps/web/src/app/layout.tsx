@@ -4,6 +4,7 @@ import { QueryProvider } from "@/components/providers/QueryProvider";
 import { ToastProvider } from "@/components/providers/ToastProvider";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { SessionBootstrap } from "@/components/auth/SessionBootstrap";
+import { VoiceCallProvider } from "@/components/calling/VoiceCallProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -26,10 +27,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#4f46e5",
+  themeColor: "#800020",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -40,7 +42,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <QueryProvider>
             <ToastProvider>
               <SessionBootstrap />
-              {children}
+              <VoiceCallProvider>
+                {children}
+              </VoiceCallProvider>
             </ToastProvider>
           </QueryProvider>
         </I18nProvider>

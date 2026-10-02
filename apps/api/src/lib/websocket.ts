@@ -4,7 +4,18 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 import { logger } from "./logger";
 
+import { CallService } from "../services/call.service";
+import { CallStatus } from "@prisma/client";
+
 let io: SocketIOServer;
+const activeCalls = new Map<string, { callId: string; targetUserId: string; orderId: string }>();
+
+type WorkerLocationHandler = (payload: any, userId: string) => Promise<void>;
+let workerLocationHandler: WorkerLocationHandler | null = null;
+
+export function registerWorkerLocationHandler(handler: WorkerLocationHandler): void {
+  workerLocationHandler = handler;
+}
 
 export function setupWebSocket(server: http.Server): void {
   io = new SocketIOServer(server, {
@@ -41,6 +52,11 @@ export function setupWebSocket(server: http.Server): void {
     logger.info(`Client connected: ${userId}`);
 
     socket.join(`role:${role}`);
+    socket.join(`user:${userId}`);
+
+    socket.on("join:user", (uId: string) => {
+      socket.join(`user:${uId}`);
+    });
 
     socket.on("join:worker", (workerId: string) => {
       socket.join(`worker:${workerId}`);
@@ -57,6 +73,28 @@ export function setupWebSocket(server: http.Server): void {
       logger.debug(`Socket joined coop room: ${coopId}`);
     });
 
+    socket.on("join:order", (orderId: string) => {
+      socket.join(`order:${orderId}`);
+      socket.join(`booking:${orderId}`);
+      logger.debug(`Socket ${userId} joined order room: ${orderId}`);
+    });
+
+    socket.on("leave:order", (orderId: string) => {
+      socket.leave(`order:${orderId}`);
+      socket.leave(`booking:${orderId}`);
+      logger.debug(`Socket ${userId} left order room: ${orderId}`);
+    });
+
+    socket.on("worker:location", async (payload: any) => {
+      try {
+        if (workerLocationHandler) {
+          await workerLocationHandler(payload, userId);
+        }
+      } catch (err: any) {
+        logger.warn(`worker:location handler error: ${err.message}`);
+      }
+    });
+
     socket.on("leave:worker", (workerId: string) => {
       socket.leave(`worker:${workerId}`);
     });
@@ -69,8 +107,161 @@ export function setupWebSocket(server: http.Server): void {
       socket.leave(`coop:${coopId}`);
     });
 
-    socket.on("disconnect", () => {
+    // Track active call for disconnect cleanup
+    socket.on("call:initiate", async (data: {
+      orderId: string;
+      targetUserId: string;
+      sdp: any;
+      callerName?: string;
+      callerPhoto?: string;
+      callerRole?: "CONSUMER" | "WORKER";
+    }) => {
+      try {
+        const callerRole =
+          data.callerRole || (role === "WORKER" ? "WORKER" : "CONSUMER");
+
+        const session = await CallService.createCallSession(
+          data.orderId,
+          userId,
+          data.targetUserId,
+          callerRole
+        );
+
+        activeCalls.set(socket.id, {
+          callId: session.id,
+          targetUserId: data.targetUserId,
+          orderId: data.orderId,
+        });
+
+        socket.emit("call:ringing", { callId: session.id, orderId: data.orderId });
+
+        io.to(`user:${data.targetUserId}`).emit("call:incoming", {
+          callId: session.id,
+          orderId: data.orderId,
+          callerId: userId,
+          callerName: data.callerName || "User",
+          callerPhoto: data.callerPhoto || null,
+          callerRole,
+          sdp: data.sdp,
+        });
+        logger.info(`WebRTC call initiated: ${session.id} from ${userId} to ${data.targetUserId}`);
+      } catch (err: any) {
+        logger.warn(`call:initiate error: ${err.message}`);
+        socket.emit("call:failed", { message: err.message || "Failed to initiate call." });
+      }
+    });
+
+    socket.on("call:answer", async (data: {
+      callId: string;
+      orderId: string;
+      targetUserId: string;
+      sdp: any;
+    }) => {
+      try {
+        await CallService.updateCallSession(data.callId, {
+          status: CallStatus.CONNECTED,
+        });
+
+        activeCalls.set(socket.id, {
+          callId: data.callId,
+          targetUserId: data.targetUserId,
+          orderId: data.orderId,
+        });
+
+        io.to(`user:${data.targetUserId}`).emit("call:answered", {
+          callId: data.callId,
+          sdp: data.sdp,
+          responderId: userId,
+        });
+        logger.info(`WebRTC call answered: ${data.callId} by ${userId}`);
+      } catch (err: any) {
+        logger.warn(`call:answer error: ${err.message}`);
+      }
+    });
+
+    socket.on("call:ice_candidate", (data: {
+      callId: string;
+      targetUserId: string;
+      candidate: any;
+    }) => {
+      if (data.targetUserId && data.candidate) {
+        io.to(`user:${data.targetUserId}`).emit("call:ice_candidate", {
+          callId: data.callId,
+          candidate: data.candidate,
+          senderId: userId,
+        });
+      }
+    });
+
+    socket.on("call:reject", async (data: {
+      callId: string;
+      targetUserId: string;
+      orderId?: string;
+      reason?: string;
+    }) => {
+      try {
+        activeCalls.delete(socket.id);
+        await CallService.updateCallSession(data.callId, {
+          status: CallStatus.REJECTED,
+          endReason: data.reason || "declined",
+        });
+
+        io.to(`user:${data.targetUserId}`).emit("call:rejected", {
+          callId: data.callId,
+          reason: data.reason || "Call declined by recipient.",
+        });
+        logger.info(`WebRTC call rejected: ${data.callId}`);
+      } catch (err: any) {
+        logger.warn(`call:reject error: ${err.message}`);
+      }
+    });
+
+    socket.on("call:end", async (data: {
+      callId: string;
+      targetUserId?: string;
+      orderId?: string;
+      durationSec?: number;
+      reason?: string;
+    }) => {
+      try {
+        activeCalls.delete(socket.id);
+        await CallService.updateCallSession(data.callId, {
+          status: CallStatus.ENDED,
+          durationSec: data.durationSec,
+          endReason: data.reason || "completed",
+        });
+
+        if (data.targetUserId) {
+          io.to(`user:${data.targetUserId}`).emit("call:ended", {
+            callId: data.callId,
+            durationSec: data.durationSec || 0,
+            reason: data.reason || "Call ended.",
+          });
+        }
+        logger.info(`WebRTC call ended: ${data.callId}`);
+      } catch (err: any) {
+        logger.warn(`call:end error: ${err.message}`);
+      }
+    });
+
+    socket.on("disconnect", async () => {
       logger.info(`Client disconnected: ${userId}`);
+      const ongoing = activeCalls.get(socket.id);
+      if (ongoing) {
+        activeCalls.delete(socket.id);
+        try {
+          await CallService.updateCallSession(ongoing.callId, {
+            status: CallStatus.ENDED,
+            endReason: "peer_disconnected",
+          });
+          io.to(`user:${ongoing.targetUserId}`).emit("call:ended", {
+            callId: ongoing.callId,
+            reason: "Other party disconnected or refreshed.",
+          });
+        } catch (err: any) {
+          logger.warn(`Disconnect cleanup error: ${err.message}`);
+        }
+      }
     });
   });
 
@@ -82,12 +273,55 @@ export function getIO(): SocketIOServer {
   return io;
 }
 
+export function broadcastToUser(userId: string, event: string, data: unknown): void {
+  io?.to(`user:${userId}`).emit(event, data);
+}
+
 export function broadcastToWorker(workerId: string, data: unknown): void {
   io?.to(`worker:${workerId}`).emit("worker_update", data);
+  io?.to(`worker:${workerId}`).emit("order:incoming", data);
 }
 
 export function broadcastToBooking(bookingId: string, data: unknown): void {
   io?.to(`booking:${bookingId}`).emit("booking_update", data);
+}
+
+export function broadcastToOrder(orderId: string, event: string, data: unknown): void {
+  io?.to(`order:${orderId}`).emit(event, data);
+  io?.to(`booking:${orderId}`).emit(event, data);
+}
+
+export function broadcastOrderStatus(order: any, extraData: any = {}): void {
+  const payload = {
+    orderId: order.id,
+    orderRef: order.orderRef,
+    status: order.status,
+    operationalState: extraData.operationalState || order.status,
+    workerName: order.worker?.user?.name,
+    order,
+    timestamp: new Date().toISOString(),
+    ...extraData,
+  };
+
+  // 1. To Order and Booking rooms
+  io?.to(`order:${order.id}`).emit("order:status_update", payload);
+  io?.to(`booking:${order.id}`).emit("order:status_update", payload);
+
+  // 2. To Consumer user room
+  if (order.consumerId) {
+    io?.to(`user:${order.consumerId}`).emit("order:status_update", payload);
+  }
+
+  // 3. To Worker user room and worker profile room
+  if (order.worker?.userId) {
+    io?.to(`user:${order.worker.userId}`).emit("order:status_update", payload);
+  }
+  if (order.workerId) {
+    io?.to(`worker:${order.workerId}`).emit("order:status_update", payload);
+  }
+
+  // 4. Global broadcast for any dashboards tracking orders
+  io?.emit("orders:update", payload);
 }
 
 export function broadcastToCoop(coopId: string, data: unknown): void {

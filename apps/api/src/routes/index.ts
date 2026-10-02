@@ -11,6 +11,12 @@ import analyticsRoutes from "./analytics.routes";
 import verificationRoutes from "./verification.routes";
 import adminRoutes from "./admin.routes";
 import consumerRoutes from "./consumer.routes";
+import catalogRoutes from "./catalog.routes";
+import problemRequestRoutes from "./problem-request.routes";
+import pricingRoutes from "./pricing.routes";
+import orderRoutes from "./order.routes";
+import routeRoutes from "./route.routes";
+import callRoutes from "./call.routes";
 
 const router = Router();
 
@@ -27,5 +33,11 @@ router.use("/uploads", uploadRoutes);
 router.use("/analytics", analyticsRoutes);
 router.use("/verification", verificationRoutes);
 router.use("/admin", adminRoutes);
+router.use("/services", catalogRoutes);
+router.use("/problem-requests", problemRequestRoutes);
+router.use("/pricing", pricingRoutes);
+router.use("/orders", orderRoutes);
+router.use("/routes", routeRoutes);
+router.use("/calls", callRoutes);
 
 export default router;

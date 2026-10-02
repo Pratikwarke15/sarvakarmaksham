@@ -5,10 +5,6 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, formatDateTime, getStatusColor } from "@/lib/utils";
-import { apiGet, apiPatch } from "@/lib/api";
-import { useToast } from "@/components/providers/ToastProvider";
-import { useAuth } from "@/hooks/useAuth";
 import {
   MapPin,
   Phone,
@@ -28,7 +24,12 @@ import {
   Smartphone,
   Lock,
 } from "lucide-react";
-import type { Booking, BookingStatus } from "@/lib/types";
+import { formatCurrency, formatDateTime, getStatusColor } from "@/lib/utils";
+import { apiGet, apiPatch, apiPost } from "@/lib/api";
+import { useToast } from "@/components/providers/ToastProvider";
+import { useAuth } from "@/hooks/useAuth";
+import { IncomingOrderRequestCard } from "@/components/worker/IncomingOrderRequestCard";
+import type { Booking, BookingStatus, Order } from "@/lib/types";
 
 type TabFilter = "PENDING" | "ACTIVE" | "COMPLETED";
 
@@ -105,6 +106,7 @@ export default function WorkerJobsPage() {
   );
   const [activeTab, setActiveTab] = useState<TabFilter>("PENDING");
   const [jobs, setJobs] = useState<Booking[]>([]);
+  const [orderRequests, setOrderRequests] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -112,8 +114,12 @@ export default function WorkerJobsPage() {
     if (!isAuthenticated || user?.role !== "WORKER") return;
     setLoading(true);
     try {
-      const res = await apiGet<{ success: boolean; data: Booking[] }>("/bookings");
-      if (res.success) setJobs(res.data || []);
+      const [bookingsRes, ordersRes] = await Promise.all([
+        apiGet<{ success: boolean; data: Booking[] }>("/bookings"),
+        apiGet<{ success: boolean; data: Order[] }>("/orders/worker/requests"),
+      ]);
+      if (bookingsRes.success) setJobs(bookingsRes.data || []);
+      if (ordersRes.success) setOrderRequests(ordersRes.data || []);
     } catch {
       toast({ title: "Failed to load jobs", variant: "danger" });
     } finally {
@@ -124,6 +130,52 @@ export default function WorkerJobsPage() {
   useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
+
+  const handleAcceptOrder = async (orderId: string) => {
+    try {
+      const res = await apiPost<{ success: boolean; message?: string }>(
+        `/orders/${orderId}/accept`,
+        {}
+      );
+      if (res.success) {
+        toast({
+          title: "Order Request Accepted!",
+          description: "Full service location released. Doorstep service scheduled.",
+          variant: "success",
+        });
+        fetchJobs();
+      }
+    } catch (err: any) {
+      toast({
+        title: "Could not accept order",
+        description: err.response?.data?.error || err.message,
+        variant: "danger",
+      });
+    }
+  };
+
+  const handleRejectOrder = async (orderId: string, reason: string, customNote?: string) => {
+    try {
+      const res = await apiPost<{ success: boolean; message?: string }>(
+        `/orders/${orderId}/reject`,
+        { reason, customNote }
+      );
+      if (res.success) {
+        toast({
+          title: "Order Declined",
+          description: "Customer has been respectfully notified to select another technician.",
+          variant: "default",
+        });
+        fetchJobs();
+      }
+    } catch (err: any) {
+      toast({
+        title: "Could not decline order",
+        description: err.response?.data?.error || err.message,
+        variant: "danger",
+      });
+    }
+  };
 
   const updateStatus = async (booking: Booking, status: BookingStatus) => {
     setBusyId(booking.id);
@@ -148,7 +200,8 @@ export default function WorkerJobsPage() {
     return j.status === "COMPLETED";
   });
 
-  const pendingCount = jobs.filter((j) => j.status === "PENDING").length;
+  const pendingCount =
+    jobs.filter((j) => j.status === "PENDING").length + orderRequests.length;
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12 animate-fade-in space-y-8">
@@ -223,8 +276,34 @@ export default function WorkerJobsPage() {
             <div className="flex justify-center py-20">
               <Loader2 className="h-8 w-8 animate-spin text-[#800020]" />
             </div>
-          ) : filtered.length > 0 ? (
-            <div className="space-y-4">
+          ) : (
+            <div className="space-y-6">
+              {/* Phase 4 Incoming Order Requests from Problem Selection Flow */}
+              {activeTab === "PENDING" && orderRequests.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                      <span>Direct Customer Problem Requests ({orderRequests.length})</span>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                        Location Privacy Protected
+                      </span>
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4">
+                    {orderRequests.map((order) => (
+                      <IncomingOrderRequestCard
+                        key={order.id}
+                        order={order}
+                        onAccept={handleAcceptOrder}
+                        onReject={handleRejectOrder}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {filtered.length > 0 ? (
+                <div className="space-y-4">
               {filtered.map((j) => (
                 <div key={j.id} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
@@ -313,6 +392,8 @@ export default function WorkerJobsPage() {
           )}
         </div>
       )}
+    </div>
+  )}
 
       {/* VIEW 2: COMPREHENSIVE TEXTUAL & GRAPHICAL WORKER JOBS GUIDE */}
       {(viewMode === "guide" || !isAuthenticated || user?.role !== "WORKER") && (
