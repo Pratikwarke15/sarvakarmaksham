@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/Footer";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { LayoutDashboard, CalendarCheck, Briefcase, Wallet, User } from "lucide-react";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import type { SidebarLink } from "@/components/layout/Sidebar";
 
 const sidebarLinks: SidebarLink[] = [
@@ -30,20 +31,22 @@ export default function ConsumerLayout({ children }: { children: React.ReactNode
     return (
       <div className="min-h-screen bg-[#FCFBFA] flex flex-col justify-between">
         <Navbar />
-        <main className="flex-1 w-full">{children}</main>
+        <main className="flex-1 w-full pb-20 md:pb-0">{children}</main>
         <Footer />
+        <MobileBottomNav role="CONSUMER" />
       </div>
     );
   }
 
   return (
     <AuthGuard allowedRoles={["CONSUMER"]}>
-      <div className="min-h-screen bg-[#FCFBFA]">
+      <div className="min-h-screen bg-[#FCFBFA] flex flex-col">
         <Navbar />
-        <div className="flex">
+        <div className="flex flex-1">
           <Sidebar links={sidebarLinks} />
-          <main className="flex-1 p-3.5 sm:p-6 lg:p-8 min-w-0">{children}</main>
+          <main className="flex-1 p-3.5 sm:p-6 lg:p-8 min-w-0 pb-20 md:pb-8">{children}</main>
         </div>
+        <MobileBottomNav role="CONSUMER" />
       </div>
     </AuthGuard>
   );

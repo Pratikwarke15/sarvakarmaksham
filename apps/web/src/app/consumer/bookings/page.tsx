@@ -42,6 +42,7 @@ import { PriceNegotiationModal } from "@/components/worker/PriceNegotiationModal
 import { OrderPaymentReceiptModal } from "@/components/payment/OrderPaymentReceiptModal";
 
 import { CommunicationConsentCard } from "@/components/calling/CommunicationConsentCard";
+import { MobilePageHeader } from "@/components/layout/MobilePageHeader";
 import type { Booking, BookingStatus, Order, OrderPaymentReceipt, ProblemRequest } from "@/lib/types";
 
 type ConsumerTabFilter = "ALL" | "ACTIVE" | "COMPLETED" | "CANCELLED" | "DRAFTS";
@@ -295,9 +296,27 @@ export default function BookingsPage() {
       : filteredOrders.length + filteredBookings.length;
 
   return (
-    <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-4 sm:py-10 animate-fade-in space-y-6 sm:space-y-8">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200/90 pb-5">
+    <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-2 sm:py-10 animate-fade-in space-y-4 sm:space-y-8">
+      {/* Mobile Page Header */}
+      <MobilePageHeader
+        title="My Bookings"
+        subtitle={`${countActive} active, ${countAll} total`}
+        backHref="/consumer/dashboard"
+        action={
+          <button
+            type="button"
+            onClick={fetchData}
+            disabled={loading}
+            className="p-1.5 text-slate-600 hover:text-slate-900 active:bg-slate-100 rounded-full transition-colors"
+            title="Refresh bookings"
+          >
+            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin text-[#800020]")} />
+          </button>
+        }
+      />
+
+      {/* Top Header for Desktop */}
+      <div className="hidden md:flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200/90 pb-5">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full bg-rose-50 border border-rose-200/60 px-3 py-1 text-xs font-bold text-[#800020] mb-2">
             <ShieldCheck className="h-3.5 w-3.5" />
@@ -340,9 +359,9 @@ export default function BookingsPage() {
 
       {/* VIEW 1: ACTIVE & PAST BOOKINGS (For Authenticated Consumers) */}
       {viewMode === "bookings" && isAuthenticated && user?.role === "CONSUMER" && (
-        <div className="space-y-6">
-          {/* Segmented Filter Tabs */}
-          <div className="flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">
+        <div className="space-y-5 sm:space-y-6">
+          {/* Segmented Filter Tabs with smooth mobile horizontal scroll */}
+          <div className="flex gap-2 border-b border-slate-200/80 pb-2.5 overflow-x-auto hide-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
             {tabs.map((t) => {
               const count =
                 t.filter === "ALL"

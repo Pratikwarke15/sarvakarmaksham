@@ -26,7 +26,9 @@ import { apiGet, apiPatch } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
 import { DigiLockerDemoFlow } from "@/components/verification/DigiLockerDemoFlow";
 import { ProfilePhotoCapture } from "@/components/profile/ProfilePhotoCapture";
+import { MobilePageHeader } from "@/components/layout/MobilePageHeader";
 import { detectLiveLocation } from "@/lib/location";
+import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 
 interface ConsumerProfileResp {
@@ -206,9 +208,27 @@ export default function ConsumerProfilePage() {
   const isAadhaarVerified = Boolean(profile?.aadhaarVerified || profile?.aadhaarNumber);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 animate-fade-in pb-16">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="mx-auto max-w-3xl space-y-5 animate-fade-in pb-16">
+      {/* Mobile Page Header */}
+      <MobilePageHeader
+        title="My Profile"
+        subtitle={userName}
+        backHref="/consumer/dashboard"
+        action={
+          <button
+            type="button"
+            onClick={fetchProfile}
+            disabled={loading}
+            className="p-1.5 text-slate-600 hover:text-slate-900 active:bg-slate-100 rounded-full transition-colors"
+            title="Refresh profile"
+          >
+            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin text-[#800020]")} />
+          </button>
+        }
+      />
+
+      {/* Desktop Header */}
+      <div className="hidden md:flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 font-heading">My Consumer Profile</h1>
           <p className="text-xs text-gray-500 mt-0.5">Manage your household service details, verified identity & bookings.</p>

@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, ShieldCheck, CheckCircle2, Award, RefreshCw, X, Camera, Activity, Briefcase } from "lucide-react";
 import { Rating } from "@/components/ui/rating";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 import { apiGet, apiPatch } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
 import type { WorkerStatus } from "@/lib/types";
 import { DigiLockerDemoFlow } from "@/components/verification/DigiLockerDemoFlow";
 import { ProfilePhotoCapture } from "@/components/profile/ProfilePhotoCapture";
+import { MobilePageHeader } from "@/components/layout/MobilePageHeader";
 import { useAuthStore } from "@/store/authStore";
 
 interface ProfileResp {
@@ -237,8 +238,27 @@ export default function WorkerProfilePage() {
   const reviews = profile.reviewsReceived || [];
 
   return (
-    <div className="mx-auto max-w-2xl px-3 sm:px-4 space-y-5 sm:space-y-6 animate-fade-in pb-16">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-2xl px-3 sm:px-4 space-y-4 sm:space-y-6 animate-fade-in pb-16">
+      {/* Mobile Page Header */}
+      <MobilePageHeader
+        title="Technician Profile"
+        subtitle={profile.user?.name || "Member"}
+        backHref="/worker/dashboard"
+        action={
+          <button
+            type="button"
+            onClick={fetchProfile}
+            disabled={loading}
+            className="p-1.5 text-slate-600 hover:text-slate-900 active:bg-slate-100 rounded-full transition-colors"
+            title="Refresh profile"
+          >
+            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin text-[#800020]")} />
+          </button>
+        }
+      />
+
+      {/* Desktop Header */}
+      <div className="hidden md:flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 font-heading">My Profile</h1>
         {!profile.aadhaarVerified && (
           <button
