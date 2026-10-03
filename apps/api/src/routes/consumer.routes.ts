@@ -48,15 +48,25 @@ router.get("/profile", authenticate, authorize("CONSUMER"), asyncHandler(async (
     });
   }
 
-  const [totalBookings, activeBookings] = await Promise.all([
+  const [legacyTotal, orderTotal, legacyActive, orderActive] = await Promise.all([
     prisma.booking.count({ where: { consumerId: userId } }),
+    prisma.order.count({ where: { consumerId: userId } }),
     prisma.booking.count({
       where: {
         consumerId: userId,
         status: { in: ["PENDING", "ACCEPTED", "EN_ROUTE", "IN_PROGRESS"] },
       },
     }),
+    prisma.order.count({
+      where: {
+        consumerId: userId,
+        status: { in: ["PENDING", "MATCHING", "ACCEPTED", "ASSIGNED", "TRAVELLING", "ARRIVED", "DIAGNOSING", "IN_PROGRESS"] },
+      },
+    }),
   ]);
+
+  const totalBookings = legacyTotal + orderTotal;
+  const activeBookings = legacyActive + orderActive;
 
   res.json({
     success: true,

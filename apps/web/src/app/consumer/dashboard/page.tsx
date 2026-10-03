@@ -487,7 +487,7 @@ export default function ConsumerDashboard() {
                   )}
 
                   <Link
-                    href={`/consumer/problem-selection?orderId=${o.id}`}
+                    href={`/consumer/bookings`}
                     className="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center gap-1"
                   >
                     <span>View</span>

@@ -39,6 +39,8 @@ export default function LeafletMap({
   const routeCasingRef = useRef<any>(null);
   const [mapReady, setMapReady] = useState(false);
   const [L, setL] = useState<any>(null);
+  const [isSatellite, setIsSatellite] = useState(false);
+  const tileLayerRef = useRef<any>(null);
 
   // 1. Dynamically import Leaflet on client side
   useEffect(() => {
@@ -67,12 +69,13 @@ export default function LeafletMap({
       attributionControl: true,
     });
 
-    // Add OpenStreetMap Tile Layer
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
-    }).addTo(map);
+    });
+    streetLayer.addTo(map);
+    tileLayerRef.current = streetLayer;
 
     mapInstanceRef.current = map;
     setMapReady(true);
@@ -82,6 +85,39 @@ export default function LeafletMap({
       mapInstanceRef.current = null;
     };
   }, [L]);
+
+  // Switch between Standard and Satellite map layers
+  const toggleSatelliteView = () => {
+    if (!mapInstanceRef.current || !L) return;
+    const map = mapInstanceRef.current;
+
+    if (tileLayerRef.current) {
+      map.removeLayer(tileLayerRef.current);
+    }
+
+    if (!isSatellite) {
+      // Switch to Esri World Imagery (Satellite)
+      const satLayer = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        {
+          maxZoom: 19,
+          attribution: "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+        }
+      );
+      satLayer.addTo(map);
+      tileLayerRef.current = satLayer;
+      setIsSatellite(true);
+    } else {
+      // Switch back to OpenStreetMap (Street)
+      const streetLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
+      });
+      streetLayer.addTo(map);
+      tileLayerRef.current = streetLayer;
+      setIsSatellite(false);
+    }
+  };
 
   // Helper to create custom HTML markers
   const createWorkerIcon = (iconHeading: number) => {
@@ -245,6 +281,25 @@ export default function LeafletMap({
             <line x1="12" y1="6" x2="12" y2="2" />
             <line x1="12" y1="22" x2="12" y2="18" />
           </svg>
+        </button>
+
+        {/* Satellite View Layer Toggle */}
+        <button
+          type="button"
+          onClick={toggleSatelliteView}
+          title={isSatellite ? "Switch to Default Map" : "Switch to Satellite Imagery"}
+          className={`h-9 px-2.5 rounded-xl shadow-md border transition active:scale-95 flex items-center gap-1.5 text-xs font-semibold backdrop-blur-md ${
+            isSatellite
+              ? "bg-[#800020] text-white border-[#800020] hover:bg-[#66001a]"
+              : "bg-white/95 text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-[#800020]"
+          }`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2" />
+            <polyline points="2 17 12 22 22 17" />
+            <polyline points="2 12 12 17 22 12" />
+          </svg>
+          <span>{isSatellite ? "Satellite" : "Map"}</span>
         </button>
 
         <div className="flex flex-col rounded-xl bg-white/95 backdrop-blur-md shadow-md border border-slate-200 overflow-hidden divide-y divide-slate-100">

@@ -11,6 +11,7 @@ import {
   Building,
   Smartphone,
   Wallet,
+  Star,
 } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
@@ -50,6 +51,12 @@ export function OrderPaymentModal({
   const [paymentData, setPaymentData] = useState<any>(null);
   const [selectedMethod, setSelectedMethod] = useState<"UPI" | "CARD" | "NETBANKING">("UPI");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Rating state
+  const [ratingScore, setRatingScore] = useState<number>(5);
+  const [ratingComment, setRatingComment] = useState<string>("");
+  const [submittingRating, setSubmittingRating] = useState<boolean>(false);
+  const [ratingSubmitted, setRatingSubmitted] = useState<boolean>(false);
 
   const finalAmount = Number(order.finalPrice || order.quotedPrice || order.basePrice);
 
@@ -198,6 +205,34 @@ export function OrderPaymentModal({
       razorpaySignature: testSignature,
       isTestPayment: true,
     });
+  };
+
+  const handleRateWorker = async () => {
+    try {
+      setSubmittingRating(true);
+      const res = await apiPost<{ success: boolean; message?: string }>(
+        `/orders/${order.id}/rate`,
+        { rating: ratingScore, comment: ratingComment }
+      );
+      if (res.success) {
+        setRatingSubmitted(true);
+        toast({
+          title: "Rating Submitted!",
+          description: "Thank you for rating your cooperative technician.",
+          variant: "success",
+        });
+      } else {
+        toast({ title: "Could not submit rating", variant: "danger" });
+      }
+    } catch (err: any) {
+      toast({
+        title: "Rating Failed",
+        description: err.response?.data?.error || err.message,
+        variant: "danger",
+      });
+    } finally {
+      setSubmittingRating(false);
+    }
   };
 
   return (
@@ -454,16 +489,104 @@ export function OrderPaymentModal({
 
           {/* STAGE: COMPLETED */}
           {stage === "COMPLETED" && (
-            <div className="py-6 text-center space-y-3">
-              <div className="h-12 w-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+            <div className="py-4 text-center space-y-4 animate-fade-in">
+              <div className="h-12 w-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
                 <CheckCircle2 className="h-7 w-7" />
               </div>
-              <h4 className="text-base font-black text-slate-900">
-                Payment Completed!
-              </h4>
-              <p className="text-xs text-slate-600">
-                Escrow payment has been officially released to technician {order.worker?.user?.name || "Technician"}.
-              </p>
+              <div>
+                <h4 className="text-base font-black text-slate-900">
+                  Payment Completed!
+                </h4>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Escrow payment released to {order.worker?.user?.name || "Technician"}.
+                </p>
+              </div>
+
+              {/* Real-time 5-Star Rating Card */}
+              <div className="rounded-2xl border border-amber-200/90 bg-amber-50/50 p-4 text-left space-y-3 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                    <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
+                    <span>Rate Technician &amp; Service</span>
+                  </span>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                    {ratingScore} of 5 Stars
+                  </span>
+                </div>
+
+                {!ratingSubmitted ? (
+                  <>
+                    <p className="text-[11px] text-slate-600">
+                      How was your experience? Your rating directly updates the technician&apos;s cooperative score in real time.
+                    </p>
+
+                    {/* Interactive 5 Stars */}
+                    <div className="flex items-center justify-center gap-2 py-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRatingScore(star)}
+                          className="p-1 hover:scale-110 active:scale-95 transition-transform"
+                        >
+                          <Star
+                            className={`h-7 w-7 transition-colors ${
+                              star <= ratingScore
+                                ? "fill-amber-400 text-amber-400"
+                                : "fill-slate-200 text-slate-300"
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-slate-700 block">
+                        Feedback / Remarks (Satisfaction or concerns)
+                      </label>
+                      <textarea
+                        value={ratingComment}
+                        onChange={(e) => setRatingComment(e.target.value)}
+                        rows={2}
+                        placeholder="e.g. Arrived on time, fixed the leak neatly and explained the repair..."
+                        className="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-800 focus:outline-none focus:border-[#800020] resize-none"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleRateWorker}
+                      disabled={submittingRating}
+                      className="w-full py-2.5 rounded-xl bg-[#800020] hover:bg-[#66001a] text-white text-xs font-bold shadow-sm transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      {submittingRating ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>Submitting Rating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Star className="h-3.5 w-3.5 fill-white" />
+                          <span>Submit Rating &amp; Review</span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  <div className="py-2 text-center text-xs text-emerald-800 font-bold space-y-1">
+                    <p>✓ Rating recorded and updated on technician profile!</p>
+                    <p className="text-[11px] font-normal text-slate-500">Thank you for helping keep cooperative standards high.</p>
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition"
+              >
+                Close Window
+              </button>
             </div>
           )}
         </div>

@@ -190,9 +190,13 @@ export function LiveOrderTrackingMap({
         }
 
         // Distance & Time threshold checks:
-        // Minimum 5 meters movement OR minimum 5 seconds elapsed
+        // When technician is actively travelling, update every 1 second or 3+ meters movement.
+        // Otherwise conserve battery with 5s / 5m throttle.
         const now = Date.now();
         const last = lastPositionRef.current;
+        const isTravelling = trackingData?.status === "TRAVELLING";
+        const minTimeSec = isTravelling ? 1 : 5;
+        const minMeters = isTravelling ? 3 : 5;
 
         if (last) {
           const timeElapsed = (now - last.time) / 1000;
@@ -201,8 +205,7 @@ export function LiveOrderTrackingMap({
           const dLng = (longitude - last.lng) * 111320 * Math.cos((latitude * Math.PI) / 180);
           const distanceMovedMeters = Math.sqrt(dLat * dLat + dLng * dLng);
 
-          if (distanceMovedMeters < 5 && timeElapsed < 5) {
-            // Insignificant movement and under 5s: skip to conserve battery and bandwidth
+          if (distanceMovedMeters < minMeters && timeElapsed < minTimeSec) {
             return;
           }
         }
@@ -511,6 +514,20 @@ export function LiveOrderTrackingMap({
               </button>
               {gpsAccuracy && (
                 <span className="text-[11px] text-slate-400 font-mono">Accuracy: ±{gpsAccuracy}m</span>
+              )}
+
+              {/* Direct 1-tap Google Maps Turn-by-Turn Navigation */}
+              {destPos?.latitude && destPos?.longitude && (
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${destPos.latitude},${destPos.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition flex items-center gap-1.5 shadow-sm"
+                  title="Open Turn-by-Turn Directions in Google Maps"
+                >
+                  <Navigation className="h-3.5 w-3.5 text-blue-600" />
+                  <span>Navigate in Google Maps</span>
+                </a>
               )}
             </div>
 

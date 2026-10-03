@@ -18,26 +18,7 @@ const sidebarLinks: SidebarLink[] = [
   { href: "/consumer/profile", label: "My Profile", icon: User },
 ];
 
-const publicExplainerRoutes = ["/consumer/bookings", "/consumer/wallet", "/consumer/book", "/consumer/problem-selection"];
-
 export default function ConsumerLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const { isAuthenticated, user } = useAuth();
-
-  const isPublicRoute = publicExplainerRoutes.some((r) => pathname === r || pathname.startsWith(r + "/"));
-
-  // If user is not authenticated or not a consumer, and on an explainer route, allow public viewing
-  if ((!isAuthenticated || user?.role !== "CONSUMER") && isPublicRoute) {
-    return (
-      <div className="min-h-screen bg-[#FCFBFA] flex flex-col justify-between">
-        <Navbar />
-        <main className="flex-1 w-full pb-20 md:pb-0">{children}</main>
-        <Footer />
-        <MobileBottomNav role="CONSUMER" />
-      </div>
-    );
-  }
-
   return (
     <AuthGuard allowedRoles={["CONSUMER"]}>
       <div className="min-h-screen bg-[#FCFBFA] flex flex-col">

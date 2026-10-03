@@ -39,7 +39,7 @@ export function Footer() {
             </h3>
             <ul className="space-y-2 text-xs text-slate-600">
               <li>
-                <Link href="/consumer/book" className="hover:text-[#800020] transition-colors">
+                <Link href="/consumer/problem-selection" className="hover:text-[#800020] transition-colors">
                   Book a Repair
                 </Link>
               </li>
@@ -73,7 +73,7 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/login" className="hover:text-[#800020] transition-colors">
+                <Link href="/login/worker" className="hover:text-[#800020] transition-colors">
                   Technician Login
                 </Link>
               </li>
