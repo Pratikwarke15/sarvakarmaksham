@@ -74,9 +74,12 @@ export function MediaProblemAttachment({
   const [isUploadingPhoto, setIsUploadingPhoto] = useState<boolean>(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
 
-  const photoInputRef = useRef<HTMLInputElement | null>(null);
-  const videoInputRef = useRef<HTMLInputElement | null>(null);
+  const photoFileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const videoFileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraVideoInputRef = useRef<HTMLInputElement | null>(null);
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -118,7 +121,8 @@ export function MediaProblemAttachment({
       setUploadError("Failed to upload photo. Please check file format and try again.");
     } finally {
       setIsUploadingPhoto(false);
-      if (photoInputRef.current) photoInputRef.current.value = "";
+      if (photoFileInputRef.current) photoFileInputRef.current.value = "";
+      if (cameraPhotoInputRef.current) cameraPhotoInputRef.current.value = "";
     }
   };
 
@@ -151,7 +155,8 @@ export function MediaProblemAttachment({
       setUploadError("Failed to upload video clip.");
     } finally {
       setIsUploadingVideo(false);
-      if (videoInputRef.current) videoInputRef.current.value = "";
+      if (videoFileInputRef.current) videoFileInputRef.current.value = "";
+      if (cameraVideoInputRef.current) cameraVideoInputRef.current.value = "";
     }
   };
 
@@ -172,6 +177,36 @@ export function MediaProblemAttachment({
         </p>
       )}
 
+      {/* Full Photo Preview Lightbox Modal */}
+      {previewPhotoUrl && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setPreviewPhotoUrl(null)}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-2xl max-h-[85vh] w-full rounded-2xl overflow-hidden bg-slate-900 border border-slate-700 shadow-2xl flex flex-col items-center justify-center"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewPhotoUrl}
+              alt="Enlarged issue photo"
+              className="max-h-[80vh] w-auto object-contain"
+            />
+            <button
+              type="button"
+              onClick={() => setPreviewPhotoUrl(null)}
+              className="absolute top-3 right-3 p-2 rounded-full bg-slate-900/80 text-white hover:bg-rose-600 transition"
+              title="Close preview"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Photos Section */}
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -187,13 +222,18 @@ export function MediaProblemAttachment({
           {photos.map((url, idx) => (
             <div
               key={idx}
-              className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group bg-slate-100"
+              className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group bg-slate-100 cursor-pointer"
+              onClick={() => setPreviewPhotoUrl(url)}
+              title="Click to view full photo"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt={`Problem attachment ${idx + 1}`} className="w-full h-full object-cover" />
+              <img src={url} alt={`Problem attachment ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
               <button
                 type="button"
-                onClick={() => removePhoto(idx)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removePhoto(idx);
+                }}
                 className="absolute top-1 right-1 p-1 rounded-full bg-slate-900/70 text-white hover:bg-rose-600 transition-colors"
                 title="Remove photo"
               >
@@ -202,31 +242,54 @@ export function MediaProblemAttachment({
             </div>
           ))}
 
-          {/* Add Photo Button */}
+          {/* Add Photo Buttons */}
           {photos.length < 5 && (
-            <button
-              type="button"
-              onClick={() => photoInputRef.current?.click()}
-              disabled={isUploadingPhoto}
-              className="aspect-square rounded-xl border border-dashed border-slate-300 hover:border-[#800020] bg-slate-50 hover:bg-white flex flex-col items-center justify-center p-2 text-slate-500 hover:text-[#800020] transition-all group disabled:opacity-50"
-            >
-              {isUploadingPhoto ? (
-                <Loader2 className="h-5 w-5 animate-spin text-[#800020]" />
-              ) : (
-                <>
-                  <Plus className="h-5 w-5 group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-semibold mt-1">Add Photo</span>
-                </>
-              )}
-            </button>
+            <>
+              {/* Take Photo with Camera */}
+              <button
+                type="button"
+                onClick={() => cameraPhotoInputRef.current?.click()}
+                disabled={isUploadingPhoto}
+                className="aspect-square rounded-xl border border-dashed border-[#800020]/40 hover:border-[#800020] bg-rose-50/50 hover:bg-rose-50 flex flex-col items-center justify-center p-2 text-[#800020] transition-all group disabled:opacity-50"
+              >
+                {isUploadingPhoto ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-[#800020]" />
+                ) : (
+                  <>
+                    <Camera className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-bold mt-1">Take Photo</span>
+                  </>
+                )}
+              </button>
+
+              {/* Upload Photo from Device */}
+              <button
+                type="button"
+                onClick={() => photoFileInputRef.current?.click()}
+                disabled={isUploadingPhoto}
+                className="aspect-square rounded-xl border border-dashed border-slate-300 hover:border-slate-500 bg-slate-50 hover:bg-white flex flex-col items-center justify-center p-2 text-slate-500 hover:text-slate-800 transition-all group disabled:opacity-50"
+              >
+                <Plus className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] font-semibold mt-1">Upload File</span>
+              </button>
+            </>
           )}
         </div>
 
+        {/* Hidden File Inputs */}
         <input
-          ref={photoInputRef}
+          ref={photoFileInputRef}
           type="file"
           accept="image/*"
           multiple
+          className="hidden"
+          onChange={handlePhotoSelect}
+        />
+        <input
+          ref={cameraPhotoInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
           className="hidden"
           onChange={handlePhotoSelect}
         />
@@ -236,13 +299,13 @@ export function MediaProblemAttachment({
       <div className="pt-2 border-t border-slate-100">
         <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-2">
           <Film className="h-4 w-4 text-[#800020]" />
-          <span>Add Short Video (Optional)</span>
+          <span>Add Short Video Clip (Optional)</span>
           <span className="text-[11px] font-normal text-slate-400">Max 25MB</span>
         </label>
 
         {videoUrl ? (
-          <div className="relative rounded-xl border border-slate-200 overflow-hidden bg-slate-900 max-w-sm">
-            <video src={videoUrl} controls className="w-full h-44 object-cover" />
+          <div className="relative rounded-2xl border border-slate-200 overflow-hidden bg-slate-950 max-w-sm shadow-xs">
+            <video src={videoUrl} controls playsInline className="w-full h-48 object-contain bg-black" />
             <button
               type="button"
               onClick={removeVideo}
@@ -253,30 +316,51 @@ export function MediaProblemAttachment({
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => videoInputRef.current?.click()}
-            disabled={isUploadingVideo}
-            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-dashed border-slate-300 hover:border-[#800020] bg-slate-50 hover:bg-white text-xs font-semibold text-slate-600 hover:text-[#800020] transition-colors disabled:opacity-50"
-          >
-            {isUploadingVideo ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin text-[#800020]" />
-                <span>Uploading video...</span>
-              </>
-            ) : (
-              <>
-                <Video className="h-4 w-4 text-slate-400 group-hover:text-[#800020]" />
-                <span>Attach a short video clip (e.g. leaking pipe, strange sound)</span>
-              </>
-            )}
-          </button>
+          <div className="flex flex-col sm:flex-row items-center gap-2">
+            <button
+              type="button"
+              onClick={() => cameraVideoInputRef.current?.click()}
+              disabled={isUploadingVideo}
+              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-dashed border-[#800020]/40 hover:border-[#800020] bg-rose-50/40 hover:bg-rose-50 text-xs font-bold text-[#800020] transition-colors disabled:opacity-50"
+            >
+              {isUploadingVideo ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-[#800020]" />
+                  <span>Uploading video...</span>
+                </>
+              ) : (
+                <>
+                  <Video className="h-4 w-4" />
+                  <span>Record Video with Camera</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => videoFileInputRef.current?.click()}
+              disabled={isUploadingVideo}
+              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border border-dashed border-slate-300 hover:border-slate-500 bg-slate-50 hover:bg-white text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-50"
+            >
+              <Film className="h-4 w-4 text-slate-400" />
+              <span>Upload Video File</span>
+            </button>
+          </div>
         )}
 
+        {/* Hidden Video Inputs */}
         <input
-          ref={videoInputRef}
+          ref={videoFileInputRef}
           type="file"
           accept="video/*"
+          className="hidden"
+          onChange={handleVideoSelect}
+        />
+        <input
+          ref={cameraVideoInputRef}
+          type="file"
+          accept="video/*"
+          capture="environment"
           className="hidden"
           onChange={handleVideoSelect}
         />

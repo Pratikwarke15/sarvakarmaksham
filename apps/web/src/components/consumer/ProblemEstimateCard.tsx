@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Clock,
   ShieldCheck,
@@ -13,6 +14,10 @@ import {
   FileText,
   AlertCircle,
   HelpCircle,
+  Volume2,
+  Film,
+  Camera,
+  X,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import type { ServiceCategory, ServiceSubCategory, ServiceProblem } from "@/lib/types";
@@ -22,10 +27,14 @@ interface ProblemEstimateCardProps {
   subcategory: ServiceSubCategory;
   problem: ServiceProblem;
   address?: string | null;
-  hasAudio: boolean;
-  hasText: boolean;
-  photosCount: number;
-  hasVideo: boolean;
+  hasAudio?: boolean;
+  hasText?: boolean;
+  photosCount?: number;
+  hasVideo?: boolean;
+  textDescription?: string | null;
+  audioUrl?: string | null;
+  photos?: string[];
+  videoUrl?: string | null;
 }
 
 export function ProblemEstimateCard({
@@ -37,7 +46,13 @@ export function ProblemEstimateCard({
   hasText,
   photosCount,
   hasVideo,
+  textDescription,
+  audioUrl,
+  photos = [],
+  videoUrl,
 }: ProblemEstimateCardProps) {
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+
   const minPrice = Number(problem.minimumPrice);
   const maxPrice = Number(problem.maximumPrice);
   const basePrice = Number(problem.basePrice);
@@ -238,38 +253,94 @@ export function ProblemEstimateCard({
         </div>
       </div>
 
-      {/* 6. Attached Problem Details (Checklist) */}
-      <div className="pt-2 border-t border-slate-100">
-        <h4 className="text-xs font-bold text-slate-700 mb-2">Attached Problem Details</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-          <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200/60">
-            <CheckCircle2 className={`h-4 w-4 ${hasText ? "text-emerald-600" : "text-slate-300"}`} />
-            <span className={hasText ? "text-slate-800 font-medium" : "text-slate-400"}>
-              {hasText ? "Written description provided" : "No text description"}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200/60">
-            <CheckCircle2 className={`h-4 w-4 ${hasAudio ? "text-emerald-600" : "text-slate-300"}`} />
-            <span className={hasAudio ? "text-slate-800 font-medium" : "text-slate-400"}>
-              {hasAudio ? "Voice recording attached" : "No voice recording"}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200/60">
-            <CheckCircle2 className={`h-4 w-4 ${photosCount > 0 ? "text-emerald-600" : "text-slate-300"}`} />
-            <span className={photosCount > 0 ? "text-slate-800 font-medium" : "text-slate-400"}>
-              {photosCount > 0 ? `${photosCount} photo(s) attached` : "No photos attached"}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 border border-slate-200/60">
-            <CheckCircle2 className={`h-4 w-4 ${hasVideo ? "text-emerald-600" : "text-slate-300"}`} />
-            <span className={hasVideo ? "text-slate-800 font-medium" : "text-slate-400"}>
-              {hasVideo ? "Video clip attached" : "No video attached"}
-            </span>
+      {/* Lightbox Modal for Photo inspection */}
+      {selectedPhoto && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setSelectedPhoto(null)}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-2xl max-h-[85vh] w-full rounded-2xl overflow-hidden bg-slate-900 border border-slate-700 shadow-2xl flex flex-col items-center justify-center"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={selectedPhoto} alt="Problem preview" className="max-h-[80vh] w-auto object-contain" />
+            <button
+              type="button"
+              onClick={() => setSelectedPhoto(null)}
+              className="absolute top-3 right-3 p-2 rounded-full bg-slate-900/80 text-white hover:bg-rose-600 transition"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
         </div>
+      )}
+
+      {/* 6. Attached Problem Explanations & Media Playback */}
+      <div className="pt-2 border-t border-slate-100 space-y-3">
+        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+          Attached Problem Explanations & Media
+        </h4>
+
+        {/* Written Description */}
+        {textDescription && (
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 italic">
+            &ldquo;{textDescription}&rdquo;
+          </div>
+        )}
+
+        {/* Voice Note Player */}
+        {audioUrl && (
+          <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-1.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+              <Volume2 className="h-4 w-4 text-amber-700" />
+              <span>Recorded Customer Voice Note</span>
+            </div>
+            <audio controls src={audioUrl} className="w-full h-8 accent-[#800020]" />
+          </div>
+        )}
+
+        {/* Photo Gallery with Clickable Lightbox */}
+        {photos && photos.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <Camera className="h-4 w-4 text-[#800020]" />
+              <span>Attached Issue Photos ({photos.length}) — Click to view</span>
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {photos.map((url, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => setSelectedPhoto(url)}
+                  className="h-16 w-16 rounded-xl overflow-hidden border border-slate-200 hover:border-[#800020] cursor-pointer group shrink-0 relative bg-slate-100 shadow-2xs"
+                  title="Click to expand photo"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`Attached issue ${idx + 1}`}
+                    className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Video Player */}
+        {videoUrl && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <Film className="h-4 w-4 text-[#800020]" />
+              <span>Attached Issue Video</span>
+            </div>
+            <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 max-w-sm shadow-xs">
+              <video src={videoUrl} controls playsInline className="w-full h-44 object-contain bg-black" />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Service Location */}

@@ -29,6 +29,7 @@ import {
   Clock,
   Sparkles,
   ExternalLink,
+  Film,
 } from "lucide-react";
 import { formatCurrency, formatDateTime, getStatusColor } from "@/lib/utils";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
@@ -36,7 +37,9 @@ import { useToast } from "@/components/providers/ToastProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { IncomingOrderRequestCard } from "@/components/worker/IncomingOrderRequestCard";
 import { PriceNegotiationModal } from "@/components/worker/PriceNegotiationModal";
+import { CommunicationConsentCard } from "@/components/calling/CommunicationConsentCard";
 import type { Booking, BookingStatus, Order, OrderStatus } from "@/lib/types";
+
 
 type TabFilter = "PENDING" | "ACTIVE" | "COMPLETED";
 
@@ -546,29 +549,25 @@ export default function WorkerJobsPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-600 bg-slate-50/80 p-3 sm:p-4 rounded-2xl border border-slate-100">
                           <div>
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                              Customer Contact
+                              Customer Contact & In-App Voice Call
                             </span>
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[#800020] font-bold text-xs">
-                                  {order.consumer?.name?.charAt(0) || "C"}
-                                </div>
-                                <div>
-                                  <p className="font-bold text-slate-900">{order.consumer?.name || "Customer"}</p>
-                                  <p className="text-[11px] text-slate-500">{order.consumer?.phone || "Phone on file"}</p>
-                                </div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="h-8 w-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[#800020] font-bold text-xs">
+                                {order.consumer?.name?.charAt(0) || "C"}
                               </div>
-
-                              {order.consumer?.phone && (
-                                <a
-                                  href={`tel:${order.consumer.phone}`}
-                                  className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-xs font-bold transition flex items-center gap-1.5"
-                                >
-                                  <Phone className="h-3.5 w-3.5" />
-                                  <span>Call</span>
-                                </a>
-                              )}
+                              <div>
+                                <p className="font-bold text-slate-900">{order.consumer?.name || "Customer"}</p>
+                                <p className="text-[11px] text-slate-500">{order.consumer?.phone ? `${order.consumer.phone.slice(0, 3)}****${order.consumer.phone.slice(-3)}` : "Verified Customer"}</p>
+                              </div>
                             </div>
+                            <CommunicationConsentCard
+                              orderId={order.id}
+                              userRole="WORKER"
+                              counterpartName={order.consumer?.name || "Customer"}
+                              counterpartAvatar={order.consumer?.avatarUrl}
+                              counterpartUserId={order.consumerId}
+                            />
+
                           </div>
 
                           <div>
@@ -582,37 +581,70 @@ export default function WorkerJobsPage() {
                           </div>
                         </div>
 
-                        {/* Customer's Explanation (Text / Audio / Photos) */}
-                        {(order.textDescription || order.audioUrl || (order.photos && order.photos.length > 0)) && (
+                        {/* Customer's Explanation (Text / Audio / Photos / Video) */}
+                        {(order.textDescription || order.audioUrl || (order.photos && order.photos.length > 0) || order.videoUrl) && (
                           <div className="space-y-2 text-xs">
                             {order.textDescription && (
-                              <p className="text-slate-600 bg-white p-3 rounded-xl border border-slate-200/70 italic">
-                                &ldquo;{order.textDescription}&rdquo;
-                              </p>
+                              <div className="bg-white p-3 rounded-xl border border-slate-200/70">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                                  Customer's Problem Description:
+                                </span>
+                                <p className="text-slate-800 italic">&ldquo;{order.textDescription}&rdquo;</p>
+                              </div>
                             )}
 
                             {order.audioUrl && (
-                              <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-center gap-2">
-                                <Volume2 className="h-4 w-4 text-amber-700 shrink-0" />
-                                <span className="text-[11px] font-bold text-amber-900 shrink-0">Customer Voice Note:</span>
-                                <audio controls src={order.audioUrl} className="w-full h-7" />
+                              <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center gap-2">
+                                <div className="flex items-center gap-1.5 text-amber-900 font-bold shrink-0">
+                                  <Volume2 className="h-4 w-4 text-amber-700" />
+                                  <span className="text-[11px]">Customer Voice Note:</span>
+                                </div>
+                                <audio controls src={order.audioUrl} className="w-full h-8 accent-[#800020]" />
                               </div>
                             )}
 
                             {order.photos && order.photos.length > 0 && (
-                              <div className="flex gap-2 overflow-x-auto pb-1">
-                                {order.photos.map((p, idx) => (
-                                  <img
-                                    key={idx}
-                                    src={p}
-                                    alt={`Attachment ${idx + 1}`}
-                                    className="h-16 w-16 rounded-xl object-cover border border-slate-200 shrink-0"
-                                  />
-                                ))}
+                              <div className="bg-slate-50/60 p-2.5 rounded-xl border border-slate-200/60 space-y-1.5">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                                  Attached Photos ({order.photos.length})
+                                </span>
+                                <div className="flex gap-2 overflow-x-auto pb-1">
+                                  {order.photos.map((p, idx) => (
+                                    <a
+                                      key={idx}
+                                      href={p}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="relative group shrink-0"
+                                    >
+                                      <img
+                                        src={p}
+                                        alt={`Attachment ${idx + 1}`}
+                                        className="h-20 w-20 rounded-xl object-cover border border-slate-200 shadow-2xs group-hover:opacity-90 transition"
+                                      />
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {order.videoUrl && (
+                              <div className="bg-slate-50/60 p-2.5 rounded-xl border border-slate-200/60 space-y-1.5">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                  <Film className="h-3 w-3 text-[#800020]" />
+                                  Customer Problem Video Clip
+                                </span>
+                                <video
+                                  controls
+                                  playsInline
+                                  src={order.videoUrl}
+                                  className="w-full max-w-sm h-36 object-contain bg-black rounded-xl"
+                                />
                               </div>
                             )}
                           </div>
                         )}
+
 
                         {/* Operational Stage Advancement Actions */}
                         <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

@@ -235,4 +235,19 @@ export class ProblemRequestService {
       })
     );
   }
+
+  /**
+   * Delete Consumer's draft
+   */
+  static async deleteDraft(id: string, consumerId: string) {
+    return withDbRetry(() =>
+      prisma.problemRequest.deleteMany({
+        where: {
+          id,
+          consumerId,
+          status: "DRAFT",
+        },
+      })
+    );
+  }
 }

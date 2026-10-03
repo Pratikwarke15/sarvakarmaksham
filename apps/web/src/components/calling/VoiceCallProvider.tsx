@@ -50,6 +50,13 @@ class SoundSynthesizer {
     return this.ctx;
   }
 
+  unlock() {
+    const ctx = this.getAudioContext();
+    if (ctx && ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+  }
+
   playIncomingRing() {
     this.stopRing();
     const ctx = this.getAudioContext();
@@ -59,31 +66,38 @@ class SoundSynthesizer {
       if (!this.ctx || this.ctx.state === "closed") return;
       try {
         const now = this.ctx.currentTime;
-        const osc1 = this.ctx.createOscillator();
-        const osc2 = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
+        const playBeep = (startTime: number, dur: number) => {
+          if (!this.ctx || this.ctx.state === "closed") return;
+          const osc1 = this.ctx.createOscillator();
+          const osc2 = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
 
-        osc1.type = "sine";
-        osc1.frequency.setValueAtTime(440, now); // A4
-        osc2.type = "sine";
-        osc2.frequency.setValueAtTime(480, now); // tone
+          osc1.type = "sine";
+          osc1.frequency.setValueAtTime(440, startTime); // A4
+          osc2.type = "sine";
+          osc2.frequency.setValueAtTime(480, startTime);
 
-        gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+          gain.gain.setValueAtTime(0.18, startTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
 
-        osc1.connect(gain);
-        osc2.connect(gain);
-        gain.connect(this.ctx.destination);
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(this.ctx.destination);
 
-        osc1.start(now);
-        osc2.start(now);
-        osc1.stop(now + 1.8);
-        osc2.stop(now + 1.8);
+          osc1.start(startTime);
+          osc2.start(startTime);
+          osc1.stop(startTime + dur);
+          osc2.stop(startTime + dur);
+        };
+
+        // Real phone ringing cadence: burst 1 (0.6s) -> pause (0.2s) -> burst 2 (0.6s) -> quiet (2s)
+        playBeep(now, 0.6);
+        playBeep(now + 0.8, 0.6);
       } catch (e) {}
     };
 
     playToneBurst();
-    this.ringInterval = setInterval(playToneBurst, 3000);
+    this.ringInterval = setInterval(playToneBurst, 3200);
   }
 
   playRingback() {
@@ -202,11 +216,21 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
   const timeoutTimerRef = useRef<any>(null);
   const durationTimerRef = useRef<any>(null);
 
-  // Initialize sound synthesizer
+  // Initialize sound synthesizer & enable on user gesture
   useEffect(() => {
     soundRef.current = new SoundSynthesizer();
+
+    const handleUnlock = () => {
+      soundRef.current?.unlock();
+    };
+
+    window.addEventListener("click", handleUnlock, { passive: true });
+    window.addEventListener("touchstart", handleUnlock, { passive: true });
+
     return () => {
       soundRef.current?.stopRing();
+      window.removeEventListener("click", handleUnlock);
+      window.removeEventListener("touchstart", handleUnlock);
     };
   }, []);
 
@@ -247,7 +271,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     setIsMuted(false);
   }, [clearTimers]);
 
-  // Connect Socket.IO for WebRTC signaling
+  // Connect Socket.IO for WebRTC signaling and real-time communication consent
   useEffect(() => {
     const token = getStoredToken();
     if (!token) return;
@@ -263,7 +287,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       path: "/ws",
       auth: { token },
       transports: ["websocket", "polling"],
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 12,
       reconnectionDelay: 1500,
     });
 
@@ -271,6 +295,38 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
 
     socket.on("connect", () => {
       console.log("WebRTC signaling socket connected:", socket.id);
+      if (user?.id) {
+        socket.emit("join:user", user.id);
+      }
+    });
+
+    // Realtime Consent Updates
+    socket.on("order:communication_consent_updated", (data: any) => {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("order:consent_updated", { detail: data }));
+      }
+    });
+
+    socket.on("order:consent_request_received", (data: any) => {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("order:consent_updated", { detail: data }));
+      }
+      toast({
+        title: data.title || "Call Consent Requested",
+        description: data.message || "A party requested communication permission for this order.",
+        variant: "default",
+      });
+    });
+
+    socket.on("order:consent_granted", (data: any) => {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("order:consent_updated", { detail: data }));
+      }
+      toast({
+        title: data.title || "Call Permission Active",
+        description: data.message || "Both parties have granted consent. You can now place in-app voice calls.",
+        variant: "success",
+      });
     });
 
     // Incoming Call Event
@@ -311,6 +367,10 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
             await pcRef.current.setRemoteDescription(
               new RTCSessionDescription(data.sdp)
             );
+          }
+
+          if (remoteAudioRef.current && remoteAudioRef.current.srcObject) {
+            remoteAudioRef.current.play().catch(() => {});
           }
 
           setCallState("CONNECTED");
@@ -397,7 +457,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [cleanupMedia, clearTimers, toast]);
+  }, [cleanupMedia, clearTimers, toast, user?.id]);
 
   // Window unload / refresh cleanup
   useEffect(() => {
@@ -462,10 +522,14 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
 
         stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
+        // Join order signaling room
+        socketRef.current?.emit("join:order", params.orderId);
+
         pc.onicecandidate = (event) => {
           if (event.candidate && socketRef.current) {
             socketRef.current.emit("call:ice_candidate", {
-              callId: "", // Will be attached or routed by targetUserId
+              callId: "",
+              orderId: params.orderId,
               targetUserId: params.targetUserId,
               candidate: event.candidate,
             });
@@ -593,10 +657,14 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
 
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
+      // Join order signaling room
+      socketRef.current?.emit("join:order", incomingCall.orderId);
+
       pc.onicecandidate = (event) => {
         if (event.candidate && socketRef.current) {
           socketRef.current.emit("call:ice_candidate", {
             callId: incomingCall.callId,
+            orderId: incomingCall.orderId,
             targetUserId: incomingCall.callerId,
             candidate: event.candidate,
           });
@@ -794,8 +862,21 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     <VoiceCallContext.Provider value={contextValue}>
       {children}
 
-      {/* Hidden HTML audio element for remote audio stream playback */}
-      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+      {/* Remote audio stream playback element with active DOM presence */}
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
+        style={{
+          position: "fixed",
+          top: -9999,
+          left: -9999,
+          width: 1,
+          height: 1,
+          opacity: 0.01,
+          pointerEvents: "none",
+        }}
+      />
 
       {/* Incoming Call Modal */}
       {incomingCall && callState === "INCOMING" && (

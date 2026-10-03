@@ -6,6 +6,7 @@ import { logger } from "./logger";
 
 import { CallService } from "../services/call.service";
 import { CallStatus } from "@prisma/client";
+import prisma from "./prisma";
 
 let io: SocketIOServer;
 const activeCalls = new Map<string, { callId: string; targetUserId: string; orderId: string }>();
@@ -110,41 +111,75 @@ export function setupWebSocket(server: http.Server): void {
     // Track active call for disconnect cleanup
     socket.on("call:initiate", async (data: {
       orderId: string;
-      targetUserId: string;
+      targetUserId?: string;
       sdp: any;
       callerName?: string;
       callerPhoto?: string;
       callerRole?: "CONSUMER" | "WORKER";
     }) => {
       try {
-        const callerRole =
-          data.callerRole || (role === "WORKER" ? "WORKER" : "CONSUMER");
+        const order = await prisma.order.findUnique({
+          where: { id: data.orderId },
+          include: {
+            consumer: { select: { id: true, name: true, avatarUrl: true } },
+            worker: { select: { id: true, userId: true, user: { select: { id: true, name: true, avatarUrl: true } } } },
+          },
+        });
+
+        if (!order) {
+          throw new Error("Order not found");
+        }
+
+        const isConsumerCaller = order.consumerId === userId;
+        const isWorkerCaller = order.worker?.userId === userId;
+
+        if (!isConsumerCaller && !isWorkerCaller) {
+          throw new Error("Unauthorized caller for this order");
+        }
+
+        const recipientUserId = isConsumerCaller
+          ? (order.worker?.userId || data.targetUserId)
+          : order.consumerId;
+
+        if (!recipientUserId) {
+          throw new Error("Recipient partner not assigned or not found");
+        }
+
+        const callerRole = isConsumerCaller ? "CONSUMER" : "WORKER";
+        const callerName = data.callerName || (isConsumerCaller ? order.consumer.name : (order.worker?.user?.name || "Service Partner"));
+        const callerPhoto = data.callerPhoto || (isConsumerCaller ? order.consumer.avatarUrl : (order.worker?.user?.avatarUrl || null));
 
         const session = await CallService.createCallSession(
           data.orderId,
           userId,
-          data.targetUserId,
+          recipientUserId,
           callerRole
         );
 
         activeCalls.set(socket.id, {
           callId: session.id,
-          targetUserId: data.targetUserId,
+          targetUserId: recipientUserId,
           orderId: data.orderId,
         });
 
         socket.emit("call:ringing", { callId: session.id, orderId: data.orderId });
 
-        io.to(`user:${data.targetUserId}`).emit("call:incoming", {
+        const incomingData = {
           callId: session.id,
           orderId: data.orderId,
           callerId: userId,
-          callerName: data.callerName || "User",
-          callerPhoto: data.callerPhoto || null,
+          callerName,
+          callerPhoto,
           callerRole,
           sdp: data.sdp,
-        });
-        logger.info(`WebRTC call initiated: ${session.id} from ${userId} to ${data.targetUserId}`);
+        };
+
+        io.to(`user:${recipientUserId}`).emit("call:incoming", incomingData);
+        if (order.workerId) {
+          io.to(`worker:${order.workerId}`).emit("call:incoming", incomingData);
+        }
+        socket.to(`order:${data.orderId}`).emit("call:incoming", incomingData);
+        logger.info(`WebRTC call initiated: ${session.id} from ${userId} (${callerRole}) to ${recipientUserId}`);
       } catch (err: any) {
         logger.warn(`call:initiate error: ${err.message}`);
         socket.emit("call:failed", { message: err.message || "Failed to initiate call." });
@@ -168,11 +203,16 @@ export function setupWebSocket(server: http.Server): void {
           orderId: data.orderId,
         });
 
-        io.to(`user:${data.targetUserId}`).emit("call:answered", {
+        const answerPayload = {
           callId: data.callId,
           sdp: data.sdp,
           responderId: userId,
-        });
+        };
+
+        io.to(`user:${data.targetUserId}`).emit("call:answered", answerPayload);
+        if (data.orderId) {
+          socket.to(`order:${data.orderId}`).emit("call:answered", answerPayload);
+        }
         logger.info(`WebRTC call answered: ${data.callId} by ${userId}`);
       } catch (err: any) {
         logger.warn(`call:answer error: ${err.message}`);
@@ -181,15 +221,20 @@ export function setupWebSocket(server: http.Server): void {
 
     socket.on("call:ice_candidate", (data: {
       callId: string;
+      orderId?: string;
       targetUserId: string;
       candidate: any;
     }) => {
       if (data.targetUserId && data.candidate) {
-        io.to(`user:${data.targetUserId}`).emit("call:ice_candidate", {
+        const icePayload = {
           callId: data.callId,
           candidate: data.candidate,
           senderId: userId,
-        });
+        };
+        io.to(`user:${data.targetUserId}`).emit("call:ice_candidate", icePayload);
+        if (data.orderId) {
+          socket.to(`order:${data.orderId}`).emit("call:ice_candidate", icePayload);
+        }
       }
     });
 
@@ -206,10 +251,15 @@ export function setupWebSocket(server: http.Server): void {
           endReason: data.reason || "declined",
         });
 
-        io.to(`user:${data.targetUserId}`).emit("call:rejected", {
+        const rejectPayload = {
           callId: data.callId,
           reason: data.reason || "Call declined by recipient.",
-        });
+        };
+
+        io.to(`user:${data.targetUserId}`).emit("call:rejected", rejectPayload);
+        if (data.orderId) {
+          socket.to(`order:${data.orderId}`).emit("call:rejected", rejectPayload);
+        }
         logger.info(`WebRTC call rejected: ${data.callId}`);
       } catch (err: any) {
         logger.warn(`call:reject error: ${err.message}`);
@@ -231,12 +281,17 @@ export function setupWebSocket(server: http.Server): void {
           endReason: data.reason || "completed",
         });
 
+        const endPayload = {
+          callId: data.callId,
+          durationSec: data.durationSec || 0,
+          reason: data.reason || "Call ended.",
+        };
+
         if (data.targetUserId) {
-          io.to(`user:${data.targetUserId}`).emit("call:ended", {
-            callId: data.callId,
-            durationSec: data.durationSec || 0,
-            reason: data.reason || "Call ended.",
-          });
+          io.to(`user:${data.targetUserId}`).emit("call:ended", endPayload);
+        }
+        if (data.orderId) {
+          socket.to(`order:${data.orderId}`).emit("call:ended", endPayload);
         }
         logger.info(`WebRTC call ended: ${data.callId}`);
       } catch (err: any) {

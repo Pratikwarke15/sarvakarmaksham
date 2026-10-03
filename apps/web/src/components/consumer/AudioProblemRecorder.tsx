@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Mic, Square, Play, Pause, RotateCcw, Trash2, CheckCircle, AlertCircle, Loader2, Volume2 } from "lucide-react";
+import { Mic, Square, Play, Pause, RotateCcw, Trash2, CheckCircle, AlertCircle, Loader2, Volume2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiUpload } from "@/lib/api";
 
@@ -26,6 +26,7 @@ export function AudioProblemRecorder({ onAudioReady, existingAudioUrl }: AudioPr
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const audioFileInputRef = useRef<HTMLInputElement | null>(null);
   const [playbackProgress, setPlaybackProgress] = useState<number>(0);
 
   // Clear timers and streams on unmount
@@ -160,6 +161,54 @@ export function AudioProblemRecorder({ onAudioReady, existingAudioUrl }: AudioPr
     }
   };
 
+  const handleAudioFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      setUploadError("Audio file must be under 15MB.");
+      return;
+    }
+
+    setUploadError(null);
+    setIsUploading(true);
+
+    try {
+      const localUrl = URL.createObjectURL(file);
+      setAudioPlaybackUrl(localUrl);
+
+      // Probe duration
+      const tempAudio = new Audio(localUrl);
+      tempAudio.onloadedmetadata = () => {
+        if (tempAudio.duration && !isNaN(tempAudio.duration)) {
+          setDuration(Math.round(tempAudio.duration));
+        }
+      };
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await apiUpload<{ success: boolean; data: { url: string } }>(
+        "/uploads/problem-audio",
+        formData
+      );
+
+      if (res.success && res.data?.url) {
+        setUploadedUrl(res.data.url);
+        setState("RECORDED");
+        onAudioReady({ audioUrl: res.data.url, duration: duration || 15 });
+      } else {
+        throw new Error("Failed to upload audio file");
+      }
+    } catch (err: any) {
+      console.error("Audio file upload error:", err);
+      setUploadError("Could not upload audio file. Please try another format or record directly.");
+    } finally {
+      setIsUploading(false);
+      if (audioFileInputRef.current) audioFileInputRef.current.value = "";
+    }
+  };
+
   const togglePlayback = () => {
     if (!audioPlayerRef.current) return;
     if (isPlaying) {
@@ -205,6 +254,15 @@ export function AudioProblemRecorder({ onAudioReady, existingAudioUrl }: AudioPr
 
   return (
     <div className="w-full rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-xs transition-all">
+      {/* Hidden file input for uploading audio files */}
+      <input
+        ref={audioFileInputRef}
+        type="file"
+        accept="audio/*,.mp3,.wav,.ogg,.m4a,.webm,.aac"
+        className="hidden"
+        onChange={handleAudioFileSelect}
+      />
+
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className={`p-2 rounded-xl ${state === "RECORDING" ? "bg-rose-100 text-rose-600 animate-pulse" : "bg-[#800020]/10 text-[#800020]"}`}>
@@ -212,7 +270,7 @@ export function AudioProblemRecorder({ onAudioReady, existingAudioUrl }: AudioPr
           </div>
           <div>
             <h4 className="text-sm font-bold text-slate-900">Voice Explanation</h4>
-            <p className="text-[11px] text-slate-500">Speak naturally in Hindi, English, or your local language</p>
+            <p className="text-[11px] text-slate-500">Record voice or upload an audio file</p>
           </div>
         </div>
 
@@ -301,9 +359,11 @@ export function AudioProblemRecorder({ onAudioReady, existingAudioUrl }: AudioPr
       {/* RECORDED / PLAYBACK VIEW */}
       {state === "RECORDED" && audioPlaybackUrl && (
         <div className="my-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+          {/* Audio controller */}
           <audio
             ref={audioPlayerRef}
             src={audioPlaybackUrl}
+            controls
             onTimeUpdate={() => {
               if (audioPlayerRef.current) {
                 const cur = audioPlayerRef.current.currentTime;
@@ -315,35 +375,8 @@ export function AudioProblemRecorder({ onAudioReady, existingAudioUrl }: AudioPr
               setIsPlaying(false);
               setPlaybackProgress(0);
             }}
-            className="hidden"
+            className="w-full h-8 rounded-lg accent-[#800020]"
           />
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={togglePlayback}
-              disabled={isUploading}
-              className="h-10 w-10 shrink-0 rounded-full bg-[#800020] text-white flex items-center justify-center hover:bg-[#68001a] transition-all active:scale-95 disabled:opacity-50"
-            >
-              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
-            </button>
-
-            <div className="flex-1 space-y-1">
-              <div className="flex items-center justify-between text-xs text-slate-600 font-semibold">
-                <span className="flex items-center gap-1">
-                  <Volume2 className="h-3.5 w-3.5 text-slate-400" />
-                  Voice Explanation Audio
-                </span>
-                <span className="font-mono text-[11px]">{formatTime(duration)}</span>
-              </div>
-              <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                <div
-                  className="bg-[#800020] h-1.5 rounded-full transition-all duration-100"
-                  style={{ width: `${playbackProgress}%` }}
-                />
-              </div>
-            </div>
-          </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 text-xs">
             <div className="flex items-center gap-2">
@@ -355,7 +388,7 @@ export function AudioProblemRecorder({ onAudioReady, existingAudioUrl }: AudioPr
               ) : (
                 <span className="flex items-center gap-1 text-emerald-700 font-medium">
                   <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
-                  Audio saved securely
+                  Audio saved securely ({formatTime(duration)})
                 </span>
               )}
             </div>
@@ -370,7 +403,18 @@ export function AudioProblemRecorder({ onAudioReady, existingAudioUrl }: AudioPr
                 className="h-8 px-2.5 rounded-lg text-slate-600 hover:text-slate-900 gap-1 text-xs"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                <span>Retake</span>
+                <span>Re-record</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => audioFileInputRef.current?.click()}
+                disabled={isUploading}
+                className="h-8 px-2.5 rounded-lg text-slate-600 hover:text-slate-900 gap-1 text-xs"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                <span>Change File</span>
               </Button>
               <Button
                 type="button"
@@ -392,17 +436,28 @@ export function AudioProblemRecorder({ onAudioReady, existingAudioUrl }: AudioPr
       {state === "IDLE" && (
         <div className="my-2 flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-xl border border-dashed border-slate-300 bg-slate-50/70">
           <div className="text-center sm:text-left">
-            <p className="text-xs font-semibold text-slate-700">Don&apos;t want to type? Just speak!</p>
-            <p className="text-[11px] text-slate-500">Record a 15–60s voice message detailing what needs fixing.</p>
+            <p className="text-xs font-semibold text-slate-700">Don&apos;t want to type? Just speak or upload!</p>
+            <p className="text-[11px] text-slate-500">Record a voice note or choose an audio file from your device.</p>
           </div>
-          <Button
-            type="button"
-            onClick={startRecording}
-            className="w-full sm:w-auto rounded-xl bg-[#800020] hover:bg-[#68001a] text-white text-xs font-bold gap-2 px-4 py-2 shadow-xs transition-transform active:scale-95"
-          >
-            <Mic className="h-4 w-4" />
-            <span>Record Voice Note</span>
-          </Button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              type="button"
+              onClick={startRecording}
+              className="flex-1 sm:flex-none rounded-xl bg-[#800020] hover:bg-[#68001a] text-white text-xs font-bold gap-1.5 px-3.5 py-2 shadow-xs transition-transform active:scale-95"
+            >
+              <Mic className="h-4 w-4" />
+              <span>Record Voice</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => audioFileInputRef.current?.click()}
+              className="flex-1 sm:flex-none rounded-xl border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold gap-1.5 px-3.5 py-2 transition-transform active:scale-95"
+            >
+              <Upload className="h-4 w-4 text-slate-500" />
+              <span>Upload Audio</span>
+            </Button>
+          </div>
         </div>
       )}
     </div>

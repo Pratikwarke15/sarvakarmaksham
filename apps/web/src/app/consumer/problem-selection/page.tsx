@@ -216,6 +216,168 @@ function ProblemSelectionContent() {
     };
   }, [searchParams]);
 
+  const DRAFT_LOCAL_KEY = "coopgig_active_booking_draft";
+  const [restoredFromStorage, setRestoredFromStorage] = useState<boolean>(false);
+
+  // 1b. Load Draft directly if draftId param is present
+  useEffect(() => {
+    const draftIdParam = searchParams.get("draftId");
+    if (!draftIdParam) return;
+
+    let mounted = true;
+    const fetchDraft = async () => {
+      try {
+        const res = await apiGet<{ success: boolean; data: ProblemRequest }>(
+          `/problem-requests/${draftIdParam}`
+        );
+        if (mounted && res.success && res.data) {
+          const draft = res.data;
+          setSavedDraft(draft);
+          if (draft.category) setSelectedCategory(draft.category as any);
+          if (draft.subcategory) setSelectedSubCategory(draft.subcategory as any);
+          if (draft.problem) setSelectedProblem(draft.problem as any);
+          if (draft.textDescription) setTextDescription(draft.textDescription);
+          if (draft.audioUrl) setAudioUrl(draft.audioUrl);
+          if (draft.audioDuration) setAudioDuration(draft.audioDuration);
+          if (draft.photos) setPhotos(draft.photos);
+          if (draft.videoUrl) setVideoUrl(draft.videoUrl);
+          if (draft.address) setAddress(draft.address);
+          if (draft.latitude) setLatitude(draft.latitude);
+          if (draft.longitude) setLongitude(draft.longitude);
+          if (draft.additionalNotes) setAdditionalNotes(draft.additionalNotes);
+
+          // Proceed directly to worker selection
+          setCurrentStep(6);
+          setViewMode("worker_selection");
+          loadWorkersForDraft(draft.id);
+        }
+      } catch (err: any) {
+        console.error("Failed to load draft by param:", err);
+      }
+    };
+    fetchDraft();
+    return () => {
+      mounted = false;
+    };
+  }, [searchParams]);
+
+  // 1c. Restore unsaved mid-process progress on refresh
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const orderIdParam = searchParams.get("orderId");
+    const draftIdParam = searchParams.get("draftId");
+    if (orderIdParam || draftIdParam) return;
+
+    try {
+      const stored = localStorage.getItem(DRAFT_LOCAL_KEY);
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (data.currentStep && data.currentStep > 1) {
+          setCurrentStep(data.currentStep);
+          if (data.viewMode && data.viewMode !== "order_active") setViewMode(data.viewMode);
+          if (data.selectedCategory) setSelectedCategory(data.selectedCategory);
+          if (data.selectedSubCategory) setSelectedSubCategory(data.selectedSubCategory);
+          if (data.selectedProblem) setSelectedProblem(data.selectedProblem);
+          if (data.textDescription) setTextDescription(data.textDescription);
+          if (data.audioUrl) setAudioUrl(data.audioUrl);
+          if (data.audioDuration) setAudioDuration(data.audioDuration);
+          if (data.photos) setPhotos(data.photos);
+          if (data.videoUrl) setVideoUrl(data.videoUrl);
+          if (data.address) setAddress(data.address);
+          if (data.latitude) setLatitude(data.latitude);
+          if (data.longitude) setLongitude(data.longitude);
+          if (data.additionalNotes) setAdditionalNotes(data.additionalNotes);
+          if (data.savedDraft) setSavedDraft(data.savedDraft);
+          if (data.selectedWorker) setSelectedWorker(data.selectedWorker);
+          if (data.bookingMode) setBookingMode(data.bookingMode);
+          if (data.scheduledDate) setScheduledDate(data.scheduledDate);
+          if (data.scheduledTime) setScheduledTime(data.scheduledTime);
+          setRestoredFromStorage(true);
+
+          if (data.savedDraft?.id) {
+            loadWorkersForDraft(data.savedDraft.id);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Could not restore booking draft from storage:", e);
+    }
+  }, [searchParams]);
+
+  // 1d. Auto-sync state changes to localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (viewMode === "order_active") return;
+
+    if (currentStep > 1 || selectedCategory || textDescription || photos.length > 0 || audioUrl) {
+      const payload = {
+        currentStep,
+        viewMode,
+        selectedCategory,
+        selectedSubCategory,
+        selectedProblem,
+        textDescription,
+        audioUrl,
+        audioDuration,
+        photos,
+        videoUrl,
+        address,
+        latitude,
+        longitude,
+        additionalNotes,
+        savedDraft,
+        selectedWorker,
+        bookingMode,
+        scheduledDate,
+        scheduledTime,
+        updatedAt: Date.now(),
+      };
+      try {
+        localStorage.setItem(DRAFT_LOCAL_KEY, JSON.stringify(payload));
+      } catch (e) {}
+    }
+  }, [
+    currentStep,
+    viewMode,
+    selectedCategory,
+    selectedSubCategory,
+    selectedProblem,
+    textDescription,
+    audioUrl,
+    audioDuration,
+    photos,
+    videoUrl,
+    address,
+    latitude,
+    longitude,
+    additionalNotes,
+    savedDraft,
+    selectedWorker,
+    bookingMode,
+    scheduledDate,
+    scheduledTime,
+  ]);
+
+  const handleStartFresh = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(DRAFT_LOCAL_KEY);
+    }
+    setCurrentStep(1);
+    setViewMode("flow");
+    setSelectedCategory(null);
+    setSelectedSubCategory(null);
+    setSelectedProblem(null);
+    setTextDescription("");
+    setAudioUrl(null);
+    setAudioDuration(null);
+    setPhotos([]);
+    setVideoUrl(null);
+    setAddress("");
+    setSavedDraft(null);
+    setSelectedWorker(null);
+    setRestoredFromStorage(false);
+  };
+
   // Handle category selection - immediate transition if subcategories are present
   const handleSelectCategory = async (cat: ServiceCategory) => {
     setSelectedCategory(cat);
@@ -536,6 +698,9 @@ function ProblemSelectionContent() {
       );
 
       if (res.success && res.data) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(DRAFT_LOCAL_KEY);
+        }
         setActiveOrder(res.data);
         setViewMode("order_active");
         setCurrentStep(8);
@@ -647,18 +812,32 @@ function ProblemSelectionContent() {
               </div>
             )}
             {savedDraft.audioUrl && (
-              <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between">
-                <span className="text-slate-400">Voice Note Attached:</span>
-                <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                  <Mic className="h-3.5 w-3.5 text-emerald-600" />
-                  {savedDraft.audioDuration ? `${savedDraft.audioDuration}s recorded` : "Attached"}
-                </span>
+              <div className="pt-2 border-t border-slate-200/70 space-y-1.5">
+                <span className="text-slate-400 block">Voice Note:</span>
+                <audio controls src={savedDraft.audioUrl} className="w-full h-8 accent-[#800020]" />
               </div>
             )}
             {savedDraft.photos && savedDraft.photos.length > 0 && (
-              <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between">
-                <span className="text-slate-400">Photos Attached:</span>
-                <span className="font-semibold text-slate-700">{savedDraft.photos.length} item(s)</span>
+              <div className="pt-2 border-t border-slate-200/70 space-y-1.5">
+                <span className="text-slate-400 block">Photos Attached ({savedDraft.photos.length}):</span>
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  {savedDraft.photos.map((p, idx) => (
+                    <img
+                      key={idx}
+                      src={p}
+                      alt={`Draft photo ${idx + 1}`}
+                      className="h-16 w-16 rounded-xl object-cover border border-slate-200 shrink-0"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            {savedDraft.videoUrl && (
+              <div className="pt-2 border-t border-slate-200/70 space-y-1.5">
+                <span className="text-slate-400 block">Video Clip:</span>
+                <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-950">
+                  <video src={savedDraft.videoUrl} controls playsInline className="w-full h-40 object-contain bg-black" />
+                </div>
               </div>
             )}
           </div>
@@ -973,6 +1152,7 @@ function ProblemSelectionContent() {
     const problemDesc = textDescription || savedDraft?.textDescription || "No written description provided.";
     const voiceUrl = audioUrl || savedDraft?.audioUrl;
     const mediaPhotos = photos.length > 0 ? photos : savedDraft?.photos || [];
+    const mediaVideo = videoUrl || savedDraft?.videoUrl;
 
     return (
       <div className="max-w-4xl mx-auto space-y-6 pb-16">
@@ -1070,6 +1250,16 @@ function ProblemSelectionContent() {
                         className="h-20 w-20 rounded-2xl object-cover border border-slate-200 shrink-0"
                       />
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Video attached */}
+              {mediaVideo && (
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-slate-700">Attached Video</span>
+                  <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 max-w-sm">
+                    <video src={mediaVideo} controls playsInline className="w-full h-44 object-contain bg-black" />
                   </div>
                 </div>
               )}
@@ -1539,6 +1729,22 @@ function ProblemSelectionContent() {
               Choose your category and problem, then explain via text or voice.
             </p>
           </div>
+
+          {restoredFromStorage && (
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 w-full">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-amber-600 shrink-0" />
+                <span>Restored your draft in progress so you don&apos;t lose changes on refresh.</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleStartFresh}
+                className="text-xs font-bold text-amber-800 hover:text-amber-950 underline shrink-0 ml-2"
+              >
+                Start Fresh
+              </button>
+            </div>
+          )}
 
           {/* Mobile App Progress Bar */}
           <div className="sm:hidden w-full space-y-2 bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
@@ -2103,6 +2309,10 @@ function ProblemSelectionContent() {
             hasAudio={hasAudioExplanation}
             photosCount={photos.length}
             hasVideo={!!videoUrl}
+            textDescription={textDescription}
+            audioUrl={audioUrl}
+            photos={photos}
+            videoUrl={videoUrl}
           />
 
           {/* Price Protection & Negotiation Notice */}

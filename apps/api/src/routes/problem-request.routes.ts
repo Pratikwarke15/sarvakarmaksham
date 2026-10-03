@@ -81,4 +81,23 @@ router.get(
   })
 );
 
+// DELETE /api/v1/problem-requests/drafts/:id
+router.delete(
+
+  "/drafts/:id",
+  authenticate,
+  authorize("CONSUMER"),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const consumerId = req.user!.id;
+    await ProblemRequestService.deleteDraft(id, consumerId);
+
+    res.json({
+      success: true,
+      message: "Draft deleted successfully",
+    });
+  })
+);
+
 export default router;
+

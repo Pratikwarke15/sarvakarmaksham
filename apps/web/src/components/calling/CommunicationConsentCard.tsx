@@ -85,34 +85,59 @@ export function CommunicationConsentCard({
   useEffect(() => {
     fetchConsent();
 
-    // Setup Socket listener for real-time consent updates
-    const token = getStoredToken();
-    if (!token) return;
-
-    const socketUrl =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1")
-        ? "http://localhost:4000"
-        : "";
-
-    const socket: Socket = io(socketUrl, {
-      path: "/ws",
-      auth: { token },
-      transports: ["websocket", "polling"],
-    });
-
-    socket.emit("join:order", orderId);
-
-    socket.on("order:communication_consent_updated", (payload: any) => {
-      if (payload.orderId === orderId) {
+    // Listen to window-level consent events dispatched by global VoiceCallProvider
+    const handleConsentEvent = (e: any) => {
+      if (!e.detail?.orderId || e.detail.orderId === orderId) {
         fetchConsent();
       }
-    });
+    };
+    window.addEventListener("order:consent_updated", handleConsentEvent);
+
+    // Setup Socket listener for real-time consent updates
+    const token = getStoredToken();
+    let socket: Socket | null = null;
+
+    if (token) {
+      const socketUrl =
+        typeof window !== "undefined" &&
+        (window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1")
+          ? "http://localhost:4000"
+          : "";
+
+      socket = io(socketUrl, {
+        path: "/ws",
+        auth: { token },
+        transports: ["websocket", "polling"],
+      });
+
+      socket.emit("join:order", orderId);
+
+      socket.on("order:communication_consent_updated", (payload: any) => {
+        if (!payload || payload.orderId === orderId) {
+          fetchConsent();
+        }
+      });
+
+      socket.on("order:consent_request_received", (payload: any) => {
+        if (!payload || payload.orderId === orderId) {
+          fetchConsent();
+        }
+      });
+
+      socket.on("order:consent_granted", (payload: any) => {
+        if (!payload || payload.orderId === orderId) {
+          fetchConsent();
+        }
+      });
+    }
 
     return () => {
-      socket.emit("leave:order", orderId);
-      socket.disconnect();
+      window.removeEventListener("order:consent_updated", handleConsentEvent);
+      if (socket) {
+        socket.emit("leave:order", orderId);
+        socket.disconnect();
+      }
     };
   }, [fetchConsent, orderId]);
 
@@ -130,6 +155,11 @@ export function CommunicationConsentCard({
           description: res.data?.message || "Communication preference saved.",
           variant: "success",
         });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("order:consent_updated", { detail: { orderId } })
+          );
+        }
         await fetchConsent();
       }
     } catch (err: any) {
@@ -157,6 +187,11 @@ export function CommunicationConsentCard({
           description: "Voice calling has been disabled for this order.",
           variant: "default",
         });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("order:consent_updated", { detail: { orderId } })
+          );
+        }
         await fetchConsent();
       }
     } catch (err: any) {

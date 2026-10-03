@@ -184,6 +184,45 @@ export class CallService {
     if (order.consumerId) broadcastToUser(order.consumerId, "order:communication_consent_updated", consentData);
     if (order.worker?.userId) broadcastToUser(order.worker.userId, "order:communication_consent_updated", consentData);
 
+    const counterpartUserId = isConsumer ? order.worker?.userId : order.consumerId;
+    const requesterName = isConsumer ? order.consumer.name : (order.worker?.user?.name || "Service Partner");
+
+    if (isNowConsented) {
+      if (order.consumerId) {
+        broadcastToUser(order.consumerId, "order:consent_granted", {
+          ...consentData,
+          granterName: requesterName,
+          title: "Call Permission Active",
+          message: "You can now make voice calls with your technician.",
+        });
+      }
+      if (order.worker?.userId) {
+        broadcastToUser(order.worker.userId, "order:consent_granted", {
+          ...consentData,
+          granterName: requesterName,
+          title: "Call Permission Active",
+          message: "You can now make voice calls with the customer.",
+        });
+      }
+    } else if (counterpartUserId) {
+      broadcastToUser(counterpartUserId, "order:consent_request_received", {
+        ...consentData,
+        requesterName,
+        title: isConsumer ? "Resident requested call permission" : "Technician requested call permission",
+        message: `${requesterName} is requesting call consent for Order ${order.orderRef}. Please grant consent to talk.`,
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId: counterpartUserId,
+          title: isConsumer ? "Resident requested call permission" : "Technician requested call permission",
+          message: `${requesterName} has granted call permission for Order ${order.orderRef}. Please grant consent to enable in-app voice calling.`,
+          type: "ORDER",
+          data: { orderId: order.id, type: "CALL_CONSENT" },
+        },
+      }).catch(() => {});
+    }
+
     return consentData;
   }
 

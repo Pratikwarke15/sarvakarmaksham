@@ -29,22 +29,28 @@ import {
   TrendingUp,
   Volume2,
   XCircle,
+  Camera,
+  Film,
+  Trash2,
 } from "lucide-react";
 import { cn, formatCurrency, formatDateTime, getStatusColor } from "@/lib/utils";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { PriceNegotiationModal } from "@/components/worker/PriceNegotiationModal";
 import { OrderPaymentReceiptModal } from "@/components/payment/OrderPaymentReceiptModal";
-import type { Booking, BookingStatus, Order, OrderPaymentReceipt } from "@/lib/types";
 
-type ConsumerTabFilter = "ALL" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+import { CommunicationConsentCard } from "@/components/calling/CommunicationConsentCard";
+import type { Booking, BookingStatus, Order, OrderPaymentReceipt, ProblemRequest } from "@/lib/types";
+
+type ConsumerTabFilter = "ALL" | "ACTIVE" | "COMPLETED" | "CANCELLED" | "DRAFTS";
 
 const tabs: { label: string; filter: ConsumerTabFilter }[] = [
   { label: "All", filter: "ALL" },
   { label: "Active", filter: "ACTIVE" },
   { label: "Completed", filter: "COMPLETED" },
   { label: "Cancelled", filter: "CANCELLED" },
+  { label: "Drafts", filter: "DRAFTS" },
 ];
 
 const ACTIVE_ORDER_STATUSES = [
@@ -129,6 +135,7 @@ export default function BookingsPage() {
   );
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [drafts, setDrafts] = useState<ProblemRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<ConsumerTabFilter>("ALL");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -143,9 +150,10 @@ export default function BookingsPage() {
     if (!isAuthenticated || user?.role !== "CONSUMER") return;
     setLoading(true);
     try {
-      const [bookingsRes, ordersRes] = await Promise.allSettled([
+      const [bookingsRes, ordersRes, draftsRes] = await Promise.allSettled([
         apiGet<{ success: boolean; data: Booking[] }>("/bookings"),
         apiGet<{ success: boolean; data: Order[] }>("/orders/consumer"),
+        apiGet<{ success: boolean; data: ProblemRequest[] }>("/problem-requests/my-drafts"),
       ]);
 
       if (bookingsRes.status === "fulfilled" && bookingsRes.value.success) {
@@ -153,6 +161,9 @@ export default function BookingsPage() {
       }
       if (ordersRes.status === "fulfilled" && ordersRes.value.success) {
         setOrders(ordersRes.value.data || []);
+      }
+      if (draftsRes.status === "fulfilled" && draftsRes.value.success) {
+        setDrafts(draftsRes.value.data || []);
       }
     } catch {
       toast({ title: "Failed to load bookings", variant: "danger" });
@@ -212,7 +223,20 @@ export default function BookingsPage() {
     }
   };
 
+  const handleDeleteDraft = async (id: string) => {
+    try {
+      const res = await apiDelete<{ success: boolean; message?: string }>(`/problem-requests/drafts/${id}`);
+      if (res.success) {
+        toast({ title: "Draft discarded", variant: "default" });
+        setDrafts((prev) => prev.filter((d) => d.id !== id));
+      }
+    } catch {
+      toast({ title: "Failed to delete draft", variant: "danger" });
+    }
+  };
+
   const handleOpenReceipt = async (orderId: string) => {
+
     try {
       setLoadingReceiptId(orderId);
       const res = await apiGet<{ success: boolean; data: OrderPaymentReceipt }>(
@@ -262,8 +286,12 @@ export default function BookingsPage() {
   const countCancelled =
     orders.filter((o) => o.status === ("CANCELLED" as any) || o.status === ("REJECTED" as any)).length +
     bookings.filter((b) => b.status === "CANCELLED").length;
+  const countDrafts = drafts.length;
 
-  const totalItemsCount = filteredOrders.length + filteredBookings.length;
+  const totalItemsCount =
+    activeTab === "DRAFTS"
+      ? drafts.length
+      : filteredOrders.length + filteredBookings.length;
 
   return (
     <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-4 sm:py-10 animate-fade-in space-y-6 sm:space-y-8">
@@ -322,7 +350,9 @@ export default function BookingsPage() {
                   ? countActive
                   : t.filter === "COMPLETED"
                   ? countCompleted
-                  : countCancelled;
+                  : t.filter === "CANCELLED"
+                  ? countCancelled
+                  : countDrafts;
 
               return (
                 <button
@@ -364,12 +394,16 @@ export default function BookingsPage() {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  {activeTab === "ALL"
+                  {activeTab === "DRAFTS"
+                    ? "No saved problem drafts"
+                    : activeTab === "ALL"
                     ? "No service bookings yet"
                     : `No ${activeTab.toLowerCase()} bookings found`}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                  Book certified cooperative plumbers, electricians, carpenters, and appliance experts with transparent rate protection.
+                  {activeTab === "DRAFTS"
+                    ? "When you describe an issue and save a draft, it will stay here so you can review worker quotes and book whenever you're ready."
+                    : "Book certified cooperative plumbers, electricians, carpenters, and appliance experts with transparent rate protection."}
                 </p>
               </div>
               <div className="pt-2">
@@ -378,9 +412,126 @@ export default function BookingsPage() {
                   className="inline-flex items-center gap-2 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white px-5 py-2.5 text-xs font-bold shadow-md shadow-[#800020]/20 transition-all"
                 >
                   <Sparkles className="h-4 w-4" />
-                  <span>Book a Service Now</span>
+                  <span>{activeTab === "DRAFTS" ? "Create a Problem Request" : "Book a Service Now"}</span>
                 </Link>
               </div>
+            </div>
+          ) : activeTab === "DRAFTS" ? (
+            <div className="space-y-4">
+              {drafts.map((draft) => (
+                <div
+                  key={draft.id}
+                  className="rounded-2xl sm:rounded-3xl border border-rose-200/80 bg-white p-4 sm:p-6 shadow-xs space-y-4 hover:border-[#800020]/40 transition-all"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-base sm:text-lg font-black text-slate-900">
+                          {draft.problem?.name || draft.problemTitle || "Saved Problem Request"}
+                        </span>
+                        {draft.category && (
+                          <Badge className="bg-rose-50 text-[#800020] border-rose-200 font-bold">
+                            {draft.category.name}
+                          </Badge>
+                        )}
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          DRAFT · READY TO BOOK
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 font-mono mt-0.5">
+                        Ref: {draft.requestRef} · Saved {formatDateTime(draft.createdAt)}
+                      </p>
+                    </div>
+
+                    <div className="text-left sm:text-right">
+                      <span className="text-base sm:text-xl font-black text-[#800020] font-mono">
+                        {formatCurrency(Number(draft.estimatedPriceMin || draft.estimatedMin || 100))} - {formatCurrency(Number(draft.estimatedPriceMax || draft.estimatedMax || 400))}
+                      </span>
+                      <p className="text-[10px] text-slate-500 font-medium">Cooperative Rate Range</p>
+                    </div>
+
+                  </div>
+
+                  {/* Problem Explanations */}
+                  <div className="space-y-3 bg-slate-50/80 rounded-2xl p-3 sm:p-4 border border-slate-100">
+                    {draft.textDescription && (
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Written Description
+                        </span>
+                        <p className="text-xs sm:text-sm text-slate-800 bg-white p-3 rounded-xl border border-slate-200/80">
+                          {draft.textDescription}
+                        </p>
+                      </div>
+                    )}
+
+                    {draft.audioUrl && (
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Recorded Voice Note
+                        </span>
+                        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 flex items-center gap-2">
+                          <audio controls src={draft.audioUrl} className="w-full h-8 accent-[#800020]" />
+                        </div>
+                      </div>
+                    )}
+
+                    {draft.photos && draft.photos.length > 0 && (
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Attached Photos ({draft.photos.length})
+                        </span>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {draft.photos.map((url, i) => (
+                            <img
+                              key={i}
+                              src={url}
+                              alt={`Draft photo ${i + 1}`}
+                              className="h-16 w-16 sm:h-20 sm:w-20 object-cover rounded-xl border border-slate-200 shrink-0"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {draft.videoUrl && (
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Problem Video Clip
+                        </span>
+                        <video
+                          controls
+                          playsInline
+                          src={draft.videoUrl}
+                          className="w-full max-w-xs h-32 object-contain bg-black rounded-xl"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Draft Actions */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteDraft(draft.id)}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-xl transition"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span>Discard Draft</span>
+                    </button>
+
+                    <Link
+                      href={`/consumer/problem-selection?draftId=${draft.id}`}
+                      className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#800020] hover:bg-[#66001a] text-white text-xs sm:text-sm font-bold shadow-md shadow-[#800020]/20 transition"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      <span>Resume & Select Worker</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="space-y-4">
@@ -465,18 +616,25 @@ export default function BookingsPage() {
                             </p>
                           </div>
                         </div>
-
-                        {order.worker.user?.phone && isActive && (
-                          <a
-                            href={`tel:${order.worker.user.phone}`}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-xs font-bold transition self-end sm:self-auto"
-                          >
-                            <Phone className="h-3.5 w-3.5 text-emerald-600" />
-                            <span>Call Technician</span>
-                          </a>
-                        )}
                       </div>
                     )}
+
+                    {/* In-PWA Realtime WebRTC Voice Calling & Consent Card */}
+                    {order.worker && isActive && (
+                      <div className="pt-1">
+                        <CommunicationConsentCard
+                          orderId={order.id}
+                          userRole="CONSUMER"
+                          counterpartName={order.worker.user?.name || "Technician"}
+                          counterpartAvatar={order.worker.user?.avatarUrl}
+                          counterpartTrade={order.problemTitle || "Technician"}
+                          counterpartUserId={order.worker.userId}
+                          onOpenNegotiation={!order.isPriceLocked ? () => setNegotiatingOrder(order) : undefined}
+                        />
+                      </div>
+                    )}
+
+
 
                     {/* Doorstep Address & Location */}
                     <div className="flex items-start gap-2 text-xs text-slate-600">
@@ -484,19 +642,44 @@ export default function BookingsPage() {
                       <span>{order.address || order.approxArea || "Doorstep Service Address"}</span>
                     </div>
 
-                    {/* Problem Description & Audio if attached */}
-                    {(order.textDescription || order.audioUrl) && (
-                      <div className="space-y-1.5 text-xs">
+                    {/* Problem Description & Media (Audio, Photos, Video) */}
+                    {(order.textDescription || order.audioUrl || (order.photos && order.photos.length > 0) || order.videoUrl) && (
+                      <div className="space-y-2 text-xs">
                         {order.textDescription && (
                           <p className="text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 italic">
                             &ldquo;{order.textDescription}&rdquo;
                           </p>
                         )}
                         {order.audioUrl && (
-                          <div className="p-2 rounded-xl bg-amber-50/70 border border-amber-200/70 flex items-center gap-2">
-                            <Volume2 className="h-3.5 w-3.5 text-amber-700 shrink-0" />
-                            <span className="text-[11px] font-bold text-amber-900 shrink-0">Attached Voice Note:</span>
-                            <audio controls src={order.audioUrl} className="w-full h-6" />
+                          <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/70 space-y-1">
+                            <div className="flex items-center gap-1.5 font-bold text-amber-900 text-[11px]">
+                              <Volume2 className="h-3.5 w-3.5 text-amber-700" />
+                              <span>Attached Voice Note</span>
+                            </div>
+                            <audio controls src={order.audioUrl} className="w-full h-8 accent-[#800020]" />
+                          </div>
+                        )}
+                        {order.photos && order.photos.length > 0 && (
+                          <div className="space-y-1">
+                            <span className="text-[11px] font-bold text-slate-500">Attached Photos ({order.photos.length})</span>
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                              {order.photos.map((p, idx) => (
+                                <img
+                                  key={idx}
+                                  src={p}
+                                  alt={`Order attachment ${idx + 1}`}
+                                  className="h-16 w-16 rounded-xl object-cover border border-slate-200 shrink-0"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {order.videoUrl && (
+                          <div className="space-y-1">
+                            <span className="text-[11px] font-bold text-slate-500">Attached Video</span>
+                            <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-950 max-w-xs">
+                              <video src={order.videoUrl} controls playsInline className="w-full h-36 object-contain bg-black" />
+                            </div>
                           </div>
                         )}
                       </div>

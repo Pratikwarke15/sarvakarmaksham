@@ -349,6 +349,7 @@ export interface ProblemRequest {
   subcategory: ServiceSubCategory;
   problemId: string;
   problem: ServiceProblem;
+  problemTitle?: string | null;
   textDescription?: string | null;
   audioUrl?: string | null;
   audioDuration?: number | null;
@@ -360,8 +361,11 @@ export interface ProblemRequest {
   longitude?: number | null;
   estimatedPriceMin: number | string;
   estimatedPriceMax: number | string;
+  estimatedMin?: number | string;
+  estimatedMax?: number | string;
   estimatedDuration: number;
   status: ProblemRequestStatus;
+
   createdAt: string;
   updatedAt: string;
   consumer?: {

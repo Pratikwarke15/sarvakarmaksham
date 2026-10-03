@@ -16,8 +16,10 @@ import {
   Loader2,
   ChevronDown,
   TrendingUp,
+  Film,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+
 import type { Order } from "@/lib/types";
 
 interface IncomingOrderRequestCardProps {
@@ -171,9 +173,26 @@ export function IncomingOrderRequestCard({
             </div>
           </div>
         )}
+
+        {/* Problem Video Clip */}
+        {order.videoUrl && (
+          <div className="space-y-1.5 pt-1">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <Film className="h-3.5 w-3.5 text-[#800020]" />
+              Customer Video Clip
+            </span>
+            <video
+              controls
+              playsInline
+              src={order.videoUrl}
+              className="w-full max-w-sm h-36 object-contain bg-black rounded-xl"
+            />
+          </div>
+        )}
       </div>
 
       {/* Approximate Location & Privacy Strip */}
+
       <div className="p-3.5 rounded-2xl bg-gradient-to-r from-slate-50 to-emerald-50/30 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div className="flex items-center gap-2 text-xs text-slate-700 font-medium">
           <MapPin className="h-4 w-4 text-[#800020] shrink-0" />
