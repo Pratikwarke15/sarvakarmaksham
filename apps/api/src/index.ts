@@ -21,7 +21,9 @@ const server = http.createServer(app);
 
 app.use(helmet({
   contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
 }));
+
 app.use(cors({
   origin: (requestOrigin, callback) => {
     if (!requestOrigin) return callback(null, true);

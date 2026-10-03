@@ -31,8 +31,9 @@ import {
   ExternalLink,
   Film,
 } from "lucide-react";
-import { formatCurrency, formatDateTime, getStatusColor } from "@/lib/utils";
+import { formatCurrency, formatDateTime, getStatusColor, resolveMediaUrl } from "@/lib/utils";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
+
 import { useToast } from "@/components/providers/ToastProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { IncomingOrderRequestCard } from "@/components/worker/IncomingOrderRequestCard";
@@ -599,7 +600,7 @@ export default function WorkerJobsPage() {
                                   <Volume2 className="h-4 w-4 text-amber-700" />
                                   <span className="text-[11px]">Customer Voice Note:</span>
                                 </div>
-                                <audio controls src={order.audioUrl} className="w-full h-8 accent-[#800020]" />
+                                <audio controls preload="metadata" src={resolveMediaUrl(order.audioUrl)} className="w-full h-8 accent-[#800020]" />
                               </div>
                             )}
 
@@ -612,13 +613,13 @@ export default function WorkerJobsPage() {
                                   {order.photos.map((p, idx) => (
                                     <a
                                       key={idx}
-                                      href={p}
+                                      href={resolveMediaUrl(p)}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="relative group shrink-0"
                                     >
                                       <img
-                                        src={p}
+                                        src={resolveMediaUrl(p)}
                                         alt={`Attachment ${idx + 1}`}
                                         className="h-20 w-20 rounded-xl object-cover border border-slate-200 shadow-2xs group-hover:opacity-90 transition"
                                       />
@@ -637,11 +638,13 @@ export default function WorkerJobsPage() {
                                 <video
                                   controls
                                   playsInline
-                                  src={order.videoUrl}
+                                  preload="metadata"
+                                  src={resolveMediaUrl(order.videoUrl)}
                                   className="w-full max-w-sm h-36 object-contain bg-black rounded-xl"
                                 />
                               </div>
                             )}
+
                           </div>
                         )}
 

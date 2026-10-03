@@ -54,7 +54,10 @@ async function uploadFileLocally(
     await fs.mkdir(directory, { recursive: true });
     await fs.writeFile(absolutePath, fileBuffer);
 
-    const baseUrl = process.env.PUBLIC_API_URL || process.env.RENDER_EXTERNAL_URL || "https://coopgig.onrender.com";
+    const baseUrl =
+      process.env.PUBLIC_API_URL ||
+      process.env.RENDER_EXTERNAL_URL ||
+      (process.env.NODE_ENV === "development" ? "http://localhost:4000" : "https://coopgig.onrender.com");
     return {
       path: relativePath,
       url: `${baseUrl}/uploads/${relativePath}`,
@@ -81,9 +84,23 @@ export async function uploadFile(
 
   if (client) {
     try {
-      const { data, error } = await client.storage
+      let { data, error } = await client.storage
         .from(bucket)
         .upload(fileName, fileBuffer, { contentType: mimeType, upsert: true });
+
+      if (
+        error &&
+        (error.message?.toLowerCase().includes("not found") ||
+          (error as any).statusCode === 404 ||
+          (error as any).statusCode === "404")
+      ) {
+        await client.storage.createBucket(bucket, { public: true });
+        const retry = await client.storage
+          .from(bucket)
+          .upload(fileName, fileBuffer, { contentType: mimeType, upsert: true });
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (!error && data) {
         const { data: urlData } = client.storage.from(bucket).getPublicUrl(fileName);
@@ -98,6 +115,7 @@ export async function uploadFile(
 
   return uploadFileLocally(bucket, fileBuffer, originalName, mimeType);
 }
+
 
 export async function deleteFile(
   bucket: string,

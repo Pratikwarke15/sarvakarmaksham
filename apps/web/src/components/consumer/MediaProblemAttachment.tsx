@@ -3,8 +3,10 @@
 import { useState, useRef } from "react";
 import { Camera, Video, Plus, X, Loader2, Image as ImageIcon, CheckCircle, Film } from "lucide-react";
 import { apiUpload } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/utils";
 
 interface MediaProblemAttachmentProps {
+
   photos: string[];
   videoUrl?: string | null;
   onPhotosChange: (photos: string[]) => void;
@@ -191,7 +193,7 @@ export function MediaProblemAttachment({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={previewPhotoUrl}
+              src={resolveMediaUrl(previewPhotoUrl)}
               alt="Enlarged issue photo"
               className="max-h-[80vh] w-auto object-contain"
             />
@@ -227,7 +229,8 @@ export function MediaProblemAttachment({
               title="Click to view full photo"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt={`Problem attachment ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+              <img src={resolveMediaUrl(url)} alt={`Problem attachment ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+
               <button
                 type="button"
                 onClick={(e) => {
@@ -305,8 +308,9 @@ export function MediaProblemAttachment({
 
         {videoUrl ? (
           <div className="relative rounded-2xl border border-slate-200 overflow-hidden bg-slate-950 max-w-sm shadow-xs">
-            <video src={videoUrl} controls playsInline className="w-full h-48 object-contain bg-black" />
+            <video src={resolveMediaUrl(videoUrl)} controls playsInline className="w-full h-48 object-contain bg-black" />
             <button
+
               type="button"
               onClick={removeVideo}
               className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-900/80 text-white hover:bg-rose-600 transition-colors"

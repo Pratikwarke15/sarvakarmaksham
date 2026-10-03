@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Mic, Square, Play, Pause, RotateCcw, Trash2, CheckCircle, AlertCircle, Loader2, Volume2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiUpload } from "@/lib/api";
+import { resolveMediaUrl } from "@/lib/utils";
 
 interface AudioProblemRecorderProps {
   onAudioReady: (audioData: { audioUrl: string; duration: number } | null) => void;
@@ -28,6 +29,16 @@ export function AudioProblemRecorder({ onAudioReady, existingAudioUrl }: AudioPr
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const audioFileInputRef = useRef<HTMLInputElement | null>(null);
   const [playbackProgress, setPlaybackProgress] = useState<number>(0);
+
+  // Sync existing audio if loaded asynchronously
+  useEffect(() => {
+    if (existingAudioUrl) {
+      setAudioPlaybackUrl(existingAudioUrl);
+      setUploadedUrl(existingAudioUrl);
+      setState("RECORDED");
+    }
+  }, [existingAudioUrl]);
+
 
   // Clear timers and streams on unmount
   useEffect(() => {
@@ -362,8 +373,10 @@ export function AudioProblemRecorder({ onAudioReady, existingAudioUrl }: AudioPr
           {/* Audio controller */}
           <audio
             ref={audioPlayerRef}
-            src={audioPlaybackUrl}
+            src={resolveMediaUrl(audioPlaybackUrl)}
             controls
+            preload="metadata"
+
             onTimeUpdate={() => {
               if (audioPlayerRef.current) {
                 const cur = audioPlayerRef.current.currentTime;

@@ -72,3 +72,29 @@ export function generateBookingRef(): string {
   }
   return ref;
 }
+
+export function resolveMediaUrl(url?: string | null): string {
+  if (!url) return "";
+  if (url.startsWith("data:") || url.startsWith("blob:")) {
+    return url;
+  }
+  if (url.startsWith("https://") || url.startsWith("http://")) {
+    if (typeof window !== "undefined") {
+      const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      if (isLocal && url.includes("coopgig.onrender.com/uploads/")) {
+        return url.replace("https://coopgig.onrender.com/uploads/", "http://localhost:4000/uploads/");
+      }
+    }
+    return url;
+  }
+  if (url.startsWith("/")) {
+    if (typeof window !== "undefined") {
+      const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      const apiHost = isLocal ? "http://localhost:4000" : "https://coopgig.onrender.com";
+      return `${apiHost}${url}`;
+    }
+    return url;
+  }
+  return url;
+}
+

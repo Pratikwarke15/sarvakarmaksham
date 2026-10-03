@@ -19,8 +19,10 @@ import {
   Camera,
   X,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, resolveMediaUrl } from "@/lib/utils";
+
 import type { ServiceCategory, ServiceSubCategory, ServiceProblem } from "@/lib/types";
+
 
 interface ProblemEstimateCardProps {
   category: ServiceCategory;
@@ -266,7 +268,7 @@ export function ProblemEstimateCard({
             className="relative max-w-2xl max-h-[85vh] w-full rounded-2xl overflow-hidden bg-slate-900 border border-slate-700 shadow-2xl flex flex-col items-center justify-center"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={selectedPhoto} alt="Problem preview" className="max-h-[80vh] w-auto object-contain" />
+            <img src={resolveMediaUrl(selectedPhoto)} alt="Problem preview" className="max-h-[80vh] w-auto object-contain" />
             <button
               type="button"
               onClick={() => setSelectedPhoto(null)}
@@ -298,7 +300,7 @@ export function ProblemEstimateCard({
               <Volume2 className="h-4 w-4 text-amber-700" />
               <span>Recorded Customer Voice Note</span>
             </div>
-            <audio controls src={audioUrl} className="w-full h-8 accent-[#800020]" />
+            <audio controls preload="metadata" src={resolveMediaUrl(audioUrl)} className="w-full h-8 accent-[#800020]" />
           </div>
         )}
 
@@ -319,7 +321,7 @@ export function ProblemEstimateCard({
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={url}
+                    src={resolveMediaUrl(url)}
                     alt={`Attached issue ${idx + 1}`}
                     className="h-full w-full object-cover group-hover:scale-105 transition-transform"
                   />
@@ -337,11 +339,12 @@ export function ProblemEstimateCard({
               <span>Attached Issue Video</span>
             </div>
             <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-950 max-w-sm shadow-xs">
-              <video src={videoUrl} controls playsInline className="w-full h-44 object-contain bg-black" />
+              <video src={resolveMediaUrl(videoUrl)} controls playsInline preload="metadata" className="w-full h-44 object-contain bg-black" />
             </div>
           </div>
         )}
       </div>
+
 
       {/* Service Location */}
       {address && (

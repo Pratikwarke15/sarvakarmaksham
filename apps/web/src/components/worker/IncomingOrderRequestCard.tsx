@@ -18,9 +18,10 @@ import {
   TrendingUp,
   Film,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, resolveMediaUrl } from "@/lib/utils";
 
 import type { Order } from "@/lib/types";
+
 
 interface IncomingOrderRequestCardProps {
   order: Order;
@@ -149,7 +150,7 @@ export function IncomingOrderRequestCard({
               <Volume2 className="h-4 w-4 text-amber-700" />
               <span>Voice Description ({order.audioDuration || 15}s)</span>
             </div>
-            <audio controls src={order.audioUrl} className="h-8 max-w-[200px]" />
+            <audio controls preload="metadata" src={resolveMediaUrl(order.audioUrl)} className="h-8 max-w-[200px]" />
           </div>
         )}
 
@@ -167,7 +168,7 @@ export function IncomingOrderRequestCard({
                   onClick={() => setSelectedPhoto(photo)}
                   className="h-16 w-16 rounded-xl overflow-hidden border border-slate-200 hover:border-[#800020] transition-all shrink-0"
                 >
-                  <img src={photo} alt="Issue photo" className="h-full w-full object-cover" />
+                  <img src={resolveMediaUrl(photo)} alt="Issue photo" className="h-full w-full object-cover" />
                 </button>
               ))}
             </div>
@@ -184,12 +185,14 @@ export function IncomingOrderRequestCard({
             <video
               controls
               playsInline
-              src={order.videoUrl}
+              preload="metadata"
+              src={resolveMediaUrl(order.videoUrl)}
               className="w-full max-w-sm h-36 object-contain bg-black rounded-xl"
             />
           </div>
         )}
       </div>
+
 
       {/* Approximate Location & Privacy Strip */}
 

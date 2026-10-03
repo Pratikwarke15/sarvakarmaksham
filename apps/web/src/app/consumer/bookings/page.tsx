@@ -33,8 +33,9 @@ import {
   Film,
   Trash2,
 } from "lucide-react";
-import { cn, formatCurrency, formatDateTime, getStatusColor } from "@/lib/utils";
+import { cn, formatCurrency, formatDateTime, getStatusColor, resolveMediaUrl } from "@/lib/utils";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
+
 import { useToast } from "@/components/providers/ToastProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { PriceNegotiationModal } from "@/components/worker/PriceNegotiationModal";
@@ -472,7 +473,7 @@ export default function BookingsPage() {
                           Recorded Voice Note
                         </span>
                         <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 flex items-center gap-2">
-                          <audio controls src={draft.audioUrl} className="w-full h-8 accent-[#800020]" />
+                          <audio controls preload="metadata" src={resolveMediaUrl(draft.audioUrl)} className="w-full h-8 accent-[#800020]" />
                         </div>
                       </div>
                     )}
@@ -486,7 +487,7 @@ export default function BookingsPage() {
                           {draft.photos.map((url, i) => (
                             <img
                               key={i}
-                              src={url}
+                              src={resolveMediaUrl(url)}
                               alt={`Draft photo ${i + 1}`}
                               className="h-16 w-16 sm:h-20 sm:w-20 object-cover rounded-xl border border-slate-200 shrink-0"
                             />
@@ -503,12 +504,14 @@ export default function BookingsPage() {
                         <video
                           controls
                           playsInline
-                          src={draft.videoUrl}
+                          preload="metadata"
+                          src={resolveMediaUrl(draft.videoUrl)}
                           className="w-full max-w-xs h-32 object-contain bg-black rounded-xl"
                         />
                       </div>
                     )}
                   </div>
+
 
                   {/* Draft Actions */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
@@ -656,7 +659,7 @@ export default function BookingsPage() {
                               <Volume2 className="h-3.5 w-3.5 text-amber-700" />
                               <span>Attached Voice Note</span>
                             </div>
-                            <audio controls src={order.audioUrl} className="w-full h-8 accent-[#800020]" />
+                            <audio controls preload="metadata" src={resolveMediaUrl(order.audioUrl)} className="w-full h-8 accent-[#800020]" />
                           </div>
                         )}
                         {order.photos && order.photos.length > 0 && (
@@ -666,7 +669,7 @@ export default function BookingsPage() {
                               {order.photos.map((p, idx) => (
                                 <img
                                   key={idx}
-                                  src={p}
+                                  src={resolveMediaUrl(p)}
                                   alt={`Order attachment ${idx + 1}`}
                                   className="h-16 w-16 rounded-xl object-cover border border-slate-200 shrink-0"
                                 />
@@ -678,11 +681,12 @@ export default function BookingsPage() {
                           <div className="space-y-1">
                             <span className="text-[11px] font-bold text-slate-500">Attached Video</span>
                             <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-950 max-w-xs">
-                              <video src={order.videoUrl} controls playsInline className="w-full h-36 object-contain bg-black" />
+                              <video src={resolveMediaUrl(order.videoUrl)} controls playsInline preload="metadata" className="w-full h-36 object-contain bg-black" />
                             </div>
                           </div>
                         )}
                       </div>
+
                     )}
 
                     {/* Actions Row */}
