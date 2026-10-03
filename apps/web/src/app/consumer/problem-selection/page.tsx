@@ -38,8 +38,9 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { MobilePageHeader } from "@/components/layout/MobilePageHeader";
 import { AudioProblemRecorder } from "@/components/consumer/AudioProblemRecorder";
 import { MediaProblemAttachment } from "@/components/consumer/MediaProblemAttachment";
 import { ProblemEstimateCard } from "@/components/consumer/ProblemEstimateCard";
@@ -1746,58 +1747,72 @@ function ProblemSelectionContent() {
             </div>
           )}
 
-          {/* Mobile App Progress Bar */}
-          <div className="sm:hidden w-full space-y-2 bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
-              <span className="flex items-center gap-1.5 text-[#800020]">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#800020] text-[10px] text-white font-black">
+          {/* Modern App Progress Bar for Mobile */}
+          <div className="sm:hidden w-full bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#800020] text-[11px] text-white font-extrabold shadow-2xs">
                   {currentStep}
                 </span>
-                <span>{stepLabels[currentStep] || `Step ${currentStep}`}</span>
+                <div>
+                  <p className="text-xs font-bold text-slate-900 leading-tight">
+                    {stepLabels[currentStep] || `Step ${currentStep}`}
+                  </p>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    {currentStep < 5 ? `Next: ${stepLabels[currentStep + 1]}` : "Final step before matching"}
+                  </p>
+                </div>
+              </div>
+              <span className="text-[11px] font-bold text-[#800020] bg-rose-50 border border-rose-200/70 px-2 py-0.5 rounded-full">
+                Step {currentStep} of 5
               </span>
-              <span className="text-[11px] text-slate-400 font-medium">Step {currentStep} of 7</span>
             </div>
-            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-[#800020] rounded-full transition-all duration-300"
-                style={{ width: `${Math.min(100, Math.max(14, (currentStep / 7) * 100))}%` }}
-              />
+            
+            {/* Visual multi-segment indicator */}
+            <div className="grid grid-cols-5 gap-1.5 pt-0.5">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <div
+                  key={s}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    s <= currentStep ? "bg-[#800020]" : "bg-slate-200"
+                  }`}
+                />
+              ))}
             </div>
           </div>
 
           {/* Step Pills for Desktop */}
-          <div className="hidden sm:flex items-center gap-1.5 self-start sm:self-auto bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/60 overflow-x-auto max-w-full">
+          <div className="hidden sm:flex items-center gap-1.5 self-start sm:self-auto bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/70 overflow-x-auto hide-scrollbar max-w-full">
             {[
               { num: 1, label: "Category" },
-              { num: 2, label: "Sub-cat" },
+              { num: 2, label: "Sub-category" },
               { num: 3, label: "Problem" },
-              { num: 4, label: "Explain" },
-              { num: 5, label: "Estimate" },
-              { num: 6, label: "Workers" },
-              { num: 7, label: "Confirm" },
-              { num: 8, label: "Order" },
+              { num: 4, label: "Explanation" },
+              { num: 5, label: "Estimate & Draft" },
             ].map((step) => (
               <button
                 key={step.num}
                 type="button"
                 onClick={() => {
                   if (step.num < currentStep) {
-                    if (step.num < 6) setViewMode("flow");
-                    else if (step.num === 6) setViewMode("worker_selection");
-                    else if (step.num === 7 && selectedWorker) setViewMode("confirm_order");
                     setCurrentStep(step.num);
                   }
                 }}
                 disabled={step.num > currentStep}
-                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
                   currentStep === step.num
                     ? "bg-[#800020] text-white shadow-2xs"
                     : step.num < currentStep
-                    ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100 cursor-pointer"
-                    : "text-slate-400 cursor-not-allowed"
+                    ? "text-[#800020] bg-rose-50/80 hover:bg-rose-100 cursor-pointer border border-rose-200/60"
+                    : "text-slate-400 cursor-not-allowed opacity-60"
                 }`}
               >
-                {step.num}. {step.label}
+                <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] ${
+                  currentStep === step.num ? "bg-white/20 text-white" : "bg-slate-200/80 text-slate-600"
+                }`}>
+                  {step.num}
+                </span>
+                <span>{step.label}</span>
               </button>
             ))}
           </div>
@@ -1808,33 +1823,60 @@ function ProblemSelectionContent() {
       {/* STEP 1: CATEGORY SELECTION                                  */}
       {/* ----------------------------------------------------------- */}
       {currentStep === 1 && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="space-y-4 sm:space-y-5 animate-fade-in">
+          {/* Section Banner with Next Step Preview */}
+          <div className="bg-gradient-to-r from-rose-50/80 via-white to-amber-50/50 p-4 sm:p-5 rounded-2xl border border-rose-100 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#800020]/10 text-[#800020] text-[11px] font-bold mb-1.5">
+                <span>Step 1 of 5</span>
+                <span>•</span>
+                <span>Next: Choose Specific Issue</span>
+              </div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading">
-                Step 1: Choose Service Category
+                What service do you need today?
               </h2>
-              <p className="text-xs text-slate-500">
-                Indian household categories backed by certified cooperative artisans.
+              <p className="text-xs text-slate-500 mt-0.5">
+                Select your service category to view verified cooperative artisans and standard rate cards.
               </p>
             </div>
 
-            <div className="relative w-full sm:w-64">
+            {/* Quick search input */}
+            <div className="relative w-full sm:w-64 shrink-0">
               <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search categories..."
+                placeholder="Search plumbing, wiring, AC..."
                 value={categorySearch}
                 onChange={(e) => setCategorySearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#800020] bg-white"
+                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200/90 focus:outline-none focus:border-[#800020] focus:ring-1 focus:ring-[#800020]/30 bg-white shadow-2xs"
               />
+              {categorySearch && (
+                <button
+                  type="button"
+                  onClick={() => setCategorySearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                >
+                  ✕
+                </button>
+              )}
             </div>
           </div>
 
           {loadingCategories ? (
-            <div className="py-16 flex flex-col items-center justify-center space-y-3">
+            <div className="py-20 flex flex-col items-center justify-center space-y-3 bg-white rounded-3xl border border-slate-200/80 shadow-2xs">
               <Loader2 className="h-8 w-8 animate-spin text-[#800020]" />
               <p className="text-xs text-slate-500 font-medium">Loading verified service catalogue...</p>
+            </div>
+          ) : filteredCategories.length === 0 ? (
+            <div className="py-16 text-center bg-white rounded-3xl border border-slate-200 p-6 space-y-3">
+              <p className="text-sm font-bold text-slate-700">No service categories matched &quot;{categorySearch}&quot;</p>
+              <button
+                type="button"
+                onClick={() => setCategorySearch("")}
+                className="text-xs text-[#800020] font-bold hover:underline"
+              >
+                Clear search filter
+              </button>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -1845,31 +1887,42 @@ function ProblemSelectionContent() {
                     key={category.id}
                     type="button"
                     onClick={() => handleSelectCategory(category)}
-                    className="p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white hover:border-[#800020] hover:shadow-md transition-all text-left group flex flex-col justify-between"
+                    className="group relative p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white hover:border-[#800020] hover:shadow-md transition-all duration-200 text-left flex flex-col justify-between active:scale-[0.98]"
                   >
                     <div>
-                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl sm:rounded-2xl bg-[#800020]/10 text-[#800020] flex items-center justify-center mb-2.5 sm:mb-3 group-hover:scale-105 transition-transform">
-                        <IconComponent className="h-5 w-5 sm:h-6 sm:w-6" />
+                      {/* Top icon and badge */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-rose-50 to-[#800020]/10 text-[#800020] flex items-center justify-center border border-[#800020]/15 group-hover:scale-105 group-hover:bg-[#800020] group-hover:text-white transition-all duration-200 shadow-2xs">
+                          <IconComponent className="h-6 w-6 stroke-[2]" />
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 bg-slate-100 group-hover:bg-rose-50 group-hover:text-[#800020] px-2 py-0.5 rounded-full transition-colors">
+                          {category._count?.subcategories || 4} parts
+                        </span>
                       </div>
+
+                      {/* Category Titles */}
                       <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-[#800020] transition-colors leading-snug">
                         {category.name}
                       </h3>
                       {category.hindiName && (
-                        <p className="text-[11px] sm:text-xs font-medium text-slate-400 mt-0.5">
+                        <p className="text-[11px] font-medium text-slate-500 mt-0.5">
                           {category.hindiName}
                         </p>
                       )}
                       {category.description && (
-                        <p className="hidden sm:block text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">
+                        <p className="text-[11px] text-slate-600 mt-2 line-clamp-2 leading-relaxed">
                           {category.description}
                         </p>
                       )}
                     </div>
 
-                    <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-[11px] font-semibold text-slate-500">
-                      <span>{category._count?.subcategories || 4} sub-categories</span>
-                      <span className="text-[#800020] font-bold group-hover:translate-x-0.5 transition-transform">
-                        Select →
+                    {/* Bottom CTA strip */}
+                    <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-slate-600 group-hover:text-slate-800">
+                        View Sub-categories
+                      </span>
+                      <span className="h-6 w-6 rounded-full bg-slate-100 text-slate-600 group-hover:bg-[#800020] group-hover:text-white flex items-center justify-center transition-all">
+                        <ChevronRight className="h-3.5 w-3.5" />
                       </span>
                     </div>
                   </button>
@@ -1884,26 +1937,39 @@ function ProblemSelectionContent() {
       {/* STEP 2: SUB-CATEGORY SELECTION                              */}
       {/* ----------------------------------------------------------- */}
       {currentStep === 2 && selectedCategory && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="space-y-4 sm:space-y-5 animate-fade-in">
+          {/* Step 2 Header Banner with Previous Step Context & Next Step Preview */}
+          <div className="bg-gradient-to-r from-rose-50/80 via-white to-amber-50/50 p-4 sm:p-5 rounded-2xl border border-rose-100 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 text-xs text-[#800020] font-bold uppercase tracking-wider mb-1">
-                <span>{selectedCategory.name}</span>
-                {selectedCategory.hindiName && <span>• {selectedCategory.hindiName}</span>}
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 text-[11px] font-bold hover:border-[#800020] hover:text-[#800020] transition-colors"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  <span>Category: {selectedCategory.name}</span>
+                </button>
+                <span className="text-slate-400">•</span>
+                <span className="text-[11px] font-bold text-[#800020]">Step 2 of 5</span>
+                <span className="text-slate-400">•</span>
+                <span className="text-[11px] text-slate-500 font-medium">Next: Select Specific Problem</span>
               </div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading">
-                Step 2: Choose Sub-category
+                Which part of {selectedCategory.name} needs service?
               </h2>
-              <p className="text-xs text-slate-500">Select the specific part or area needing repair.</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Narrow down to the right component to view transparent standardized pricing.
+              </p>
             </div>
 
             <button
               type="button"
               onClick={() => setCurrentStep(1)}
-              className="text-xs font-bold text-slate-600 hover:text-[#800020] flex items-center gap-1"
+              className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:text-[#800020] hover:border-[#800020] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 self-start sm:self-auto"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Change</span>
+              <span>Change Category</span>
             </button>
           </div>
 
@@ -1916,33 +1982,41 @@ function ProblemSelectionContent() {
                   setSelectedSubCategory(sub);
                   setCurrentStep(3); // advance to specific problems
                 }}
-                className={`p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all text-left flex flex-col justify-between group ${
+                className={`group relative p-4 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all duration-200 text-left flex flex-col justify-between active:scale-[0.98] ${
                   selectedSubCategory?.id === sub.id
-                    ? "border-[#800020] bg-rose-50/30 shadow-xs"
-                    : "border-slate-200/90 bg-white hover:border-[#800020]/60 hover:shadow-xs"
+                    ? "border-[#800020] bg-rose-50/40 shadow-sm ring-2 ring-[#800020]/20"
+                    : "border-slate-200/90 bg-white hover:border-[#800020] hover:shadow-md"
                 }`}
               >
                 <div>
-                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-700 group-hover:bg-[#800020]/10 group-hover:text-[#800020] flex items-center justify-center mb-2.5 sm:mb-3 transition-colors">
-                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-2xl bg-slate-100 text-slate-700 group-hover:bg-[#800020] group-hover:text-white flex items-center justify-center transition-all duration-200 shadow-2xs">
+                      <CheckCircle2 className="h-5 w-5 stroke-[2]" />
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 group-hover:bg-rose-50 group-hover:text-[#800020] px-2 py-0.5 rounded-full transition-colors">
+                      {sub.problems?.length || 0} issues
+                    </span>
                   </div>
-                  <h3 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-[#800020] transition-colors leading-snug">
+
+                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-[#800020] transition-colors leading-snug">
                     {sub.name}
                   </h3>
                   {sub.hindiName && (
-                    <p className="text-[10px] sm:text-[11px] font-medium text-slate-400 mt-0.5">{sub.hindiName}</p>
+                    <p className="text-[11px] font-medium text-slate-500 mt-0.5">{sub.hindiName}</p>
                   )}
                   {sub.description && (
-                    <p className="hidden sm:block text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">
+                    <p className="text-[11px] text-slate-600 mt-2 line-clamp-2 leading-relaxed">
                       {sub.description}
                     </p>
                   )}
                 </div>
 
-                <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-[11px] font-semibold text-slate-500">
-                  <span>{sub.problems?.length || 0} issues</span>
-                  <span className="text-[#800020] font-bold group-hover:translate-x-0.5 transition-transform">
-                    View →
+                <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                  <span className="font-semibold text-slate-600 group-hover:text-slate-800">
+                    Select Issues
+                  </span>
+                  <span className="h-6 w-6 rounded-full bg-slate-100 text-slate-600 group-hover:bg-[#800020] group-hover:text-white flex items-center justify-center transition-all">
+                    <ChevronRight className="h-3.5 w-3.5" />
                   </span>
                 </div>
               </button>
@@ -1955,37 +2029,54 @@ function ProblemSelectionContent() {
       {/* STEP 3: SPECIFIC PROBLEM SELECTION                          */}
       {/* ----------------------------------------------------------- */}
       {currentStep === 3 && selectedSubCategory && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="space-y-4 sm:space-y-5 animate-fade-in">
+          {/* Step 3 Header Banner with Previous Steps Context */}
+          <div className="bg-gradient-to-r from-rose-50/80 via-white to-amber-50/50 p-4 sm:p-5 rounded-2xl border border-rose-100 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 text-xs text-[#800020] font-bold uppercase tracking-wider mb-1">
-                <span>{selectedCategory?.name}</span>
-                <span>/</span>
-                <span>{selectedSubCategory.name}</span>
+              <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className="px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 text-[10px] font-bold hover:border-[#800020] hover:text-[#800020] transition-colors"
+                >
+                  {selectedCategory?.name}
+                </button>
+                <span className="text-slate-400">/</span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(2)}
+                  className="px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 text-[10px] font-bold hover:border-[#800020] hover:text-[#800020] transition-colors"
+                >
+                  {selectedSubCategory.name}
+                </button>
+                <span className="text-slate-400">•</span>
+                <span className="text-[11px] font-bold text-[#800020]">Step 3 of 5</span>
+                <span className="text-slate-400">•</span>
+                <span className="text-[11px] text-slate-500 font-medium">Next: Explain with Text or Voice</span>
               </div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading">
-                Step 3: Select Specific Problem
+                What is the exact issue with {selectedSubCategory.name}?
               </h2>
-              <p className="text-xs text-slate-500">
-                Transparent database-driven rates based on real Indian service standards.
+              <p className="text-xs text-slate-500 mt-0.5">
+                Standard cooperative rate cards ensure fair pricing without unexpected surge charges.
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="relative w-full sm:w-56">
+            <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-56">
                 <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Filter issues..."
                   value={problemSearch}
                   onChange={(e) => setProblemSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-[#800020] bg-white"
+                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-slate-200/90 focus:outline-none focus:border-[#800020] bg-white shadow-2xs"
                 />
               </div>
               <button
                 type="button"
                 onClick={() => setCurrentStep(2)}
-                className="text-xs font-bold text-slate-600 hover:text-[#800020] flex items-center gap-1 whitespace-nowrap"
+                className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:text-[#800020] hover:border-[#800020] transition-all flex items-center gap-1 shadow-2xs shrink-0"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 <span>Back</span>
@@ -1993,7 +2084,7 @@ function ProblemSelectionContent() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {filteredProblems.map((prob) => {
               const isSelected = selectedProblem?.id === prob.id;
               const minP = Number(prob.minimumPrice);
@@ -2009,39 +2100,43 @@ function ProblemSelectionContent() {
                     setSelectedProblem(prob);
                     setCurrentStep(4); // advance to explanation
                   }}
-                  className={`w-full text-left p-4 sm:p-5 rounded-2xl sm:rounded-3xl border cursor-pointer transition-all flex flex-col justify-between ${
+                  className={`group relative w-full text-left p-4 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all duration-200 flex flex-col justify-between active:scale-[0.99] ${
                     isSelected
-                      ? "border-[#800020] bg-rose-50/40 shadow-xs ring-2 ring-[#800020]/20"
-                      : "border-slate-200/90 bg-white hover:border-[#800020]/50 hover:shadow-xs"
+                      ? "border-[#800020] bg-rose-50/40 shadow-sm ring-2 ring-[#800020]/20"
+                      : "border-slate-200/90 bg-white hover:border-[#800020] hover:shadow-md"
                   }`}
                 >
                   <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">{prob.name}</h3>
-                      <span className="shrink-0 text-[10px] sm:text-xs font-bold text-[#800020] font-mono bg-rose-50 border border-rose-200/70 px-2 py-0.5 rounded-full">
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-bold text-slate-900 group-hover:text-[#800020] transition-colors leading-snug">
+                          {prob.name}
+                        </h3>
+                        {prob.hindiName && (
+                          <p className="text-[11px] font-medium text-slate-500 mt-0.5">{prob.hindiName}</p>
+                        )}
+                      </div>
+                      <span className="shrink-0 text-xs font-bold text-[#800020] font-mono bg-rose-50 border border-rose-200/80 px-2.5 py-1 rounded-full shadow-2xs">
                         {formatCurrency(minP)} – {formatCurrency(maxP)}
                       </span>
                     </div>
 
-                    {prob.hindiName && (
-                      <p className="text-[11px] sm:text-xs font-medium text-slate-500 mt-0.5">{prob.hindiName}</p>
-                    )}
-
                     {prob.description && (
-                      <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                      <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
                         {prob.description}
                       </p>
                     )}
                   </div>
 
-                  <div className="mt-3.5 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-[11px]">
-                    <span className="flex items-center gap-1 text-slate-500 font-medium">
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                    <span className="flex items-center gap-1.5 text-slate-500 font-medium">
                       <Clock className="h-3.5 w-3.5 text-slate-400" />
-                      ~{prob.estimatedDuration} mins
+                      <span>Est. ~{prob.estimatedDuration} mins</span>
                     </span>
 
-                    <span className="font-bold text-[#800020] flex items-center gap-1">
-                      Explain Issue →
+                    <span className="inline-flex items-center gap-1 font-bold text-[#800020] group-hover:translate-x-0.5 transition-transform">
+                      <span>Explain Issue</span>
+                      <ChevronRight className="h-3.5 w-3.5" />
                     </span>
                   </div>
                 </button>
@@ -2055,31 +2150,53 @@ function ProblemSelectionContent() {
       {/* STEP 4: EXPLAIN PROBLEM (Text OR Audio Mandatory)           */}
       {/* ----------------------------------------------------------- */}
       {currentStep === 4 && selectedProblem && selectedCategory && selectedSubCategory && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between">
+        <div className="space-y-4 sm:space-y-5 animate-fade-in">
+          {/* Step 4 Header Banner with Full Selection Context */}
+          <div className="bg-gradient-to-r from-rose-50/80 via-white to-amber-50/50 p-4 sm:p-5 rounded-2xl border border-rose-100 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 text-xs text-[#800020] font-bold uppercase tracking-wider mb-1">
-                <span>{selectedCategory.name}</span>
-                <span>/</span>
-                <span>{selectedSubCategory.name}</span>
-                <span>/</span>
-                <span>{selectedProblem.name}</span>
+              <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className="px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 text-[10px] font-bold hover:border-[#800020] hover:text-[#800020] transition-colors"
+                >
+                  {selectedCategory.name}
+                </button>
+                <span className="text-slate-400">/</span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(2)}
+                  className="px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 text-[10px] font-bold hover:border-[#800020] hover:text-[#800020] transition-colors"
+                >
+                  {selectedSubCategory.name}
+                </button>
+                <span className="text-slate-400">/</span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(3)}
+                  className="px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-[#800020] text-[10px] font-bold hover:bg-rose-100 transition-colors"
+                >
+                  {selectedProblem.name}
+                </button>
+                <span className="text-slate-400">•</span>
+                <span className="text-[11px] font-bold text-[#800020]">Step 4 of 5</span>
               </div>
+
               <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading">
-                Step 4: Explain Your Problem
+                Describe the issue with {selectedProblem.name}
               </h2>
-              <p className="text-xs text-slate-500">
-                You MUST provide either a written description OR a voice recording (at least one is required).
+              <p className="text-xs text-slate-500 mt-0.5">
+                Provide either a short text explanation or record a quick voice note so the artisan brings the right tools.
               </p>
             </div>
 
             <button
               type="button"
               onClick={() => setCurrentStep(3)}
-              className="text-xs font-bold text-slate-600 hover:text-[#800020] flex items-center gap-1"
+              className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:text-[#800020] hover:border-[#800020] transition-all flex items-center gap-1 shadow-2xs shrink-0 self-start sm:self-auto"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Back to Problems</span>
+              <span>Change Problem</span>
             </button>
           </div>
 
@@ -2268,27 +2385,40 @@ function ProblemSelectionContent() {
       {/* STEP 5: ESTIMATE & SAVE ORDER DRAFT                         */}
       {/* ----------------------------------------------------------- */}
       {currentStep === 5 && selectedProblem && selectedCategory && selectedSubCategory && (
-        <div className="space-y-5">
-          <div className="flex items-center justify-between">
+        <div className="space-y-4 sm:space-y-5 animate-fade-in">
+          {/* Step 5 Header Banner */}
+          <div className="bg-gradient-to-r from-rose-50/80 via-white to-amber-50/50 p-4 sm:p-5 rounded-2xl border border-rose-100 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 text-xs text-[#800020] font-bold uppercase tracking-wider mb-1">
-                <span>Final Step</span>
+              <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                <span className="px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 text-[10px] font-bold">
+                  {selectedCategory.name}
+                </span>
+                <span className="text-slate-400">/</span>
+                <span className="px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 text-[10px] font-bold">
+                  {selectedSubCategory.name}
+                </span>
+                <span className="text-slate-400">/</span>
+                <span className="px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-[#800020] text-[10px] font-bold">
+                  {selectedProblem.name}
+                </span>
+                <span className="text-slate-400">•</span>
+                <span className="text-[11px] font-bold text-[#800020]">Step 5 of 5</span>
               </div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading">
-                Step 5: Price Estimate & Problem Draft
+                Price Estimate & Problem Summary
               </h2>
-              <p className="text-xs text-slate-500">
-                Review your problem request and proceed to worker matching.
+              <p className="text-xs text-slate-500 mt-0.5">
+                Review your problem request details. When ready, proceed to find matching verified cooperative technicians.
               </p>
             </div>
 
             <button
               type="button"
               onClick={() => setCurrentStep(4)}
-              className="text-xs font-bold text-slate-600 hover:text-[#800020] flex items-center gap-1"
+              className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:text-[#800020] hover:border-[#800020] transition-all flex items-center gap-1.5 shadow-2xs shrink-0 self-start sm:self-auto"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Edit</span>
+              <span>Edit Details</span>
             </button>
           </div>
 
