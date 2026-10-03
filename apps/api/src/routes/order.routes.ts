@@ -70,6 +70,24 @@ router.get(
 );
 
 /**
+ * GET /api/v1/orders/worker
+ * Worker lists all their assigned orders (active, scheduled, completed, all).
+ */
+router.get(
+  "/worker",
+  asyncHandler(async (req: Request, res: Response) => {
+    const orders = await OrderService.getWorkerOrders(
+      req.user!.id,
+      req.query.status as string | undefined
+    );
+    res.status(200).json({
+      success: true,
+      data: orders,
+    });
+  })
+);
+
+/**
  * GET /api/v1/orders/:id
  * Retrieve details for a single order with role-aware privacy enforcement.
  */
@@ -143,6 +161,26 @@ router.post(
       success: true,
       data: updated,
       message: "Order successfully reassigned to new technician.",
+    });
+  })
+);
+
+/**
+ * POST /api/v1/orders/:id/cancel
+ * Consumer cancels the order.
+ */
+router.post(
+  "/:id/cancel",
+  asyncHandler(async (req: Request, res: Response) => {
+    const cancelled = await OrderService.cancelOrder(
+      req.params.id,
+      req.user!.id,
+      req.body.reason
+    );
+    res.status(200).json({
+      success: true,
+      data: cancelled,
+      message: "Order successfully cancelled.",
     });
   })
 );

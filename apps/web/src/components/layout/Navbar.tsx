@@ -242,32 +242,62 @@ export function Navbar() {
       </div>
 
       {mobileOpen && (
-        <div className="border-t bg-white md:hidden animate-fade-in">
-          <div className="space-y-1 px-4 py-3">
+        <div className="border-t border-slate-200/90 bg-white md:hidden animate-fade-in shadow-xl">
+          {user && (
+            <div className="px-4 py-3 bg-gradient-to-r from-rose-50/70 to-slate-50 border-b border-slate-100 flex items-center gap-3">
+              <Avatar className="h-10 w-10 rounded-full overflow-hidden shrink-0 border border-rose-200 shadow-2xs">
+                {user?.avatarUrl && (
+                  <AvatarImage
+                    src={user.avatarUrl}
+                    alt={user?.name || "User"}
+                    className="h-full w-full object-cover"
+                  />
+                )}
+                <AvatarFallback className="flex h-full w-full items-center justify-center rounded-full bg-[#800020]/10 text-xs font-bold text-[#800020]">
+                  {user?.name?.charAt(0) || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-slate-900 truncate">{user?.name}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#800020] bg-rose-50 border border-rose-200/60 px-2 py-0.5 rounded-md">
+                    {user?.role?.replace("_", " ")}
+                  </span>
+                  <span className="text-[10px] text-slate-500 truncate">{user?.phone || user?.email}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="space-y-1.5 px-3 py-3">
             {links.map((link) => {
               const Icon = link.icon;
-              const active = pathname === link.href;
+              const active = pathname === link.href || pathname.startsWith(link.href + "/");
               return (
                 <Link
                   key={link.href}
                   href={link.href}
+                  onClick={() => setMobileOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium",
-                    active ? "bg-indigo-50 text-indigo-700" : "text-gray-600 hover:bg-gray-50"
+                    "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all",
+                    active
+                      ? "bg-rose-50 text-[#800020] font-bold border border-rose-200/60 shadow-2xs"
+                      : "text-slate-600 hover:bg-rose-50/40 hover:text-[#800020]"
                   )}
                 >
-                  <Icon className="h-5 w-5" />
-                  {(link as any).key ? t(`nav.${(link as any).key}`) : link.label}
+                  <Icon className={cn("h-5 w-5", active ? "text-[#800020]" : "text-slate-400")} />
+                  <span>{(link as any).key ? t(`nav.${(link as any).key}`) : link.label}</span>
                 </Link>
               );
             })}
-            <button
-              onClick={handleLogout}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"
-            >
-              <LogOut className="h-5 w-5" />
-              {t("nav.logout")}
-            </button>
+            <div className="pt-2 border-t border-slate-100 mt-2">
+              <button
+                onClick={handleLogout}
+                className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
+              >
+                <LogOut className="h-5 w-5" />
+                <span>{t("nav.logout")}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

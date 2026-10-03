@@ -73,6 +73,17 @@ function getCategoryIcon(slug: string) {
   }
 }
 
+const stepLabels: Record<number, string> = {
+  1: "Service Category",
+  2: "Sub-category",
+  3: "Specific Problem",
+  4: "Explain Issue",
+  5: "Estimate & Summary",
+  6: "Select Worker",
+  7: "Confirm Order",
+  8: "Active Order",
+};
+
 function ProblemSelectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1529,8 +1540,27 @@ function ProblemSelectionContent() {
             </p>
           </div>
 
-          {/* Step Pills */}
-          <div className="flex items-center gap-1.5 self-start sm:self-auto bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/60 overflow-x-auto max-w-full">
+          {/* Mobile App Progress Bar */}
+          <div className="sm:hidden w-full space-y-2 bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+              <span className="flex items-center gap-1.5 text-[#800020]">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#800020] text-[10px] text-white font-black">
+                  {currentStep}
+                </span>
+                <span>{stepLabels[currentStep] || `Step ${currentStep}`}</span>
+              </span>
+              <span className="text-[11px] text-slate-400 font-medium">Step {currentStep} of 7</span>
+            </div>
+            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#800020] rounded-full transition-all duration-300"
+                style={{ width: `${Math.min(100, Math.max(14, (currentStep / 7) * 100))}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Step Pills for Desktop */}
+          <div className="hidden sm:flex items-center gap-1.5 self-start sm:self-auto bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/60 overflow-x-auto max-w-full">
             {[
               { num: 1, label: "Category" },
               { num: 2, label: "Sub-cat" },
@@ -1573,7 +1603,7 @@ function ProblemSelectionContent() {
       {/* ----------------------------------------------------------- */}
       {currentStep === 1 && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading">
                 Step 1: Choose Service Category
@@ -1601,7 +1631,7 @@ function ProblemSelectionContent() {
               <p className="text-xs text-slate-500 font-medium">Loading verified service catalogue...</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {filteredCategories.map((category) => {
                 const IconComponent = getCategoryIcon(category.slug);
                 return (
@@ -1609,30 +1639,30 @@ function ProblemSelectionContent() {
                     key={category.id}
                     type="button"
                     onClick={() => handleSelectCategory(category)}
-                    className="p-5 rounded-3xl border border-slate-200/90 bg-white hover:border-[#800020] hover:shadow-md transition-all text-left group flex flex-col justify-between"
+                    className="p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white hover:border-[#800020] hover:shadow-md transition-all text-left group flex flex-col justify-between"
                   >
                     <div>
-                      <div className="h-12 w-12 rounded-2xl bg-[#800020]/10 text-[#800020] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                        <IconComponent className="h-6 w-6" />
+                      <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl sm:rounded-2xl bg-[#800020]/10 text-[#800020] flex items-center justify-center mb-2.5 sm:mb-3 group-hover:scale-105 transition-transform">
+                        <IconComponent className="h-5 w-5 sm:h-6 sm:w-6" />
                       </div>
-                      <h3 className="text-base font-bold text-slate-900 group-hover:text-[#800020] transition-colors">
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-[#800020] transition-colors leading-snug">
                         {category.name}
                       </h3>
                       {category.hindiName && (
-                        <p className="text-xs font-medium text-slate-400 mt-0.5">
+                        <p className="text-[11px] sm:text-xs font-medium text-slate-400 mt-0.5">
                           {category.hindiName}
                         </p>
                       )}
                       {category.description && (
-                        <p className="text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">
+                        <p className="hidden sm:block text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">
                           {category.description}
                         </p>
                       )}
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                    <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-[11px] font-semibold text-slate-500">
                       <span>{category._count?.subcategories || 4} sub-categories</span>
-                      <span className="text-[#800020] flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                      <span className="text-[#800020] font-bold group-hover:translate-x-0.5 transition-transform">
                         Select →
                       </span>
                     </div>
@@ -1667,11 +1697,11 @@ function ProblemSelectionContent() {
               className="text-xs font-bold text-slate-600 hover:text-[#800020] flex items-center gap-1"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Change Category</span>
+              <span>Change</span>
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {selectedCategory.subcategories?.map((sub) => (
               <button
                 key={sub.id}
@@ -1680,33 +1710,33 @@ function ProblemSelectionContent() {
                   setSelectedSubCategory(sub);
                   setCurrentStep(3); // advance to specific problems
                 }}
-                className={`p-5 rounded-3xl border transition-all text-left flex flex-col justify-between group ${
+                className={`p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all text-left flex flex-col justify-between group ${
                   selectedSubCategory?.id === sub.id
                     ? "border-[#800020] bg-rose-50/30 shadow-xs"
                     : "border-slate-200/90 bg-white hover:border-[#800020]/60 hover:shadow-xs"
                 }`}
               >
                 <div>
-                  <div className="h-10 w-10 rounded-2xl bg-slate-100 text-slate-700 group-hover:bg-[#800020]/10 group-hover:text-[#800020] flex items-center justify-center mb-3 transition-colors">
-                    <CheckCircle2 className="h-5 w-5" />
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl sm:rounded-2xl bg-slate-100 text-slate-700 group-hover:bg-[#800020]/10 group-hover:text-[#800020] flex items-center justify-center mb-2.5 sm:mb-3 transition-colors">
+                    <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
                   </div>
-                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-[#800020] transition-colors">
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-[#800020] transition-colors leading-snug">
                     {sub.name}
                   </h3>
                   {sub.hindiName && (
-                    <p className="text-[11px] font-medium text-slate-400 mt-0.5">{sub.hindiName}</p>
+                    <p className="text-[10px] sm:text-[11px] font-medium text-slate-400 mt-0.5">{sub.hindiName}</p>
                   )}
                   {sub.description && (
-                    <p className="text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">
+                    <p className="hidden sm:block text-xs text-slate-500 mt-2 line-clamp-2 leading-relaxed">
                       {sub.description}
                     </p>
                   )}
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-[11px] font-semibold text-slate-500">
                   <span>{sub.problems?.length || 0} issues</span>
-                  <span className="text-[#800020] flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
-                    View Problems →
+                  <span className="text-[#800020] font-bold group-hover:translate-x-0.5 transition-transform">
+                    View →
                   </span>
                 </div>
               </button>
@@ -1757,7 +1787,7 @@ function ProblemSelectionContent() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5">
             {filteredProblems.map((prob) => {
               const isSelected = selectedProblem?.id === prob.id;
               const minP = Number(prob.minimumPrice);
@@ -1773,7 +1803,7 @@ function ProblemSelectionContent() {
                     setSelectedProblem(prob);
                     setCurrentStep(4); // advance to explanation
                   }}
-                  className={`w-full text-left p-5 rounded-3xl border cursor-pointer transition-all flex flex-col justify-between ${
+                  className={`w-full text-left p-4 sm:p-5 rounded-2xl sm:rounded-3xl border cursor-pointer transition-all flex flex-col justify-between ${
                     isSelected
                       ? "border-[#800020] bg-rose-50/40 shadow-xs ring-2 ring-[#800020]/20"
                       : "border-slate-200/90 bg-white hover:border-[#800020]/50 hover:shadow-xs"
@@ -1781,14 +1811,14 @@ function ProblemSelectionContent() {
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-bold text-slate-900">{prob.name}</h3>
-                      <span className="shrink-0 text-xs font-bold text-[#800020] font-mono bg-rose-50 border border-rose-200/70 px-2 py-0.5 rounded-full">
+                      <h3 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">{prob.name}</h3>
+                      <span className="shrink-0 text-[10px] sm:text-xs font-bold text-[#800020] font-mono bg-rose-50 border border-rose-200/70 px-2 py-0.5 rounded-full">
                         {formatCurrency(minP)} – {formatCurrency(maxP)}
                       </span>
                     </div>
 
                     {prob.hindiName && (
-                      <p className="text-xs font-medium text-slate-500 mt-0.5">{prob.hindiName}</p>
+                      <p className="text-[11px] sm:text-xs font-medium text-slate-500 mt-0.5">{prob.hindiName}</p>
                     )}
 
                     {prob.description && (
@@ -1798,10 +1828,10 @@ function ProblemSelectionContent() {
                     )}
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                  <div className="mt-3.5 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] sm:text-[11px]">
                     <span className="flex items-center gap-1 text-slate-500 font-medium">
                       <Clock className="h-3.5 w-3.5 text-slate-400" />
-                      ~{prob.estimatedDuration} mins duration
+                      ~{prob.estimatedDuration} mins
                     </span>
 
                     <span className="font-bold text-[#800020] flex items-center gap-1">
@@ -1880,24 +1910,24 @@ function ProblemSelectionContent() {
           {/* Explanation Modes */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* OPTION A: Text Description */}
-            <div className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-3 flex flex-col justify-between">
+            <div className="rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs space-y-3 flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-2 rounded-xl bg-slate-100 text-slate-700">
                     <PenTool className="h-4 w-4 text-[#800020]" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">Option A: Write Description</h3>
-                    <p className="text-[11px] text-slate-500">Detail what is broken or when it started</p>
+                    <h3 className="text-xs sm:text-sm font-bold text-slate-900">Option A: Write Description</h3>
+                    <p className="text-[10px] sm:text-[11px] text-slate-500">Detail what is broken or when it started</p>
                   </div>
                 </div>
 
                 <textarea
-                  rows={5}
+                  rows={4}
                   value={textDescription}
                   onChange={(e) => setTextDescription(e.target.value)}
                   placeholder="e.g. The kitchen tap is leaking from the base and making a humming sound when turned on..."
-                  className="w-full p-3 rounded-2xl border border-slate-200 text-xs focus:outline-none focus:border-[#800020] bg-slate-50/50 leading-relaxed resize-none"
+                  className="w-full p-3 rounded-xl sm:rounded-2xl border border-slate-200 text-xs focus:outline-none focus:border-[#800020] bg-slate-50/50 leading-relaxed resize-none"
                 />
               </div>
 
@@ -1913,15 +1943,15 @@ function ProblemSelectionContent() {
             </div>
 
             {/* OPTION B: Audio Recording */}
-            <div className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-3 flex flex-col justify-between">
+            <div className="rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs space-y-3 flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-2 rounded-xl bg-slate-100 text-slate-700">
                     <Mic className="h-4 w-4 text-[#800020]" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">Option B: Record Audio</h3>
-                    <p className="text-[11px] text-slate-500">Speak in Hindi, English, or your local language</p>
+                    <h3 className="text-xs sm:text-sm font-bold text-slate-900">Option B: Record Audio</h3>
+                    <p className="text-[10px] sm:text-[11px] text-slate-500">Speak in Hindi, English, or your local language</p>
                   </div>
                 </div>
 
@@ -1942,8 +1972,8 @@ function ProblemSelectionContent() {
           </div>
 
           {/* Optional Attachments: Photos, Video, Additional Notes */}
-          <div className="rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <div className="rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-6 shadow-xs space-y-4">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
               <Plus className="h-4 w-4 text-[#800020]" />
               <span>Optional Attachments & Notes</span>
             </h3>
@@ -1970,7 +2000,7 @@ function ProblemSelectionContent() {
           </div>
 
           {/* Location Information */}
-          <div className="rounded-3xl border border-slate-200/90 bg-white p-5 shadow-xs space-y-3">
+          <div className="rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <MapPin className="h-4 w-4 text-[#800020]" />
@@ -1988,7 +2018,7 @@ function ProblemSelectionContent() {
                 ) : (
                   <MapPin className="h-3 w-3" />
                 )}
-                <span>Detect My GPS</span>
+                <span>Detect GPS</span>
               </button>
             </div>
 
@@ -2002,11 +2032,11 @@ function ProblemSelectionContent() {
           </div>
 
           {/* Action button to proceed to Estimate */}
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2">
             <button
               type="button"
               onClick={() => setCurrentStep(3)}
-              className="px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50"
+              className="order-2 sm:order-1 px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 text-center"
             >
               Back
             </button>
@@ -2019,7 +2049,7 @@ function ProblemSelectionContent() {
                 }
               }}
               disabled={!isExplanationValid}
-              className="px-6 py-2.5 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="order-1 sm:order-2 px-6 py-2.5 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>View Estimate & Summary</span>
               <ArrowRight className="h-4 w-4" />
@@ -2039,10 +2069,10 @@ function ProblemSelectionContent() {
                 <span>Final Step</span>
               </div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading">
-                Step 5: Official Price Estimate & Problem Draft
+                Step 5: Price Estimate & Problem Draft
               </h2>
               <p className="text-xs text-slate-500">
-                Review your problem request. When you save, an Order Draft is created in the database.
+                Review your problem request and proceed to worker matching.
               </p>
             </div>
 
@@ -2052,7 +2082,7 @@ function ProblemSelectionContent() {
               className="text-xs font-bold text-slate-600 hover:text-[#800020] flex items-center gap-1"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Edit Explanation</span>
+              <span>Edit</span>
             </button>
           </div>
 
@@ -2076,18 +2106,18 @@ function ProblemSelectionContent() {
           />
 
           {/* Price Protection & Negotiation Notice */}
-          <div className="p-4 rounded-3xl border border-slate-200/90 bg-slate-50 text-xs text-slate-600 space-y-1">
+          <div className="p-4 rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-slate-50 text-xs text-slate-600 space-y-1">
             <div className="font-bold text-slate-800 flex items-center gap-1.5">
               <ShieldCheck className="h-4 w-4 text-[#800020]" />
               <span>Fair Negotiation & Worker Ceiling Guarantee</span>
             </div>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              This estimate is grounded in CPWD DSR labour norms and Indian home-service rate cards. The final price can change only through the defined negotiation within the worker price ceiling (<strong>{formatCurrency(Number(selectedProblem.workerPriceCeiling))}</strong>) or if physical inspection reveals authorized additional services/materials. Technicians cannot arbitrarily quote above this ceiling.
+              This estimate is grounded in CPWD DSR labour norms and Indian home-service rate cards. The final price can change only through defined negotiation within the worker price ceiling (<strong>{formatCurrency(Number(selectedProblem.workerPriceCeiling))}</strong>) or if physical inspection reveals authorized additional services/materials. Technicians cannot arbitrarily quote above this ceiling.
             </p>
           </div>
 
           {/* Submission Action Bar */}
-          <div className="p-4 rounded-3xl border border-slate-200/90 bg-white shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="p-4 rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <span className="text-xs font-bold text-slate-900 block">Proceed with this estimate?</span>
               <span className="text-[11px] text-slate-500">
@@ -2095,35 +2125,26 @@ function ProblemSelectionContent() {
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(4)}
-                disabled={isSubmitting}
-                className="px-4 py-2.5 rounded-2xl bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors"
-              >
-                Back
-              </button>
-
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={handleSaveDraft}
                 disabled={isSubmitting}
-                className="px-4 py-2.5 rounded-2xl bg-white border border-slate-300 text-slate-800 text-xs font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-white border border-slate-300 text-slate-800 text-xs font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <FileCheck className="h-3.5 w-3.5 text-slate-600" />
                 )}
-                <span>Save Problem Draft</span>
+                <span>Save Draft</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleProceedToWorkerSelection}
                 disabled={isSubmitting}
-                className="px-5 py-2.5 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white text-xs font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white text-xs font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>
@@ -2132,7 +2153,7 @@ function ProblemSelectionContent() {
                   </>
                 ) : (
                   <>
-                    <span>Continue to Worker Selection</span>
+                    <span>Continue to Workers</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}

@@ -23,23 +23,40 @@ import {
   CheckCircle2,
   Smartphone,
   Lock,
+  Volume2,
+  User,
+  TrendingUp,
+  Clock,
+  Sparkles,
+  ExternalLink,
 } from "lucide-react";
 import { formatCurrency, formatDateTime, getStatusColor } from "@/lib/utils";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
 import { useAuth } from "@/hooks/useAuth";
 import { IncomingOrderRequestCard } from "@/components/worker/IncomingOrderRequestCard";
-import type { Booking, BookingStatus, Order } from "@/lib/types";
+import { PriceNegotiationModal } from "@/components/worker/PriceNegotiationModal";
+import type { Booking, BookingStatus, Order, OrderStatus } from "@/lib/types";
 
 type TabFilter = "PENDING" | "ACTIVE" | "COMPLETED";
 
 const tabs: { label: string; filter: TabFilter }[] = [
   { label: "New Requests", filter: "PENDING" },
-  { label: "Active", filter: "ACTIVE" },
+  { label: "Active Jobs", filter: "ACTIVE" },
   { label: "Completed", filter: "COMPLETED" },
 ];
 
-const ACTIVE_STATUSES: BookingStatus[] = ["ACCEPTED", "EN_ROUTE", "IN_PROGRESS"];
+const ACTIVE_BOOKING_STATUSES: BookingStatus[] = ["ACCEPTED", "EN_ROUTE", "IN_PROGRESS"];
+
+const ACTIVE_ORDER_STATUSES: OrderStatus[] = [
+  "ACCEPTED" as any,
+  "NEGOTIATION" as any,
+  "CONFIRMED" as any,
+  "TRAVELLING" as any,
+  "ARRIVED" as any,
+  "IN_PROGRESS" as any,
+  "PAYMENT_PENDING" as any,
+];
 
 const workerWorkflowSteps = [
   {
@@ -107,19 +124,31 @@ export default function WorkerJobsPage() {
   const [activeTab, setActiveTab] = useState<TabFilter>("PENDING");
   const [jobs, setJobs] = useState<Booking[]>([]);
   const [orderRequests, setOrderRequests] = useState<Order[]>([]);
+  const [workerOrders, setWorkerOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [updatingStateId, setUpdatingStateId] = useState<string | null>(null);
+  const [negotiatingOrder, setNegotiatingOrder] = useState<Order | null>(null);
 
   const fetchJobs = useCallback(async () => {
     if (!isAuthenticated || user?.role !== "WORKER") return;
     setLoading(true);
     try {
-      const [bookingsRes, ordersRes] = await Promise.all([
+      const [bookingsRes, ordersRes, workerOrdersRes] = await Promise.allSettled([
         apiGet<{ success: boolean; data: Booking[] }>("/bookings"),
         apiGet<{ success: boolean; data: Order[] }>("/orders/worker/requests"),
+        apiGet<{ success: boolean; data: Order[] }>("/orders/worker"),
       ]);
-      if (bookingsRes.success) setJobs(bookingsRes.data || []);
-      if (ordersRes.success) setOrderRequests(ordersRes.data || []);
+
+      if (bookingsRes.status === "fulfilled" && bookingsRes.value.success) {
+        setJobs(bookingsRes.value.data || []);
+      }
+      if (ordersRes.status === "fulfilled" && ordersRes.value.success) {
+        setOrderRequests(ordersRes.value.data || []);
+      }
+      if (workerOrdersRes.status === "fulfilled" && workerOrdersRes.value.success) {
+        setWorkerOrders(workerOrdersRes.value.data || []);
+      }
     } catch {
       toast({ title: "Failed to load jobs", variant: "danger" });
     } finally {
@@ -143,6 +172,7 @@ export default function WorkerJobsPage() {
           description: "Full service location released. Doorstep service scheduled.",
           variant: "success",
         });
+        setActiveTab("ACTIVE");
         fetchJobs();
       }
     } catch (err: any) {
@@ -163,7 +193,7 @@ export default function WorkerJobsPage() {
       if (res.success) {
         toast({
           title: "Order Declined",
-          description: "Customer has been respectfully notified to select another technician.",
+          description: "Customer has been notified to select another technician.",
           variant: "default",
         });
         fetchJobs();
@@ -177,10 +207,47 @@ export default function WorkerJobsPage() {
     }
   };
 
-  const updateStatus = async (booking: Booking, status: BookingStatus) => {
+  const handleAdvanceOperationalState = async (
+    orderId: string,
+    nextState: "TRAVELLING" | "ARRIVED" | "WORKING" | "COMPLETED"
+  ) => {
+    try {
+      setUpdatingStateId(orderId);
+      const res = await apiPatch<{
+        success: boolean;
+        operationalState: string;
+        message?: string;
+      }>(`/orders/${orderId}/operational-state`, { operationalState: nextState });
+
+      if (res.success) {
+        toast({
+          title: `Status Updated: ${nextState}`,
+          description: res.message || "Operational stage advanced.",
+          variant: nextState === "COMPLETED" ? "success" : "default",
+        });
+        if (nextState === "COMPLETED") {
+          setActiveTab("COMPLETED");
+        }
+        await fetchJobs();
+      }
+    } catch (err: any) {
+      toast({
+        title: "State Update Failed",
+        description: err.message || "Cannot advance operational state.",
+        variant: "danger",
+      });
+    } finally {
+      setUpdatingStateId(null);
+    }
+  };
+
+  const updateBookingStatus = async (booking: Booking, status: BookingStatus) => {
     setBusyId(booking.id);
     try {
-      const res = await apiPatch<{ success: boolean; error?: string }>(`/bookings/${booking.id}/status`, { status });
+      const res = await apiPatch<{ success: boolean; error?: string }>(
+        `/bookings/${booking.id}/status`,
+        { status }
+      );
       if (res.success) {
         toast({ title: "Status updated", variant: "success" });
         fetchJobs();
@@ -194,19 +261,35 @@ export default function WorkerJobsPage() {
     }
   };
 
-  const filtered = jobs.filter((j) => {
-    if (activeTab === "PENDING") return j.status === "PENDING";
-    if (activeTab === "ACTIVE") return ACTIVE_STATUSES.includes(j.status);
-    return j.status === "COMPLETED";
-  });
+  // Combine and deduplicate orders across sources
+  const allOrdersMap = new Map<string, Order>();
+  orderRequests.forEach((o) => allOrdersMap.set(o.id, o));
+  workerOrders.forEach((o) => allOrdersMap.set(o.id, o));
+  const combinedOrders = Array.from(allOrdersMap.values());
 
-  const pendingCount =
-    jobs.filter((j) => j.status === "PENDING").length + orderRequests.length;
+  // Filtered lists per tab
+  const pendingOrders = combinedOrders.filter((o) => o.status === ("REQUESTED" as any));
+  const pendingBookings = jobs.filter((j) => j.status === "PENDING");
+  const pendingCount = pendingOrders.length + pendingBookings.length;
+
+  const activeOrders = combinedOrders.filter((o) =>
+    ACTIVE_ORDER_STATUSES.includes(o.status as any)
+  );
+  const activeBookings = jobs.filter((j) => ACTIVE_BOOKING_STATUSES.includes(j.status));
+  const activeCount = activeOrders.length + activeBookings.length;
+
+  const completedOrders = combinedOrders.filter(
+    (o) => o.status === ("COMPLETED" as any) || o.paymentStatus === "PAID"
+  );
+  const completedBookings = jobs.filter((j) => j.status === "COMPLETED");
+  const completedCount = completedOrders.length + completedBookings.length;
+
+  const totalMyJobsCount = activeCount + completedCount;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12 animate-fade-in space-y-8">
+    <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8 py-4 sm:py-10 animate-fade-in space-y-6 sm:space-y-8">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200/90 pb-5">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full bg-rose-50 border border-rose-200/60 px-3 py-1 text-xs font-bold text-[#800020] mb-2">
             <Briefcase className="h-3.5 w-3.5" />
@@ -215,30 +298,34 @@ export default function WorkerJobsPage() {
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-heading tracking-tight">
             Assigned Jobs & <span className="text-[#800020]">Work Orders</span>
           </h1>
-          <p className="mt-1 text-sm text-slate-600 max-w-2xl">
-            View assigned repair tickets, manage turn-by-turn doorstep workflow, and understand how Shramik dispatches verified jobs.
+          <p className="mt-1 text-xs sm:text-sm text-slate-600 max-w-2xl">
+            Manage your live doorstep jobs, respond to customer requests, and track your completed assignments.
           </p>
         </div>
 
         {/* View Switcher Tabs (if authenticated worker) */}
         {isAuthenticated && user?.role === "WORKER" && (
-          <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200 self-start md:self-auto">
+          <div className="flex items-center rounded-2xl bg-slate-100 p-1 border border-slate-200 self-start md:self-auto">
             <button
               type="button"
               onClick={() => setViewMode("jobs")}
               className={cn(
-                "rounded-lg px-4 py-2 text-xs font-bold transition-all",
-                viewMode === "jobs" ? "bg-white text-[#800020] shadow-xs" : "text-slate-600 hover:text-slate-900"
+                "rounded-xl px-4 py-2 text-xs font-bold transition-all",
+                viewMode === "jobs"
+                  ? "bg-white text-[#800020] shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
               )}
             >
-              My Live Jobs ({jobs.length})
+              My Jobs ({totalMyJobsCount})
             </button>
             <button
               type="button"
               onClick={() => setViewMode("guide")}
               className={cn(
-                "rounded-lg px-4 py-2 text-xs font-bold transition-all",
-                viewMode === "guide" ? "bg-white text-[#800020] shadow-xs" : "text-slate-600 hover:text-slate-900"
+                "rounded-xl px-4 py-2 text-xs font-bold transition-all",
+                viewMode === "guide"
+                  ? "bg-white text-[#800020] shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
               )}
             >
               How Jobs Work (Guide)
@@ -250,150 +337,556 @@ export default function WorkerJobsPage() {
       {/* VIEW 1: AUTHENTICATED WORKER ACTIVE JOBS */}
       {viewMode === "jobs" && isAuthenticated && user?.role === "WORKER" && (
         <div className="space-y-6">
-          <div className="flex gap-1 border-b border-slate-200">
-            {tabs.map((t) => (
-              <button
-                key={t.label}
-                onClick={() => setActiveTab(t.filter)}
-                className={cn(
-                  "px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors",
-                  activeTab === t.filter
-                    ? "border-[#800020] text-[#800020]"
-                    : "border-transparent text-slate-500 hover:text-slate-800"
-                )}
-              >
-                {t.label}
-                {t.filter === "PENDING" && pendingCount > 0 && (
-                  <span className="ml-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#800020] text-[10px] text-white">
-                    {pendingCount}
+          {/* Mobile & Desktop Segmented Tabs */}
+          <div className="flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">
+            {tabs.map((t) => {
+              const count =
+                t.filter === "PENDING"
+                  ? pendingCount
+                  : t.filter === "ACTIVE"
+                  ? activeCount
+                  : completedCount;
+              return (
+                <button
+                  key={t.label}
+                  type="button"
+                  onClick={() => setActiveTab(t.filter)}
+                  className={cn(
+                    "px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap flex items-center gap-2",
+                    activeTab === t.filter
+                      ? "bg-[#800020] text-white shadow-2xs"
+                      : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/80"
+                  )}
+                >
+                  <span>{t.label}</span>
+                  <span
+                    className={cn(
+                      "inline-flex h-5 min-w-[20px] px-1.5 items-center justify-center rounded-full text-[10px] font-extrabold",
+                      activeTab === t.filter
+                        ? "bg-white text-[#800020]"
+                        : "bg-slate-100 text-slate-700"
+                    )}
+                  >
+                    {count}
                   </span>
-                )}
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-20">
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-[#800020]" />
+              <p className="text-xs text-slate-500 font-medium">Fetching assigned work orders...</p>
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Phase 4 Incoming Order Requests from Problem Selection Flow */}
-              {activeTab === "PENDING" && orderRequests.length > 0 && (
+              {/* TAB 1: NEW REQUESTS */}
+              {activeTab === "PENDING" && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                      <span>Direct Customer Problem Requests ({orderRequests.length})</span>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
-                        Location Privacy Protected
-                      </span>
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-1 gap-4">
-                    {orderRequests.map((order) => (
-                      <IncomingOrderRequestCard
-                        key={order.id}
-                        order={order}
-                        onAccept={handleAcceptOrder}
-                        onReject={handleRejectOrder}
-                      />
-                    ))}
-                  </div>
+                  {pendingOrders.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                          <span>Direct Customer Problem Requests ({pendingOrders.length})</span>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                            Location Protected
+                          </span>
+                        </h3>
+                      </div>
+                      <div className="grid grid-cols-1 gap-4">
+                        {pendingOrders.map((order) => (
+                          <IncomingOrderRequestCard
+                            key={order.id}
+                            order={order}
+                            onAccept={handleAcceptOrder}
+                            onReject={handleRejectOrder}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {pendingBookings.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">
+                        Direct Service Bookings ({pendingBookings.length})
+                      </h3>
+                      <div className="grid grid-cols-1 gap-4">
+                        {pendingBookings.map((b) => (
+                          <div
+                            key={b.id}
+                            className="rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-6 shadow-xs space-y-4"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-bold text-slate-900">
+                                    {b.service?.name || "Repair Service"}
+                                  </span>
+                                  <Badge className="bg-rose-50 text-[#800020] border-rose-200">
+                                    {b.status}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                  Ref: {b.bookingRef} · {formatDateTime(b.createdAt)}
+                                </p>
+                              </div>
+                              <div className="text-left sm:text-right">
+                                <span className="text-base sm:text-lg font-black text-slate-900">
+                                  {formatCurrency(b.quotedPrice || 50)}
+                                </span>
+                                <p className="text-[10px] text-emerald-600 font-bold">
+                                  100% Worker Payout
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="grid gap-2 sm:grid-cols-2 text-xs text-slate-600">
+                              <p className="flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-[#800020] shrink-0" />
+                                <span>{b.address || "Customer Doorstep Address"}</span>
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <Phone className="h-4 w-4 text-emerald-600 shrink-0" />
+                                <span>{b.consumer?.phone || "+91-Customer Phone"}</span>
+                              </p>
+                            </div>
+
+                            <div className="pt-2">
+                              <Button
+                                size="sm"
+                                className="w-full sm:w-auto bg-[#800020] hover:bg-[#66001a] text-white font-bold rounded-xl"
+                                disabled={busyId === b.id}
+                                onClick={() => updateBookingStatus(b, "ACCEPTED")}
+                              >
+                                Accept Work Order
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {pendingOrders.length === 0 && pendingBookings.length === 0 && (
+                    <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-8 sm:p-12 text-center shadow-xs">
+                      <div className="h-12 w-12 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                        <Briefcase className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-800">
+                        No pending incoming requests
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                        Keep your status toggled to <strong>Available</strong> on the dashboard to receive direct customer requests in your area.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {filtered.length > 0 ? (
+              {/* TAB 2: ACTIVE JOBS */}
+              {activeTab === "ACTIVE" && (
                 <div className="space-y-4">
-              {filtered.map((j) => (
-                <div key={j.id} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-slate-900">{j.service?.name || "Repair Service"}</span>
-                        <Badge className="bg-rose-50 text-[#800020] border-rose-200">{j.status}</Badge>
+                  {activeOrders.map((order) => {
+                    const isPriceLocked = order.isPriceLocked;
+                    const priceCeiling = Number(order.workerPriceCeiling || order.problem?.workerPriceCeiling || 299);
+                    const agreedOrQuotedPrice = Number(order.finalPrice || order.basePrice || 50);
+
+                    return (
+                      <div
+                        key={order.id}
+                        className="rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-6 shadow-xs space-y-4 transition-all hover:border-slate-300"
+                      >
+                        {/* Top Card Bar */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm sm:text-base font-bold text-slate-900">
+                                {order.problemTitle || order.problem?.name || "Home Repair"}
+                              </span>
+                              <Badge className="bg-rose-50 text-[#800020] border-rose-200 font-bold">
+                                {order.category?.name || "Service"}
+                              </Badge>
+                              {/* Status Badge */}
+                              <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold flex items-center gap-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                {order.status}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 font-mono mt-0.5">
+                              Ref: {order.orderRef} · Mode: {order.bookingMode}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-3">
+                            <div className="text-left sm:text-right">
+                              <span className="text-base sm:text-xl font-black text-slate-900 font-mono">
+                                {formatCurrency(agreedOrQuotedPrice)}
+                              </span>
+                              <p className="text-[10px] text-emerald-600 font-bold">
+                                {isPriceLocked ? "✓ Price Locked" : `Ceiling: ${formatCurrency(priceCeiling)}`}
+                              </p>
+                            </div>
+
+                            {!isPriceLocked && (
+                              <button
+                                type="button"
+                                onClick={() => setNegotiatingOrder(order)}
+                                className="px-3 py-1.5 rounded-xl bg-rose-50 text-[#800020] hover:bg-rose-100 border border-rose-200/70 text-xs font-bold transition flex items-center gap-1"
+                              >
+                                <TrendingUp className="h-3.5 w-3.5" />
+                                <span>Negotiate</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Customer & Doorstep Info */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-600 bg-slate-50/80 p-3 sm:p-4 rounded-2xl border border-slate-100">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                              Customer Contact
+                            </span>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[#800020] font-bold text-xs">
+                                  {order.consumer?.name?.charAt(0) || "C"}
+                                </div>
+                                <div>
+                                  <p className="font-bold text-slate-900">{order.consumer?.name || "Customer"}</p>
+                                  <p className="text-[11px] text-slate-500">{order.consumer?.phone || "Phone on file"}</p>
+                                </div>
+                              </div>
+
+                              {order.consumer?.phone && (
+                                <a
+                                  href={`tel:${order.consumer.phone}`}
+                                  className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-xs font-bold transition flex items-center gap-1.5"
+                                >
+                                  <Phone className="h-3.5 w-3.5" />
+                                  <span>Call</span>
+                                </a>
+                              )}
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                              Doorstep Location
+                            </span>
+                            <p className="flex items-start gap-1.5 text-slate-800 font-medium">
+                              <MapPin className="h-4 w-4 text-[#800020] shrink-0 mt-0.5" />
+                              <span>{order.address || order.approxArea || "Local Service Address"}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Customer's Explanation (Text / Audio / Photos) */}
+                        {(order.textDescription || order.audioUrl || (order.photos && order.photos.length > 0)) && (
+                          <div className="space-y-2 text-xs">
+                            {order.textDescription && (
+                              <p className="text-slate-600 bg-white p-3 rounded-xl border border-slate-200/70 italic">
+                                &ldquo;{order.textDescription}&rdquo;
+                              </p>
+                            )}
+
+                            {order.audioUrl && (
+                              <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-center gap-2">
+                                <Volume2 className="h-4 w-4 text-amber-700 shrink-0" />
+                                <span className="text-[11px] font-bold text-amber-900 shrink-0">Customer Voice Note:</span>
+                                <audio controls src={order.audioUrl} className="w-full h-7" />
+                              </div>
+                            )}
+
+                            {order.photos && order.photos.length > 0 && (
+                              <div className="flex gap-2 overflow-x-auto pb-1">
+                                {order.photos.map((p, idx) => (
+                                  <img
+                                    key={idx}
+                                    src={p}
+                                    alt={`Attachment ${idx + 1}`}
+                                    className="h-16 w-16 rounded-xl object-cover border border-slate-200 shrink-0"
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Operational Stage Advancement Actions */}
+                        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 overflow-x-auto pb-1 sm:pb-0">
+                            <span className={cn("px-2 py-0.5 rounded-md font-bold", order.status === "ACCEPTED" ? "bg-[#800020] text-white" : "bg-slate-100 text-slate-600")}>
+                              1. Accepted
+                            </span>
+                            <span>→</span>
+                            <span className={cn("px-2 py-0.5 rounded-md font-bold", order.status === "TRAVELLING" ? "bg-[#800020] text-white" : "bg-slate-100 text-slate-600")}>
+                              2. Travelling
+                            </span>
+                            <span>→</span>
+                            <span className={cn("px-2 py-0.5 rounded-md font-bold", order.status === "ARRIVED" ? "bg-[#800020] text-white" : "bg-slate-100 text-slate-600")}>
+                              3. Arrived
+                            </span>
+                            <span>→</span>
+                            <span className={cn("px-2 py-0.5 rounded-md font-bold", order.status === "IN_PROGRESS" ? "bg-[#800020] text-white" : "bg-slate-100 text-slate-600")}>
+                              4. Working
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {order.status === ("ACCEPTED" as any) && (
+                              <Button
+                                size="sm"
+                                disabled={updatingStateId === order.id}
+                                onClick={() => handleAdvanceOperationalState(order.id, "TRAVELLING")}
+                                className="w-full sm:w-auto bg-[#800020] hover:bg-[#68001a] text-white text-xs font-bold rounded-xl"
+                              >
+                                {updatingStateId === order.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Navigation className="h-3.5 w-3.5 mr-1" />}
+                                Start Travelling
+                              </Button>
+                            )}
+
+                            {order.status === ("TRAVELLING" as any) && (
+                              <Button
+                                size="sm"
+                                disabled={updatingStateId === order.id}
+                                onClick={() => handleAdvanceOperationalState(order.id, "ARRIVED")}
+                                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl"
+                              >
+                                {updatingStateId === order.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MapPin className="h-3.5 w-3.5 mr-1" />}
+                                I Have Arrived
+                              </Button>
+                            )}
+
+                            {order.status === ("ARRIVED" as any) && (
+                              <Button
+                                size="sm"
+                                disabled={updatingStateId === order.id}
+                                onClick={() => handleAdvanceOperationalState(order.id, "WORKING")}
+                                className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl"
+                              >
+                                {updatingStateId === order.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5 mr-1" />}
+                                Start Work
+                              </Button>
+                            )}
+
+                            {order.status === ("IN_PROGRESS" as any) && (
+                              <Button
+                                size="sm"
+                                disabled={updatingStateId === order.id}
+                                onClick={() => handleAdvanceOperationalState(order.id, "COMPLETED")}
+                                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl"
+                              >
+                                {updatingStateId === order.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1" />}
+                                Complete Service
+                              </Button>
+                            )}
+
+                            <Link
+                              href={`/worker/dashboard`}
+                              className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-1"
+                            >
+                              <span>Cockpit</span>
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Link>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5">Ref: {j.bookingRef} · {formatDateTime(j.createdAt)}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-lg font-black text-slate-900">{formatCurrency(j.quotedPrice || 50)}</span>
-                      <p className="text-[10px] text-emerald-600 font-bold">100% Worker Payout</p>
-                    </div>
-                  </div>
+                    );
+                  })}
 
-                  <div className="grid gap-3 sm:grid-cols-2 text-xs text-slate-600">
-                    <p className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-[#800020] shrink-0" />
-                      <span>{j.address || "Customer Doorstep Address"}</span>
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-emerald-600 shrink-0" />
-                      <span>{j.consumer?.phone || "+91-Customer Phone"}</span>
-                    </p>
-                  </div>
+                  {activeBookings.map((b) => (
+                    <div
+                      key={b.id}
+                      className="rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-6 shadow-xs space-y-4"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-slate-900">
+                              {b.service?.name || "Repair Service"}
+                            </span>
+                            <Badge className="bg-rose-50 text-[#800020] border-rose-200">
+                              {b.status}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Ref: {b.bookingRef} · {formatDateTime(b.createdAt)}
+                          </p>
+                        </div>
+                        <div className="text-left sm:text-right">
+                          <span className="text-base sm:text-lg font-black text-slate-900 font-mono">
+                            {formatCurrency(b.quotedPrice || 50)}
+                          </span>
+                          <p className="text-[10px] text-emerald-600 font-bold">100% Worker Payout</p>
+                        </div>
+                      </div>
 
-                  {/* Actions */}
-                  <div className="pt-2 flex flex-wrap items-center gap-2.5">
-                    {j.status === "PENDING" && (
-                      <Button
-                        size="sm"
-                        className="bg-[#800020] hover:bg-[#66001a] text-white font-bold"
-                        disabled={busyId === j.id}
-                        onClick={() => updateStatus(j, "ACCEPTED")}
-                      >
-                        Accept Work Order
-                      </Button>
-                    )}
-                    {j.status === "ACCEPTED" && (
-                      <Button
-                        size="sm"
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
-                        disabled={busyId === j.id}
-                        onClick={() => updateStatus(j, "EN_ROUTE")}
-                      >
-                        Start Journey (En Route)
-                      </Button>
-                    )}
-                    {j.status === "EN_ROUTE" && (
-                      <Button
-                        size="sm"
-                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold"
-                        disabled={busyId === j.id}
-                        onClick={() => updateStatus(j, "IN_PROGRESS")}
-                      >
-                        Check-in (Enter Start OTP)
-                      </Button>
-                    )}
-                    {j.status === "IN_PROGRESS" && (
-                      <Button
-                        size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                        disabled={busyId === j.id}
-                        onClick={() => updateStatus(j, "COMPLETED")}
-                      >
-                        Complete Job (Enter Stop OTP)
-                      </Button>
-                    )}
-                  </div>
+                      <div className="grid gap-2 sm:grid-cols-2 text-xs text-slate-600">
+                        <p className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-[#800020] shrink-0" />
+                          <span>{b.address || "Customer Doorstep Address"}</span>
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-emerald-600 shrink-0" />
+                          <span>{b.consumer?.phone || "+91-Customer Phone"}</span>
+                        </p>
+                      </div>
+
+                      <div className="pt-2 flex flex-wrap items-center gap-2.5">
+                        {b.status === "ACCEPTED" && (
+                          <Button
+                            size="sm"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl"
+                            disabled={busyId === b.id}
+                            onClick={() => updateBookingStatus(b, "EN_ROUTE")}
+                          >
+                            Start Journey (En Route)
+                          </Button>
+                        )}
+                        {b.status === "EN_ROUTE" && (
+                          <Button
+                            size="sm"
+                            className="bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl"
+                            disabled={busyId === b.id}
+                            onClick={() => updateBookingStatus(b, "IN_PROGRESS")}
+                          >
+                            Check-in (Start OTP)
+                          </Button>
+                        )}
+                        {b.status === "IN_PROGRESS" && (
+                          <Button
+                            size="sm"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl"
+                            disabled={busyId === b.id}
+                            onClick={() => updateBookingStatus(b, "COMPLETED")}
+                          >
+                            Complete Job
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {activeOrders.length === 0 && activeBookings.length === 0 && (
+                    <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-8 sm:p-12 text-center shadow-xs">
+                      <div className="h-12 w-12 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                        <Zap className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-800">
+                        No active jobs in progress
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                        Accept incoming customer requests in the <strong>New Requests</strong> tab to begin active doorstep service.
+                      </p>
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-xs">
-              <p className="text-sm text-slate-400">No jobs currently in this tab</p>
-              <button
-                type="button"
-                onClick={() => setViewMode("guide")}
-                className="mt-4 inline-flex items-center gap-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-2 text-xs font-semibold"
-              >
-                <span>Read Dispatch Workflow Guide</span>
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
+              )}
+
+              {/* TAB 3: COMPLETED JOBS */}
+              {activeTab === "COMPLETED" && (
+                <div className="space-y-4">
+                  {completedOrders.map((order) => {
+                    const finalFare = Number(order.finalPrice || order.grossAmount || order.basePrice || 50);
+                    return (
+                      <div
+                        key={order.id}
+                        className="rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-6 shadow-xs space-y-3"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm sm:text-base font-bold text-slate-900">
+                                {order.problemTitle || order.problem?.name || "Repair Service"}
+                              </span>
+                              <Badge className="bg-emerald-50 text-emerald-800 border-emerald-200 font-bold">
+                                Completed
+                              </Badge>
+                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                                {order.category?.name || "Service"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 font-mono mt-0.5">
+                              Ref: {order.orderRef} · Completed on {formatDateTime(order.completedAt || order.updatedAt)}
+                            </p>
+                          </div>
+
+                          <div className="text-left sm:text-right">
+                            <span className="text-base sm:text-xl font-black text-emerald-700 font-mono">
+                              +{formatCurrency(finalFare)}
+                            </span>
+                            <p className="text-[10px] text-emerald-600 font-bold">Settled to Wallet</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs text-slate-600 flex-wrap gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <User className="h-4 w-4 text-slate-400" />
+                            <span>Customer: <strong>{order.consumer?.name || "Customer"}</strong></span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-slate-500">
+                            <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                            <span>{order.address || order.approxArea || "Customer Site"}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-emerald-700 font-bold">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                            <span>100% Direct Payout</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {completedBookings.map((b) => (
+                    <div
+                      key={b.id}
+                      className="rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-6 shadow-xs space-y-3"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-slate-900">
+                              {b.service?.name || "Service"}
+                            </span>
+                            <Badge className="bg-emerald-50 text-emerald-800 border-emerald-200">
+                              Completed
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Ref: {b.bookingRef} · {formatDateTime(b.createdAt)}
+                          </p>
+                        </div>
+                        <div className="text-left sm:text-right">
+                          <span className="text-base sm:text-lg font-black text-slate-900 font-mono">
+                            {formatCurrency(b.quotedPrice || 50)}
+                          </span>
+                          <p className="text-[10px] text-emerald-600 font-bold">Settled</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {completedOrders.length === 0 && completedBookings.length === 0 && (
+                    <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-8 sm:p-12 text-center shadow-xs">
+                      <div className="h-12 w-12 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                        <CheckCircle2 className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-800">
+                        No completed jobs yet
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                        Once you complete your active jobs, their full payout records and receipts will be stored here.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
-    </div>
-  )}
 
       {/* VIEW 2: COMPREHENSIVE TEXTUAL & GRAPHICAL WORKER JOBS GUIDE */}
       {(viewMode === "guide" || !isAuthenticated || user?.role !== "WORKER") && (
@@ -431,7 +924,7 @@ export default function WorkerJobsPage() {
 
           {/* Stepper Cards */}
           <div>
-            <div className="text-center max-w-2xl mx-auto mb-10">
+            <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-10">
               <span className="text-xs font-bold text-[#800020] uppercase tracking-wider">Technician Protection</span>
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
                 How Assigned Jobs Work for Technicians
@@ -441,13 +934,13 @@ export default function WorkerJobsPage() {
               </p>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
               {workerWorkflowSteps.map((item) => {
                 const Icon = item.icon;
                 return (
                   <div
                     key={item.step}
-                    className="group rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs hover:shadow-md transition-all hover:-translate-y-0.5"
+                    className="group rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition-all hover:-translate-y-0.5"
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div className="h-11 w-11 rounded-2xl bg-rose-50 text-[#800020] border border-rose-100 flex items-center justify-center">
@@ -468,80 +961,24 @@ export default function WorkerJobsPage() {
               })}
             </div>
           </div>
-
-          {/* Mock Job Card Walkthrough */}
-          <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-10 shadow-xs">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Live Job Dispatch Ticket Anatomy</h3>
-            <p className="text-xs text-slate-500 mb-8 max-w-xl">
-              Technicians see everything upfront before committing. No guessing, no hidden travel costs:
-            </p>
-
-            <div className="mx-auto max-w-xl rounded-3xl border-2 border-dashed border-[#800020]/30 bg-rose-50/20 p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold px-3 py-1">
-                  NEW BROADCAST · 2.8 km AWAY
-                </span>
-                <span className="text-xl font-black text-[#800020]">₹65.00 Base</span>
-              </div>
-              <div>
-                <h4 className="text-base font-bold text-slate-900">Ceiling Fan Motor Humming & Sparking</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Electrical Category · Jalgaon Local Geofence</p>
-              </div>
-              <div className="rounded-2xl bg-white p-4 space-y-2 border border-slate-200 text-xs text-slate-600">
-                <div className="flex justify-between">
-                  <span>Labour Fare:</span>
-                  <strong className="text-slate-900">₹50.00</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span>Travel Allowance (2.8 km):</span>
-                  <strong className="text-slate-900">₹15.00</strong>
-                </div>
-                <div className="flex justify-between text-emerald-700 font-bold pt-1 border-t border-slate-100">
-                  <span>Your Net Take-Home:</span>
-                  <span>100% (₹65.00)</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  className="flex-1 rounded-xl bg-[#800020] text-white py-2.5 text-xs font-bold shadow-xs hover:bg-[#66001a]"
-                >
-                  Accept Work Order
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl border border-slate-300 bg-white text-slate-600 px-4 py-2.5 text-xs font-semibold hover:bg-slate-50"
-                >
-                  Skip
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Banner */}
-          <div className="rounded-3xl bg-slate-950 text-white p-8 sm:p-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
-            <div>
-              <h3 className="text-xl font-bold">Are You an Electrician, Plumber, or Carpenter?</h3>
-              <p className="text-xs text-slate-400 mt-1 max-w-lg">
-                Join our verified cooperative worker network. DigiLocker onboarding takes less than 2 minutes.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Link
-                href="/register?role=WORKER"
-                className="rounded-full bg-[#800020] hover:bg-[#66001a] text-white px-7 py-3 text-xs font-bold shadow-md transition-all active:scale-98"
-              >
-                Register as Technician
-              </Link>
-              <Link
-                href="/login?redirect=/worker/jobs"
-                className="rounded-full bg-white/10 hover:bg-white/20 text-white px-6 py-3 text-xs font-bold transition-colors"
-              >
-                Technician Login
-              </Link>
-            </div>
-          </div>
         </div>
+      )}
+
+      {/* Price Negotiation Modal */}
+      {negotiatingOrder && (
+        <PriceNegotiationModal
+          isOpen={!!negotiatingOrder}
+          onClose={() => {
+            setNegotiatingOrder(null);
+            fetchJobs();
+          }}
+          orderId={negotiatingOrder.id}
+          userRole="WORKER"
+          onPriceConfirmed={() => {
+            setNegotiatingOrder(null);
+            fetchJobs();
+          }}
+        />
       )}
     </div>
   );

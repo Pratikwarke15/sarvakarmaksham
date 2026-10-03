@@ -237,7 +237,7 @@ export default function WorkerProfilePage() {
   const reviews = profile.reviewsReceived || [];
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 animate-fade-in pb-16">
+    <div className="mx-auto max-w-2xl px-3 sm:px-4 space-y-5 sm:space-y-6 animate-fade-in pb-16">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 font-heading">My Profile</h1>
         {!profile.aadhaarVerified && (
@@ -300,7 +300,7 @@ export default function WorkerProfilePage() {
       )}
 
       {/* Main Profile Header */}
-      <Card className="overflow-hidden border border-slate-200/90 shadow-xs">
+      <Card className="overflow-hidden border border-slate-200/90 shadow-xs rounded-2xl sm:rounded-3xl">
         <div className="h-2 bg-[#800020]" />
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -401,30 +401,31 @@ export default function WorkerProfilePage() {
             </div>
           )}
 
-          {profile.bio && <p className="text-sm text-gray-600">{profile.bio}</p>}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-500">Experience</span>
-              <p className="font-medium">{profile.experienceYears} years</p>
+          {profile.bio && <p className="text-sm text-gray-600 leading-relaxed">{profile.bio}</p>}
+
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <span className="text-[11px] text-slate-500 font-semibold block">Experience</span>
+              <p className="text-base font-black text-slate-900 mt-0.5">{profile.experienceYears} years</p>
             </div>
-            <div>
-              <span className="text-gray-500">Total Jobs</span>
-              <p className="font-medium">{profile.totalJobs}</p>
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <span className="text-[11px] text-slate-500 font-semibold block">Total Jobs</span>
+              <p className="text-base font-black text-slate-900 mt-0.5">{profile.totalJobs}</p>
             </div>
-            <div>
-              <span className="text-gray-500">Total Earnings</span>
-              <p className="font-medium">{formatCurrency(profile.totalEarnings)}</p>
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <span className="text-[11px] text-slate-500 font-semibold block">Total Earnings</span>
+              <p className="text-base font-black text-emerald-700 mt-0.5">{formatCurrency(profile.totalEarnings)}</p>
             </div>
-            <div>
-              <span className="text-gray-500">Wallet Balance</span>
-              <p className="font-medium">{formatCurrency(profile.walletBalance)}</p>
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <span className="text-[11px] text-slate-500 font-semibold block">Wallet Balance</span>
+              <p className="text-base font-black text-[#800020] mt-0.5">{formatCurrency(profile.walletBalance)}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Profile Data Distinction: User-Provided vs Verified Information */}
-      <Card className="border border-[#800020]/20">
+      <Card className="border border-[#800020]/20 rounded-2xl sm:rounded-3xl">
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-[#800020]" />
@@ -452,7 +453,7 @@ export default function WorkerProfilePage() {
         <CardContent className="space-y-3">
           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 divide-y divide-slate-100 text-xs">
             {/* Name */}
-            <div className="py-2 flex items-center justify-between">
+            <div className="py-2.5 flex items-center justify-between">
               <div>
                 <span className="text-slate-500">Full Name</span>
                 <p className="text-[11px] text-slate-400">User Registered: {profile.user?.name}</p>
@@ -474,7 +475,7 @@ export default function WorkerProfilePage() {
             </div>
 
             {/* Date of Birth / Age */}
-            <div className="py-2 flex items-center justify-between">
+            <div className="py-2.5 flex items-center justify-between">
               <span className="text-slate-500">Date of Birth / Age</span>
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-slate-900">
@@ -489,14 +490,14 @@ export default function WorkerProfilePage() {
             </div>
 
             {/* Address */}
-            <div className="py-2 flex items-start justify-between">
-              <span className="text-slate-500 flex-shrink-0">Work / Registered Address</span>
-              <div className="text-right pl-4">
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-4">
+              <span className="text-slate-500 shrink-0">Work / Registered Address</span>
+              <div className="sm:text-right">
                 <p className="font-bold text-slate-900">
                   {profile.workAddress || "Address on record"}
                 </p>
                 {profile.aadhaarVerified && (
-                  <span className="rounded-sm bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 text-[10px] inline-block mt-0.5">
+                  <span className="rounded-sm bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 text-[10px] inline-block mt-0.5">
                     ✓ Verified
                   </span>
                 )}
@@ -504,7 +505,7 @@ export default function WorkerProfilePage() {
             </div>
 
             {/* Aadhaar Reference */}
-            <div className="py-2 flex items-center justify-between">
+            <div className="py-2.5 flex items-center justify-between">
               <span className="text-slate-500">Aadhaar Reference</span>
               <div className="flex items-center gap-1.5 font-mono">
                 <span className="font-bold text-slate-900">

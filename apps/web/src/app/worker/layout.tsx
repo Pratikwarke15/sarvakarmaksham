@@ -41,7 +41,7 @@ export default function WorkerLayout({ children }: { children: React.ReactNode }
         <Navbar />
         <div className="flex">
           <Sidebar links={sidebarLinks} />
-          <main className="flex-1 p-6 sm:p-8">{children}</main>
+          <main className="flex-1 p-3.5 sm:p-6 lg:p-8 min-w-0">{children}</main>
         </div>
       </div>
     </AuthGuard>

@@ -473,11 +473,11 @@ export default function WorkerDashboard() {
   return (
     <div className="space-y-6 sm:space-y-8 animate-fade-in max-w-6xl mx-auto pb-16">
       {/* 1 & 2 & 8: Main Cockpit Header Card */}
-      <div className="rounded-3xl border border-slate-200/90 bg-gradient-to-br from-white via-[#FFFDFB] to-rose-50/30 p-6 sm:p-7 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+      <div className="rounded-2xl sm:rounded-3xl border border-slate-200/90 bg-gradient-to-br from-white via-[#FFFDFB] to-rose-50/30 p-4 sm:p-7 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-5">
           {/* Worker Profile Snapshot */}
-          <div className="flex items-start sm:items-center gap-4">
-            <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-[#800020]/10 text-[#800020] font-black text-2xl border border-[#800020]/20 shadow-2xs shrink-0 overflow-hidden">
+          <div className="flex items-start sm:items-center gap-3.5 sm:gap-4">
+            <div className="flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-[#800020]/10 text-[#800020] font-black text-xl sm:text-2xl border border-[#800020]/20 shadow-2xs shrink-0 overflow-hidden">
               {profile?.avatarUrl ? (
                 <img
                   src={profile.avatarUrl}
@@ -490,32 +490,32 @@ export default function WorkerDashboard() {
             </div>
 
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="rounded-full bg-rose-50 text-[#800020] border border-rose-200/70 text-[10px] font-bold px-2.5 py-0.5 uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <span className="rounded-full bg-rose-50 text-[#800020] border border-rose-200/70 text-[9px] sm:text-[10px] font-bold px-2.5 py-0.5 uppercase tracking-wider">
                   Technician Cockpit
                 </span>
                 {profile?.aadhaarVerified && (
-                  <span className="rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2.5 py-0.5 flex items-center gap-1">
+                  <span className="rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 flex items-center gap-1">
                     <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                    <span>Aadhaar DigiLocker Verified</span>
+                    <span>Aadhaar Verified</span>
                   </span>
                 )}
-                <span className="rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-[10px] font-bold px-2.5 py-0.5 flex items-center gap-1">
+                <span className="rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 flex items-center gap-1">
                   <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
-                  <span>{ratings?.avgRating ? ratings.avgRating.toFixed(1) : "4.9"} ({ratings?.totalReviews || 0} reviews)</span>
+                  <span>{ratings?.avgRating ? ratings.avgRating.toFixed(1) : "4.9"} ({ratings?.totalReviews || 0})</span>
                 </span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-heading tracking-tight mt-1">
+              <h1 className="text-xl sm:text-3xl font-black text-slate-900 font-heading tracking-tight mt-1">
                 नमस्ते, {profile?.name || user?.name || "Technician"}
               </h1>
 
-              <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+              <div className="text-[11px] sm:text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-slate-700">{profile?.coopName} ({profile?.coopCity})</span>
                 <span>•</span>
-                <span>{profile?.experienceYears || 5} yrs experience</span>
+                <span>{profile?.experienceYears || 5} yrs exp</span>
                 <span>•</span>
-                <span className="text-emerald-700 font-bold">5% Fair Trade Escrow</span>
+                <span className="text-emerald-700 font-bold">5% Fair Escrow</span>
               </div>
 
               {/* Skills Tags */}
@@ -523,7 +523,7 @@ export default function WorkerDashboard() {
                 {profile?.skillTags?.slice(0, 4).map((skill, idx) => (
                   <span
                     key={idx}
-                    className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-bold text-slate-700 font-mono shadow-2xs"
+                    className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[9px] sm:text-[10px] font-bold text-slate-700 font-mono shadow-2xs"
                   >
                     {skill.replace(/-/g, " ")}
                   </span>
@@ -533,22 +533,22 @@ export default function WorkerDashboard() {
           </div>
 
           {/* 1 & 2: Dynamic Duty State & Toggle Switch */}
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 self-start md:self-auto min-w-[280px]">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs flex flex-row items-center justify-between gap-3 w-full md:w-auto">
             <div>
               <div className="flex items-center gap-2">
-                <span className={`h-2.5 w-2.5 rounded-full ${statusBadge.dot} ${statusBadge.pulse ? "animate-ping" : ""}`} />
-                <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full border ${statusBadge.color}`}>
+                <span className={`h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full ${statusBadge.dot} ${statusBadge.pulse ? "animate-ping" : ""}`} />
+                <span className={`text-[10px] sm:text-[11px] font-extrabold px-2 py-0.5 rounded-full border ${statusBadge.color}`}>
                   {statusBadge.label}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1 max-w-[200px]">
+              <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 max-w-[200px]">
                 {isOnDuty
-                  ? "Receiving immediate dispatch requests"
-                  : "Off Duty. Only direct customer requests will arrive."}
+                  ? "Receiving dispatch requests"
+                  : "Off Duty mode active"}
               </p>
             </div>
 
-            <div className="flex items-center gap-2.5 self-end sm:self-center">
+            <div className="flex items-center gap-2 shrink-0">
               <span className="text-xs font-bold text-slate-700">
                 {isOnDuty ? "ONLINE" : "OFF DUTY"}
               </span>
@@ -562,17 +562,17 @@ export default function WorkerDashboard() {
         </div>
 
         {/* Dynamic Status Explanation Banner */}
-        <div className={`mt-5 p-3 rounded-2xl border text-xs flex items-center justify-between gap-3 ${
+        <div className={`mt-4 sm:mt-5 p-3 rounded-2xl border text-xs flex items-center justify-between gap-3 ${
           isOnDuty
             ? "bg-emerald-50/70 border-emerald-200 text-emerald-900"
             : "bg-slate-50 border-slate-200 text-slate-600"
         }`}>
           <div className="flex items-center gap-2">
             <span className={`h-2 w-2 rounded-full ${isOnDuty ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
-            <span>
+            <span className="text-[11px] sm:text-xs">
               <strong>Dynamic Duty Policy:</strong> {isOnDuty
                 ? "You are AVAILABLE. New immediate problem requests in your neighborhood are routed directly to you."
-                : "You are OFF DUTY. Immediate neighborhood broadcasts will skip you, but consumers specifically requesting your profile can still place an order."}
+                : "You are OFF DUTY. Immediate neighborhood broadcasts will skip you, but direct requests can still arrive."}
             </span>
           </div>
 
@@ -589,7 +589,7 @@ export default function WorkerDashboard() {
       </div>
 
       {/* 7. Earnings Dashboard Metrics (4 Cards) */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatsCard
           icon={Briefcase}
           label="Today's Earnings"
@@ -622,7 +622,7 @@ export default function WorkerDashboard() {
 
       {/* 4. Active Job Spotlight Card (If Active Order Exists) */}
       {activeJob && (
-        <div className="rounded-3xl border border-rose-200/90 bg-gradient-to-r from-rose-50/70 via-white to-amber-50/30 p-6 sm:p-7 shadow-xs space-y-5 animate-fade-in">
+        <div className="rounded-2xl sm:rounded-3xl border border-rose-200/90 bg-gradient-to-r from-rose-50/70 via-white to-amber-50/30 p-4 sm:p-7 shadow-xs space-y-4 sm:space-y-5 animate-fade-in">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-rose-100">
             <div className="flex items-center gap-2.5">
               <span className="flex h-3 w-3 rounded-full bg-[#800020] animate-pulse" />

@@ -597,6 +597,58 @@ export class OrderService {
   }
 
   /**
+   * Cancel an order (by Consumer)
+   */
+  static async cancelOrder(orderId: string, userId: string, reason?: string) {
+    const order = await withDbRetry(() =>
+      prisma.order.findUnique({
+        where: { id: orderId },
+      })
+    );
+
+    if (!order) {
+      throw new AppError("Order not found.", 404);
+    }
+
+    if (order.consumerId !== userId) {
+      throw new AppError("You are not authorized to cancel this order.", 403);
+    }
+
+    assertValidOrderTransition(order.status, OrderStatus.CANCELLED);
+
+    const updated = await withDbRetry(() =>
+      prisma.$transaction(async (tx) => {
+        const res = await tx.order.update({
+          where: { id: orderId },
+          data: {
+            status: OrderStatus.CANCELLED,
+            cancelledAt: new Date(),
+            rejectionReason: reason || "Cancelled by consumer",
+          },
+        });
+
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId,
+            fromStatus: order.status,
+            toStatus: OrderStatus.CANCELLED,
+            changedById: userId,
+            reason: reason || "Cancelled by consumer",
+          },
+        });
+
+        return res;
+      })
+    );
+
+    broadcastOrderStatus(updated, {
+      message: "Order was cancelled by the customer.",
+    });
+
+    return updated;
+  }
+
+  /**
    * Get single order by ID with role-aware privacy enforcement
    */
   static async getOrderById(orderId: string, userId: string, role: string) {
@@ -777,6 +829,81 @@ export class OrderService {
         orderBy: { createdAt: "desc" },
       })
     );
+  }
+
+  /**
+   * Worker orders listing (All, Active, Completed, or filtered)
+   */
+  static async getWorkerOrders(workerUserId: string, statusFilter?: string) {
+    const workerProfile = await withDbRetry(() =>
+      prisma.workerProfile.findUnique({
+        where: { userId: workerUserId },
+      })
+    );
+
+    if (!workerProfile) {
+      return [];
+    }
+
+    const whereClause: any = { workerId: workerProfile.id };
+    if (statusFilter && statusFilter !== "ALL") {
+      if (statusFilter === "ACTIVE") {
+        whereClause.status = {
+          in: [
+            OrderStatus.ACCEPTED,
+            OrderStatus.NEGOTIATION,
+            OrderStatus.CONFIRMED,
+            OrderStatus.TRAVELLING,
+            OrderStatus.ARRIVED,
+            OrderStatus.IN_PROGRESS,
+            OrderStatus.PAYMENT_PENDING,
+          ],
+        };
+      } else if (statusFilter === "COMPLETED") {
+        whereClause.OR = [
+          { status: OrderStatus.COMPLETED },
+          { paymentStatus: "PAID" },
+        ];
+      } else if (statusFilter === "PENDING" || statusFilter === "REQUESTED") {
+        whereClause.status = OrderStatus.REQUESTED;
+      } else {
+        whereClause.status = statusFilter as any;
+      }
+    }
+
+    const orders = await withDbRetry(() =>
+      prisma.order.findMany({
+        where: whereClause,
+        include: {
+          category: true,
+          subcategory: true,
+          problem: true,
+          priceProposals: {
+            orderBy: { createdAt: "desc" },
+          },
+          consumer: {
+            select: { id: true, name: true, phone: true, avatarUrl: true, locale: true },
+          },
+          statusHistory: {
+            orderBy: { createdAt: "desc" },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      })
+    );
+
+    return orders.map((o) => {
+      const isMasked = o.status === OrderStatus.REQUESTED;
+      return {
+        ...o,
+        address: isMasked ? null : o.address,
+        latitude: isMasked ? null : o.latitude,
+        longitude: isMasked ? null : o.longitude,
+        isAddressMasked: isMasked,
+        approxArea: o.approxArea || "Local Service Zone",
+        approxDistanceKm: o.approxDistanceKm,
+      };
+    });
   }
 
   /**
