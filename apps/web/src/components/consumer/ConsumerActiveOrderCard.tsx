@@ -330,7 +330,14 @@ export function ConsumerActiveOrderCard({
         <div className="flex items-center gap-2 self-end sm:self-auto">
           <button
             type="button"
-            onClick={refreshOrder}
+            onClick={() => {
+              refreshOrder();
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(
+                  new CustomEvent("order:consent_updated", { detail: { orderId: order.id } })
+                );
+              }
+            }}
             disabled={isRefreshing}
             className="p-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs flex items-center gap-1 transition"
             title="Refresh order state"

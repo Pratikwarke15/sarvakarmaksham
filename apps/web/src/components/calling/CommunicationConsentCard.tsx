@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   AlertCircle,
   XCircle,
+  RefreshCw,
 } from "lucide-react";
 import { apiGet, apiPost } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -86,13 +87,18 @@ export function CommunicationConsentCard({
   useEffect(() => {
     fetchConsent();
 
-    // Listen to window-level consent events dispatched by global VoiceCallProvider
+    // Listen to window-level consent events dispatched by global VoiceCallProvider or manual triggers
     const handleConsentEvent = (e: any) => {
       if (!e.detail?.orderId || e.detail.orderId === orderId) {
         fetchConsent();
       }
     };
     window.addEventListener("order:consent_updated", handleConsentEvent);
+
+    // Auto-polling fallback every 3s so both parties see consent state update automatically without hard reload
+    const pollInterval = setInterval(() => {
+      fetchConsent();
+    }, 3000);
 
     // Setup Socket listener for real-time consent updates
     const token = getStoredToken();
@@ -105,9 +111,17 @@ export function CommunicationConsentCard({
         path: "/ws",
         auth: { token },
         transports: ["websocket", "polling"],
+        reconnectionAttempts: 15,
+        reconnectionDelay: 1500,
       });
 
-      socket.emit("join:order", orderId);
+      socket.on("connect", () => {
+        socket?.emit("join:order", orderId);
+      });
+
+      if (socket.connected) {
+        socket.emit("join:order", orderId);
+      }
 
       socket.on("order:communication_consent_updated", (payload: any) => {
         if (!payload || payload.orderId === orderId) {
@@ -129,6 +143,7 @@ export function CommunicationConsentCard({
     }
 
     return () => {
+      clearInterval(pollInterval);
       window.removeEventListener("order:consent_updated", handleConsentEvent);
       if (socket) {
         socket.emit("leave:order", orderId);
@@ -273,8 +288,19 @@ export function CommunicationConsentCard({
           </div>
         </div>
 
-        {/* Mutual consent badge */}
-        <div>
+        {/* Mutual consent badge & manual refresh */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fetchConsent()}
+            disabled={loading}
+            className="p-1 px-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs flex items-center gap-1 transition shadow-2xs"
+            title="Refresh calling consent status"
+          >
+            <RefreshCw className={`h-3 w-3 text-slate-500 ${loading ? "animate-spin" : ""}`} />
+            <span className="text-[11px] font-medium">Refresh</span>
+          </button>
+
           {isFullyConsented ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold">
               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />

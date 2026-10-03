@@ -27,7 +27,11 @@ const RTC_CONFIG: RTCConfiguration = {
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
     { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
+    { urls: "stun:stun4.l.google.com:19302" },
+    { urls: "stun:global.stun.twilio.com:3478" },
   ],
+  iceCandidatePoolSize: 10,
 };
 
 const CALL_RINGING_TIMEOUT_SEC = 30;
@@ -36,7 +40,7 @@ class SoundSynthesizer {
   private ctx: AudioContext | null = null;
   private ringInterval: any = null;
 
-  private getAudioContext(): AudioContext | null {
+  getAudioContext(): AudioContext | null {
     if (typeof window === "undefined") return null;
     if (!this.ctx) {
       const AudioCtx =
@@ -168,39 +172,45 @@ class SoundSynthesizer {
 }
 
 async function getAudioMediaStream(): Promise<MediaStream> {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error("Microphone capture is not supported in this browser.");
+  }
+
+  // 1. Try with high quality voice processing
   try {
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      return await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-        video: false,
-      });
-    }
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+      video: false,
+    });
+    stream.getAudioTracks().forEach((track) => {
+      track.enabled = true;
+    });
+    return stream;
   } catch (err: any) {
     if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
       throw err;
     }
-    console.warn("Hardware getUserMedia fallback triggered:", err.name, err.message);
+    console.warn("Enhanced audio constraint failed, falling back to basic audio...", err.name, err.message);
   }
 
-  // Graceful fallback for test runners / headless / devices with no hardware mic
-  const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-  if (AudioCtx) {
-    const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const dst = ctx.createMediaStreamDestination();
-    const gain = ctx.createGain();
-    gain.gain.value = 0; // silent placeholder audio
-    osc.connect(gain);
-    gain.connect(dst);
-    osc.start();
-    return dst.stream;
+  // 2. Fallback to basic audio constraint (works universally on all mobile & desktop hardware)
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: false,
+    });
+    stream.getAudioTracks().forEach((track) => {
+      track.enabled = true;
+    });
+    return stream;
+  } catch (err: any) {
+    console.error("Basic audio getUserMedia failed:", err);
+    throw err;
   }
-
-  throw new Error("Audio capture is not supported in this browser.");
 }
 
 export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
@@ -222,6 +232,8 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
   const soundRef = useRef<SoundSynthesizer | null>(null);
   const timeoutTimerRef = useRef<any>(null);
   const durationTimerRef = useRef<any>(null);
+  const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
+  const remoteAudioCtxSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
 
   // Initialize sound synthesizer & enable on user gesture
   useEffect(() => {
@@ -245,6 +257,17 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Helper to start call duration timer
+  const startDurationTimer = useCallback(() => {
+    if (!durationTimerRef.current) {
+      durationTimerRef.current = setInterval(() => {
+        setActiveCall((prev) =>
+          prev ? { ...prev, durationSec: prev.durationSec + 1 } : null
+        );
+      }, 1000);
+    }
+  }, []);
+
   // Helper to stop timers
   const clearTimers = useCallback(() => {
     if (timeoutTimerRef.current) {
@@ -261,6 +284,14 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
   const cleanupMedia = useCallback(() => {
     clearTimers();
     soundRef.current?.stopRing();
+    iceCandidateQueueRef.current = [];
+
+    if (remoteAudioCtxSourceRef.current) {
+      try {
+        remoteAudioCtxSourceRef.current.disconnect();
+      } catch (e) {}
+      remoteAudioCtxSourceRef.current = null;
+    }
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -382,26 +413,35 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       async (data: { callId: string; sdp: RTCSessionDescriptionInit; responderId: string }) => {
         try {
           soundRef.current?.stopRing();
-          clearTimers();
+          if (timeoutTimerRef.current) {
+            clearTimeout(timeoutTimerRef.current);
+            timeoutTimerRef.current = null;
+          }
 
           if (pcRef.current && data.sdp) {
-            await pcRef.current.setRemoteDescription(
-              new RTCSessionDescription(data.sdp)
-            );
+            if (pcRef.current.signalingState === "have-local-offer") {
+              await pcRef.current.setRemoteDescription(
+                new RTCSessionDescription(data.sdp)
+              );
+            }
+          }
+
+          // Flush any queued ICE candidates received before answer
+          if (pcRef.current && iceCandidateQueueRef.current.length > 0) {
+            for (const cand of iceCandidateQueueRef.current) {
+              await pcRef.current.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+            }
+            iceCandidateQueueRef.current = [];
           }
 
           if (remoteAudioRef.current && remoteAudioRef.current.srcObject) {
+            remoteAudioRef.current.muted = false;
+            remoteAudioRef.current.volume = 1.0;
             remoteAudioRef.current.play().catch(() => {});
           }
 
           setCallState("CONNECTED");
-
-          // Start duration timer
-          durationTimerRef.current = setInterval(() => {
-            setActiveCall((prev) =>
-              prev ? { ...prev, durationSec: prev.durationSec + 1 } : null
-            );
-          }, 1000);
+          startDurationTimer();
 
           toast({
             title: "Call Connected",
@@ -410,15 +450,22 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
           });
         } catch (err: any) {
           console.error("Error setting remote description on answer:", err);
+          setCallState("CONNECTED");
+          startDurationTimer();
         }
       }
     );
 
-    // ICE Candidate exchange
+    // ICE Candidate exchange with queueing support
     socket.on("call:ice_candidate", async (data: { callId: string; candidate: any }) => {
       try {
-        if (pcRef.current && data.candidate) {
-          await pcRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+        if (!data.candidate) return;
+        const pc = pcRef.current;
+        if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+          await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } else {
+          // Queue candidate until remote description is applied
+          iceCandidateQueueRef.current.push(data.candidate);
         }
       } catch (err: any) {
         console.warn("ICE candidate addition error:", err);
@@ -557,19 +604,56 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
           }
         };
 
-        pc.ontrack = (event) => {
-          console.log("Caller received remote track:", event.streams[0]);
-          if (remoteAudioRef.current && event.streams[0]) {
-            remoteAudioRef.current.srcObject = event.streams[0];
+        const setupRemoteAudio = (remoteStream: MediaStream) => {
+          console.log("Caller remote audio stream tracks:", remoteStream.getAudioTracks());
+          remoteStream.getAudioTracks().forEach((track) => {
+            track.enabled = true;
+          });
+
+          // 1. Play via HTML5 <audio>
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = remoteStream;
             remoteAudioRef.current.muted = false;
             remoteAudioRef.current.volume = 1.0;
             remoteAudioRef.current.play().catch((err) => {
-              console.warn("Autoplay remote audio error:", err);
+              console.warn("HTML5 audio play catch:", err);
             });
+          }
+
+          // 2. Play via Web Audio API AudioContext for guaranteed unmuted mobile PWA voice
+          try {
+            const ctx = soundRef.current?.getAudioContext();
+            if (ctx) {
+              if (ctx.state === "suspended") {
+                ctx.resume().catch(() => {});
+              }
+              if (remoteAudioCtxSourceRef.current) {
+                try {
+                  remoteAudioCtxSourceRef.current.disconnect();
+                } catch (e) {}
+              }
+              const source = ctx.createMediaStreamSource(remoteStream);
+              remoteAudioCtxSourceRef.current = source;
+              const gainNode = ctx.createGain();
+              gainNode.gain.value = 1.0;
+              source.connect(gainNode);
+              gainNode.connect(ctx.destination);
+              console.log("Caller remote voice routed to AudioContext destination successfully!");
+            }
+          } catch (ctxErr) {
+            console.warn("Web Audio media stream routing note:", ctxErr);
+          }
+        };
+
+        pc.ontrack = (event) => {
+          console.log("Caller received remote track:", event.streams[0]);
+          if (event.streams[0]) {
+            setupRemoteAudio(event.streams[0]);
           }
         };
 
         pc.oniceconnectionstatechange = () => {
+          console.log("Caller ICE connection state:", pc.iceConnectionState);
           if (pc.iceConnectionState === "disconnected") {
             setCallState("RECONNECTING");
           } else if (
@@ -577,12 +661,11 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
             pc.iceConnectionState === "completed"
           ) {
             setCallState("CONNECTED");
+            startDurationTimer();
           } else if (pc.iceConnectionState === "failed") {
-            toast({
-              title: "Network Interruption",
-              description: "Peer audio connection interrupted. Reconnecting...",
-              variant: "danger",
-            });
+            try {
+              pc.restartIce();
+            } catch (e) {}
           }
         };
 
@@ -697,19 +780,56 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
         }
       };
 
-      pc.ontrack = (event) => {
-        console.log("Recipient received remote track:", event.streams[0]);
-        if (remoteAudioRef.current && event.streams[0]) {
-          remoteAudioRef.current.srcObject = event.streams[0];
+      const setupRemoteAudio = (remoteStream: MediaStream) => {
+        console.log("Recipient remote audio stream tracks:", remoteStream.getAudioTracks());
+        remoteStream.getAudioTracks().forEach((track) => {
+          track.enabled = true;
+        });
+
+        // 1. Play via HTML5 <audio>
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = remoteStream;
           remoteAudioRef.current.muted = false;
           remoteAudioRef.current.volume = 1.0;
           remoteAudioRef.current.play().catch((err) => {
-            console.warn("Autoplay remote audio error:", err);
+            console.warn("HTML5 audio play catch:", err);
           });
+        }
+
+        // 2. Play via Web Audio API AudioContext for guaranteed unmuted mobile PWA voice
+        try {
+          const ctx = soundRef.current?.getAudioContext();
+          if (ctx) {
+            if (ctx.state === "suspended") {
+              ctx.resume().catch(() => {});
+            }
+            if (remoteAudioCtxSourceRef.current) {
+              try {
+                remoteAudioCtxSourceRef.current.disconnect();
+              } catch (e) {}
+            }
+            const source = ctx.createMediaStreamSource(remoteStream);
+            remoteAudioCtxSourceRef.current = source;
+            const gainNode = ctx.createGain();
+            gainNode.gain.value = 1.0;
+            source.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            console.log("Recipient remote voice routed to AudioContext destination successfully!");
+          }
+        } catch (ctxErr) {
+          console.warn("Web Audio media stream routing note:", ctxErr);
+        }
+      };
+
+      pc.ontrack = (event) => {
+        console.log("Recipient received remote track:", event.streams[0]);
+        if (event.streams[0]) {
+          setupRemoteAudio(event.streams[0]);
         }
       };
 
       pc.oniceconnectionstatechange = () => {
+        console.log("Recipient ICE connection state:", pc.iceConnectionState);
         if (pc.iceConnectionState === "disconnected") {
           setCallState("RECONNECTING");
         } else if (
@@ -717,11 +837,25 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
           pc.iceConnectionState === "completed"
         ) {
           setCallState("CONNECTED");
+          startDurationTimer();
+        } else if (pc.iceConnectionState === "failed") {
+          try {
+            pc.restartIce();
+          } catch (e) {}
         }
       };
 
       // 3. Set Remote Offer & Create Answer
       await pc.setRemoteDescription(new RTCSessionDescription(incomingCall.sdp));
+
+      // Flush any queued ICE candidates received before acceptCall
+      if (iceCandidateQueueRef.current.length > 0) {
+        for (const cand of iceCandidateQueueRef.current) {
+          await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+        }
+        iceCandidateQueueRef.current = [];
+      }
+
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
@@ -748,13 +882,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
 
       setIncomingCall(null);
       setCallState("CONNECTED");
-
-      // Start duration counter
-      durationTimerRef.current = setInterval(() => {
-        setActiveCall((prev) =>
-          prev ? { ...prev, durationSec: prev.durationSec + 1 } : null
-        );
-      }, 1000);
+      startDurationTimer();
     } catch (err: any) {
       console.error("acceptCall error:", err);
       cleanupMedia();

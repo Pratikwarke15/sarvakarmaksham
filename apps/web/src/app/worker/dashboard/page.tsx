@@ -574,7 +574,12 @@ export default function WorkerDashboard() {
 
           <button
             type="button"
-            onClick={() => fetchDashboard(false)}
+            onClick={() => {
+              fetchDashboard(false);
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("order:consent_updated"));
+              }
+            }}
             disabled={refreshing}
             className="text-[11px] font-bold text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 shrink-0 bg-white px-2.5 py-1 rounded-xl border border-slate-200 shadow-2xs"
           >
