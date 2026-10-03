@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { io, Socket } from "socket.io-client";
 import { getStoredToken } from "@/lib/storage";
+import { getWebSocketUrl } from "@/lib/websocket";
 import { useToast } from "@/components/providers/ToastProvider";
 import {
   VoiceCallContext,
@@ -61,6 +62,9 @@ class SoundSynthesizer {
     this.stopRing();
     const ctx = this.getAudioContext();
     if (!ctx) return;
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
 
     const playToneBurst = () => {
       if (!this.ctx || this.ctx.state === "closed") return;
@@ -73,11 +77,11 @@ class SoundSynthesizer {
           const gain = this.ctx.createGain();
 
           osc1.type = "sine";
-          osc1.frequency.setValueAtTime(440, startTime); // A4
+          osc1.frequency.setValueAtTime(440, startTime); // Standard Telephone Dual-Frequency
           osc2.type = "sine";
           osc2.frequency.setValueAtTime(480, startTime);
 
-          gain.gain.setValueAtTime(0.18, startTime);
+          gain.gain.setValueAtTime(0.25, startTime);
           gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
 
           osc1.connect(gain);
@@ -90,20 +94,23 @@ class SoundSynthesizer {
           osc2.stop(startTime + dur);
         };
 
-        // Real phone ringing cadence: burst 1 (0.6s) -> pause (0.2s) -> burst 2 (0.6s) -> quiet (2s)
-        playBeep(now, 0.6);
-        playBeep(now + 0.8, 0.6);
+        // Realistic double-ring bell cadence: burst 1 (0.5s) -> pause (0.2s) -> burst 2 (0.5s) -> quiet (2.2s)
+        playBeep(now, 0.5);
+        playBeep(now + 0.7, 0.5);
       } catch (e) {}
     };
 
     playToneBurst();
-    this.ringInterval = setInterval(playToneBurst, 3200);
+    this.ringInterval = setInterval(playToneBurst, 3400);
   }
 
   playRingback() {
     this.stopRing();
     const ctx = this.getAudioContext();
     if (!ctx) return;
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
 
     const playToneBurst = () => {
       if (!this.ctx || this.ctx.state === "closed") return;
@@ -115,7 +122,7 @@ class SoundSynthesizer {
         osc.type = "sine";
         osc.frequency.setValueAtTime(425, now);
 
-        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.setValueAtTime(0.12, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
 
         osc.connect(gain);
@@ -127,7 +134,7 @@ class SoundSynthesizer {
     };
 
     playToneBurst();
-    this.ringInterval = setInterval(playToneBurst, 3500);
+    this.ringInterval = setInterval(playToneBurst, 3600);
   }
 
   playEndChime() {
@@ -226,11 +233,15 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
 
     window.addEventListener("click", handleUnlock, { passive: true });
     window.addEventListener("touchstart", handleUnlock, { passive: true });
+    window.addEventListener("pointerdown", handleUnlock, { passive: true });
+    window.addEventListener("keydown", handleUnlock, { passive: true });
 
     return () => {
       soundRef.current?.stopRing();
       window.removeEventListener("click", handleUnlock);
       window.removeEventListener("touchstart", handleUnlock);
+      window.removeEventListener("pointerdown", handleUnlock);
+      window.removeEventListener("keydown", handleUnlock);
     };
   }, []);
 
@@ -276,18 +287,13 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     const token = getStoredToken();
     if (!token) return;
 
-    const socketUrl =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1")
-        ? "http://localhost:4000"
-        : "";
+    const socketUrl = getWebSocketUrl();
 
     const socket = io(socketUrl, {
       path: "/ws",
       auth: { token },
       transports: ["websocket", "polling"],
-      reconnectionAttempts: 12,
+      reconnectionAttempts: 15,
       reconnectionDelay: 1500,
     });
 
@@ -331,9 +337,17 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
 
     // Incoming Call Event
     socket.on("call:incoming", (data: IncomingCallData) => {
+      console.log("WebRTC received incoming call:", data.callId, "from", data.callerName);
       setIncomingCall(data);
       setCallState("INCOMING");
       soundRef.current?.playIncomingRing();
+
+      // Immediately acknowledge to server and caller that this recipient device is actively ringing!
+      socket.emit("call:ringing", {
+        callId: data.callId,
+        callerId: data.callerId,
+        orderId: data.orderId,
+      });
 
       // Recipient 30s ringing timeout
       clearTimers();
@@ -349,8 +363,15 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       }, CALL_RINGING_TIMEOUT_SEC * 1000);
     });
 
-    // Caller: ringing feedback
+    // Caller: server acknowledged call initiation (state: CALLING, recipient device has not answered or rung yet)
+    socket.on("call:initiated", (data: { callId: string; orderId: string }) => {
+      console.log("WebRTC call initiated on server:", data.callId);
+      setCallState("CALLING");
+    });
+
+    // Caller: recipient acknowledged receiving call and is ringing!
     socket.on("call:ringing", (data: { callId: string }) => {
+      console.log("WebRTC recipient device is ringing! Playing ringback tone:", data.callId);
       setCallState("RINGING");
       soundRef.current?.playRingback();
     });
@@ -489,7 +510,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     }) => {
       try {
         setMicPermissionError(null);
-        setCallState("INITIATING");
+        setCallState("CALLING");
 
         // 1. Acquire microphone
         let stream: MediaStream;
@@ -537,9 +558,14 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
         };
 
         pc.ontrack = (event) => {
+          console.log("Caller received remote track:", event.streams[0]);
           if (remoteAudioRef.current && event.streams[0]) {
             remoteAudioRef.current.srcObject = event.streams[0];
-            remoteAudioRef.current.play().catch(() => {});
+            remoteAudioRef.current.muted = false;
+            remoteAudioRef.current.volume = 1.0;
+            remoteAudioRef.current.play().catch((err) => {
+              console.warn("Autoplay remote audio error:", err);
+            });
           }
         };
 
@@ -672,9 +698,14 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       };
 
       pc.ontrack = (event) => {
+        console.log("Recipient received remote track:", event.streams[0]);
         if (remoteAudioRef.current && event.streams[0]) {
           remoteAudioRef.current.srcObject = event.streams[0];
-          remoteAudioRef.current.play().catch(() => {});
+          remoteAudioRef.current.muted = false;
+          remoteAudioRef.current.volume = 1.0;
+          remoteAudioRef.current.play().catch((err) => {
+            console.warn("Autoplay remote audio error:", err);
+          });
         }
       };
 

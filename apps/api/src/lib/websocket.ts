@@ -162,7 +162,12 @@ export function setupWebSocket(server: http.Server): void {
           orderId: data.orderId,
         });
 
-        socket.emit("call:ringing", { callId: session.id, orderId: data.orderId });
+        // Acknowledge initiation to the caller (state: CALLING, waiting for recipient to ring)
+        socket.emit("call:initiated", {
+          callId: session.id,
+          orderId: data.orderId,
+          recipientUserId,
+        });
 
         const incomingData = {
           callId: session.id,
@@ -183,6 +188,27 @@ export function setupWebSocket(server: http.Server): void {
       } catch (err: any) {
         logger.warn(`call:initiate error: ${err.message}`);
         socket.emit("call:failed", { message: err.message || "Failed to initiate call." });
+      }
+    });
+
+    // Recipient acknowledges receiving the incoming call and ringing starts on device
+    socket.on("call:ringing", (data: {
+      callId: string;
+      callerId: string;
+      orderId?: string;
+    }) => {
+      logger.info(`Call ringing ack from recipient ${userId} for call ${data.callId} to caller ${data.callerId}`);
+      io.to(`user:${data.callerId}`).emit("call:ringing", {
+        callId: data.callId,
+        orderId: data.orderId,
+        recipientId: userId,
+      });
+      if (data.orderId) {
+        socket.to(`order:${data.orderId}`).emit("call:ringing", {
+          callId: data.callId,
+          orderId: data.orderId,
+          recipientId: userId,
+        });
       }
     });
 

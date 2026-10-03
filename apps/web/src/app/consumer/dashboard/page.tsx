@@ -31,6 +31,7 @@ import { ConsumerActiveOrderCard } from "@/components/consumer/ConsumerActiveOrd
 import { OrderPaymentReceiptModal } from "@/components/payment/OrderPaymentReceiptModal";
 import { apiGet } from "@/lib/api";
 import { getStoredToken } from "@/lib/storage";
+import { getWebSocketUrl } from "@/lib/websocket";
 import { formatCurrency } from "@/lib/utils";
 import { useI18n } from "@/i18n/I18nProvider";
 import type { Order, OrderPaymentReceipt } from "@/lib/types";
@@ -133,12 +134,7 @@ export default function ConsumerDashboard() {
     const token = getStoredToken();
     if (!token) return;
 
-    const socketUrl =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1")
-        ? "http://localhost:4000"
-        : "";
+    const socketUrl = getWebSocketUrl();
 
     const socket = io(socketUrl, {
       path: "/ws",

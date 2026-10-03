@@ -26,6 +26,7 @@ import { io, Socket } from "socket.io-client";
 import { formatCurrency } from "@/lib/utils";
 import { apiGet } from "@/lib/api";
 import { getStoredToken } from "@/lib/storage";
+import { getWebSocketUrl } from "@/lib/websocket";
 import { LiveOrderTrackingMap } from "@/components/maps/LiveOrderTrackingMap";
 import { CommunicationConsentCard } from "@/components/calling/CommunicationConsentCard";
 import { PriceNegotiationModal } from "@/components/worker/PriceNegotiationModal";
@@ -114,12 +115,7 @@ export function ConsumerActiveOrderCard({
     const token = getStoredToken();
     if (!token || !order.id) return;
 
-    const socketUrl =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1")
-        ? "http://localhost:4000"
-        : "";
+    const socketUrl = getWebSocketUrl();
 
     const socket = io(socketUrl, {
       path: "/ws",

@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { io } from "socket.io-client";
 import { getStoredToken } from "@/lib/storage";
+import { getWebSocketUrl } from "@/lib/websocket";
 import { formatCurrency } from "@/lib/utils";
 import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { useToast } from "@/components/providers/ToastProvider";
@@ -169,12 +170,7 @@ export default function WorkerDashboard() {
     const token = getStoredToken();
     if (!token || !isAuthenticated) return;
 
-    const socketUrl =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1")
-        ? "http://localhost:4000"
-        : "";
+    const socketUrl = getWebSocketUrl();
 
     const socket = io(socketUrl, {
       path: "/ws",

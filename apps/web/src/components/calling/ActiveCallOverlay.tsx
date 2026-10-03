@@ -17,6 +17,8 @@ import {
   RefreshCw,
   WifiOff,
   Radio,
+  Loader2,
+  PhoneCall,
 } from "lucide-react";
 import type { CallState, ActiveCallData } from "./VoiceCallContext";
 
@@ -59,31 +61,43 @@ export function ActiveCallOverlay({
   // Status text & badge
   let statusBadge = {
     text: "Connected",
+    subtext: "Voice stream active",
     bg: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
     dot: "bg-emerald-400 animate-pulse",
   };
 
-  if (callState === "INITIATING" || callState === "RINGING") {
+  if (callState === "CALLING" || callState === "INITIATING") {
+    statusBadge = {
+      text: "Calling...",
+      subtext: `Reaching ${participant?.name || "partner"}...`,
+      bg: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+      dot: "bg-amber-400 animate-spin",
+    };
+  } else if (callState === "RINGING") {
     statusBadge = {
       text: "Ringing...",
+      subtext: "Recipient's phone is ringing...",
       bg: "bg-amber-500/20 text-amber-300 border-amber-500/30",
       dot: "bg-amber-400 animate-ping",
     };
   } else if (callState === "CONNECTING") {
     statusBadge = {
       text: "Connecting...",
+      subtext: "Establishing voice connection...",
       bg: "bg-blue-500/20 text-blue-300 border-blue-500/30",
       dot: "bg-blue-400 animate-ping",
     };
   } else if (callState === "RECONNECTING") {
     statusBadge = {
       text: "Reconnecting Network...",
+      subtext: "Restoring audio stream...",
       bg: "bg-orange-500/20 text-orange-300 border-orange-500/30",
       dot: "bg-orange-400 animate-ping",
     };
   } else if (callState === "ENDED") {
     statusBadge = {
       text: "Call Ended",
+      subtext: "Voice call finished",
       bg: "bg-rose-500/20 text-rose-300 border-rose-500/30",
       dot: "bg-rose-400",
     };
@@ -207,6 +221,41 @@ export function ActiveCallOverlay({
                 : "Resident")}
           </p>
         </div>
+
+        {/* Dynamic status feedback & live audio indicator */}
+        {callState === "CALLING" && (
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400" />
+            <span>Calling... waiting for response</span>
+          </div>
+        )}
+
+        {callState === "RINGING" && (
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-medium animate-pulse">
+            <Radio className="h-3.5 w-3.5 text-amber-400" />
+            <span>Ringing... bell active on partner&apos;s device</span>
+          </div>
+        )}
+
+        {callState === "CONNECTING" && (
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-medium">
+            <RefreshCw className="h-3.5 w-3.5 animate-spin text-blue-400" />
+            <span>Connecting live audio stream...</span>
+          </div>
+        )}
+
+        {callState === "CONNECTED" && (
+          <div className="flex flex-col items-center gap-1.5 pt-1">
+            <div className="flex items-center gap-1 h-5">
+              <span className="w-1 bg-emerald-400 rounded-full animate-bounce [animation-delay:0ms] h-3" />
+              <span className="w-1 bg-emerald-400 rounded-full animate-bounce [animation-delay:150ms] h-5" />
+              <span className="w-1 bg-emerald-400 rounded-full animate-bounce [animation-delay:300ms] h-4" />
+              <span className="w-1 bg-emerald-400 rounded-full animate-bounce [animation-delay:450ms] h-2" />
+              <span className="w-1 bg-emerald-400 rounded-full animate-bounce [animation-delay:200ms] h-4" />
+            </div>
+            <span className="text-xs font-mono font-bold text-emerald-400">Live Voice Connected ({durationText})</span>
+          </div>
+        )}
 
         {/* Privacy Note */}
         <p className="text-[10px] text-slate-400 flex items-center justify-center gap-1">

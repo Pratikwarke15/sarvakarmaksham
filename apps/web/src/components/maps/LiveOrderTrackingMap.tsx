@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { apiGet, apiPost, apiPatch } from "@/lib/api";
 import { getStoredToken } from "@/lib/storage";
+import { getWebSocketUrl } from "@/lib/websocket";
 import { LiveTrackingData, OrderStatus } from "@/lib/types";
 
 // Dynamically import LeafletMap with SSR disabled to prevent window undefined errors
@@ -93,11 +94,7 @@ export function LiveOrderTrackingMap({
     const token = getStoredToken();
     if (!token) return;
 
-    // Resolve socket URL: port 4000 in dev or relative in prod
-    const socketUrl =
-      typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-        ? "http://localhost:4000"
-        : "";
+    const socketUrl = getWebSocketUrl();
 
     const socket = io(socketUrl, {
       path: "/ws",

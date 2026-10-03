@@ -4,10 +4,24 @@ import { io, Socket } from "socket.io-client";
 
 let socket: Socket | null = null;
 
+export function getWebSocketUrl(): string {
+  if (process.env.NEXT_PUBLIC_WS_URL) {
+    return process.env.NEXT_PUBLIC_WS_URL;
+  }
+  if (
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1")
+  ) {
+    return "http://localhost:4000";
+  }
+  return "https://coopgig.onrender.com";
+}
+
 export function getSocket(): Socket {
   if (socket) return socket;
 
-  const url = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:4000";
+  const url = getWebSocketUrl();
   const token =
     typeof window !== "undefined"
       ? localStorage.getItem("coopgig_token")
@@ -17,6 +31,7 @@ export function getSocket(): Socket {
     path: "/ws",
     auth: { token },
     autoConnect: false,
+    transports: ["websocket", "polling"],
   });
 
   return socket;

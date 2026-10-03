@@ -5,6 +5,7 @@ import React, { createContext, useContext } from "react";
 export type CallState =
   | "IDLE"
   | "INITIATING"
+  | "CALLING"
   | "RINGING"
   | "INCOMING"
   | "CONNECTING"
