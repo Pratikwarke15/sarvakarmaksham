@@ -60,7 +60,7 @@ router.get("/profile", authenticate, authorize("CONSUMER"), asyncHandler(async (
     prisma.order.count({
       where: {
         consumerId: userId,
-        status: { in: ["PENDING", "MATCHING", "ACCEPTED", "ASSIGNED", "TRAVELLING", "ARRIVED", "DIAGNOSING", "IN_PROGRESS"] },
+        status: { in: ["REQUESTED", "ACCEPTED", "CONFIRMED", "TRAVELLING", "ARRIVED", "IN_PROGRESS", "NEGOTIATION"] },
       },
     }),
   ]);
