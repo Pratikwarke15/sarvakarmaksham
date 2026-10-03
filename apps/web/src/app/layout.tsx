@@ -5,6 +5,7 @@ import { ToastProvider } from "@/components/providers/ToastProvider";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { SessionBootstrap } from "@/components/auth/SessionBootstrap";
 import { VoiceCallProvider } from "@/components/calling/VoiceCallProvider";
+import { NotificationPermissionBanner } from "@/components/notifications/NotificationPermissionBanner";
 import "./globals.css";
 
 const inter = Inter({
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <ToastProvider>
               <SessionBootstrap />
               <VoiceCallProvider>
+                <NotificationPermissionBanner />
                 {children}
               </VoiceCallProvider>
             </ToastProvider>

@@ -32,6 +32,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useToast } from "@/components/providers/ToastProvider";
 import { getRoleDashboardPath } from "@/lib/utils";
 import type { UserRole } from "@/lib/types";
+import { notifyOtp } from "@/lib/notifications";
 
 type RegisterStep =
   | "role"
@@ -155,6 +156,8 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
 
   const triggerPushBanner = (type: "SMS" | "EMAIL", code: string) => {
     setDemoOtpNotification({ type, code });
+    // Show on real device OS notification bar
+    notifyOtp(code, type === "SMS" ? "Mobile Verification" : "Email Verification");
     setTimeout(() => {
       setDemoOtpNotification((prev) => (prev?.code === code ? null : prev));
     }, 20000);

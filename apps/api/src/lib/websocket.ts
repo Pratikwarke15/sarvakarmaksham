@@ -55,6 +55,18 @@ export function setupWebSocket(server: http.Server): void {
     socket.join(`role:${role}`);
     socket.join(`user:${userId}`);
 
+    if (role === "WORKER" || role === "ADMIN") {
+      prisma.workerProfile
+        .findUnique({ where: { userId }, select: { id: true } })
+        .then((w) => {
+          if (w) {
+            socket.join(`worker:${w.id}`);
+            logger.info(`Worker socket ${userId} auto-joined worker:${w.id}`);
+          }
+        })
+        .catch(() => {});
+    }
+
     socket.on("join:user", (uId: string) => {
       socket.join(`user:${uId}`);
     });
@@ -219,10 +231,6 @@ export function setupWebSocket(server: http.Server): void {
       sdp: any;
     }) => {
       try {
-        await CallService.updateCallSession(data.callId, {
-          status: CallStatus.CONNECTED,
-        });
-
         activeCalls.set(socket.id, {
           callId: data.callId,
           targetUserId: data.targetUserId,
@@ -235,11 +243,19 @@ export function setupWebSocket(server: http.Server): void {
           responderId: userId,
         };
 
+        // Emit immediately to ensure no signaling latency
         io.to(`user:${data.targetUserId}`).emit("call:answered", answerPayload);
         if (data.orderId) {
           socket.to(`order:${data.orderId}`).emit("call:answered", answerPayload);
         }
         logger.info(`WebRTC call answered: ${data.callId} by ${userId}`);
+
+        // Update DB in background
+        if (data.callId && !data.callId.startsWith("call_")) {
+          CallService.updateCallSession(data.callId, {
+            status: CallStatus.CONNECTED,
+          }).catch((err) => logger.warn(`call:answer DB update warning: ${err.message}`));
+        }
       } catch (err: any) {
         logger.warn(`call:answer error: ${err.message}`);
       }
@@ -266,27 +282,56 @@ export function setupWebSocket(server: http.Server): void {
 
     socket.on("call:reject", async (data: {
       callId: string;
-      targetUserId: string;
+      targetUserId?: string;
       orderId?: string;
       reason?: string;
     }) => {
       try {
+        const ongoing = activeCalls.get(socket.id);
         activeCalls.delete(socket.id);
-        await CallService.updateCallSession(data.callId, {
-          status: CallStatus.REJECTED,
-          endReason: data.reason || "declined",
-        });
+
+        const targetUserId = data.targetUserId || ongoing?.targetUserId;
+        const orderId = data.orderId || ongoing?.orderId;
+        const callId = data.callId || ongoing?.callId || `call_${Date.now()}`;
 
         const rejectPayload = {
-          callId: data.callId,
+          callId,
           reason: data.reason || "Call declined by recipient.",
         };
 
-        io.to(`user:${data.targetUserId}`).emit("call:rejected", rejectPayload);
-        if (data.orderId) {
-          socket.to(`order:${data.orderId}`).emit("call:rejected", rejectPayload);
+        // 1. CRITICAL: Emit real-time rejection/cancellation IMMEDIATELY to both rooms!
+        if (targetUserId) {
+          io.to(`user:${targetUserId}`).emit("call:rejected", rejectPayload);
+          io.to(`user:${targetUserId}`).emit("call:ended", rejectPayload);
         }
-        logger.info(`WebRTC call rejected: ${data.callId}`);
+        if (orderId) {
+          socket.to(`order:${orderId}`).emit("call:rejected", rejectPayload);
+          socket.to(`order:${orderId}`).emit("call:ended", rejectPayload);
+        }
+        logger.info(`WebRTC call rejected/cancelled: ${callId}, notified target: ${targetUserId}`);
+
+        // 2. Safe async DB update (never throws or prevents WebRTC teardown)
+        if (callId && !callId.startsWith("call_")) {
+          CallService.updateCallSession(callId, {
+            status: CallStatus.REJECTED,
+            endReason: data.reason || "declined",
+          }).catch((e) => logger.warn(`call:reject DB error: ${e.message}`));
+        } else if (orderId) {
+          prisma.callSession.findFirst({
+            where: {
+              orderId,
+              status: { in: [CallStatus.RINGING] },
+            },
+            orderBy: { createdAt: "desc" },
+          }).then((s) => {
+            if (s) {
+              CallService.updateCallSession(s.id, {
+                status: CallStatus.REJECTED,
+                endReason: data.reason || "declined",
+              }).catch(() => {});
+            }
+          }).catch(() => {});
+        }
       } catch (err: any) {
         logger.warn(`call:reject error: ${err.message}`);
       }
@@ -300,26 +345,52 @@ export function setupWebSocket(server: http.Server): void {
       reason?: string;
     }) => {
       try {
+        const ongoing = activeCalls.get(socket.id);
         activeCalls.delete(socket.id);
-        await CallService.updateCallSession(data.callId, {
-          status: CallStatus.ENDED,
-          durationSec: data.durationSec,
-          endReason: data.reason || "completed",
-        });
+
+        const targetUserId = data.targetUserId || ongoing?.targetUserId;
+        const orderId = data.orderId || ongoing?.orderId;
+        const callId = data.callId || ongoing?.callId || `call_${Date.now()}`;
 
         const endPayload = {
-          callId: data.callId,
+          callId,
           durationSec: data.durationSec || 0,
           reason: data.reason || "Call ended.",
         };
 
-        if (data.targetUserId) {
-          io.to(`user:${data.targetUserId}`).emit("call:ended", endPayload);
+        // 1. CRITICAL: Emit real-time hangup IMMEDIATELY to counterpart so audio and overlay close cleanly!
+        if (targetUserId) {
+          io.to(`user:${targetUserId}`).emit("call:ended", endPayload);
         }
-        if (data.orderId) {
-          socket.to(`order:${data.orderId}`).emit("call:ended", endPayload);
+        if (orderId) {
+          socket.to(`order:${orderId}`).emit("call:ended", endPayload);
         }
-        logger.info(`WebRTC call ended: ${data.callId}`);
+        logger.info(`WebRTC call ended: ${callId}, notified target: ${targetUserId}`);
+
+        // 2. Safe async DB update (never throws or prevents WebRTC teardown)
+        if (callId && !callId.startsWith("call_")) {
+          CallService.updateCallSession(callId, {
+            status: CallStatus.ENDED,
+            durationSec: data.durationSec,
+            endReason: data.reason || "completed",
+          }).catch((e) => logger.warn(`call:end DB error: ${e.message}`));
+        } else if (orderId) {
+          prisma.callSession.findFirst({
+            where: {
+              orderId,
+              status: { in: [CallStatus.RINGING, CallStatus.CONNECTED] },
+            },
+            orderBy: { createdAt: "desc" },
+          }).then((s) => {
+            if (s) {
+              CallService.updateCallSession(s.id, {
+                status: CallStatus.ENDED,
+                durationSec: data.durationSec,
+                endReason: data.reason || "completed",
+              }).catch(() => {});
+            }
+          }).catch(() => {});
+        }
       } catch (err: any) {
         logger.warn(`call:end error: ${err.message}`);
       }
@@ -330,15 +401,25 @@ export function setupWebSocket(server: http.Server): void {
       const ongoing = activeCalls.get(socket.id);
       if (ongoing) {
         activeCalls.delete(socket.id);
+        const endPayload = {
+          callId: ongoing.callId,
+          reason: "Other party disconnected or refreshed.",
+        };
+
+        if (ongoing.targetUserId) {
+          io.to(`user:${ongoing.targetUserId}`).emit("call:ended", endPayload);
+        }
+        if (ongoing.orderId) {
+          socket.to(`order:${ongoing.orderId}`).emit("call:ended", endPayload);
+        }
+
         try {
-          await CallService.updateCallSession(ongoing.callId, {
-            status: CallStatus.ENDED,
-            endReason: "peer_disconnected",
-          });
-          io.to(`user:${ongoing.targetUserId}`).emit("call:ended", {
-            callId: ongoing.callId,
-            reason: "Other party disconnected or refreshed.",
-          });
+          if (ongoing.callId && !ongoing.callId.startsWith("call_")) {
+            await CallService.updateCallSession(ongoing.callId, {
+              status: CallStatus.ENDED,
+              endReason: "peer_disconnected",
+            });
+          }
         } catch (err: any) {
           logger.warn(`Disconnect cleanup error: ${err.message}`);
         }

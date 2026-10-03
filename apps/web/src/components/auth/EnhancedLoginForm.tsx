@@ -22,6 +22,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useToast } from "@/components/providers/ToastProvider";
 import { getRoleDashboardPath } from "@/lib/utils";
 import type { UserRole } from "@/lib/types";
+import { notifyOtp } from "@/lib/notifications";
 
 export interface EnhancedLoginFormProps {
   initialRole?: "WORKER" | "CONSUMER";
@@ -91,6 +92,8 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
   const triggerPushNotification = (receivedOtp: string) => {
     setServerOtpNotification(receivedOtp);
     setShowNotification(true);
+    // Display on real device notification bar / OS notification shade
+    notifyOtp(receivedOtp, "Login");
     if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
     notificationTimeoutRef.current = setTimeout(() => {
       setShowNotification(false);

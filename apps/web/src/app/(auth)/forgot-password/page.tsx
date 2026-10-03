@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { OtpInput } from "@/components/auth/OtpInput";
 import { useToast } from "@/components/providers/ToastProvider";
+import { notifyOtp } from "@/lib/notifications";
 
 type Step = "identifier" | "otp" | "new_password" | "success";
 
@@ -58,6 +59,8 @@ export default function ForgotPasswordPage() {
   const triggerPushNotification = (code: string) => {
     setServerOtpNotification(code);
     setShowNotification(true);
+    // Show on real device OS notification bar
+    notifyOtp(code, "Password Reset");
   };
 
   // Step 1: Send OTP

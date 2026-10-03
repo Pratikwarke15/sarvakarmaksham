@@ -21,6 +21,13 @@ import { IncomingCallModal } from "./IncomingCallModal";
 import { ActiveCallOverlay } from "./ActiveCallOverlay";
 import { PriceNegotiationModal } from "@/components/worker/PriceNegotiationModal";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  notifyIncomingCall,
+  notifyBookingUpdate,
+  notifyBookingRequest,
+  notifyConsent,
+  closeSystemNotification,
+} from "@/lib/notifications";
 
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [
@@ -234,10 +241,15 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
   const durationTimerRef = useRef<any>(null);
   const iceCandidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
   const remoteAudioCtxSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const currentCallIdRef = useRef<string | null>(null);
 
-  // Initialize sound synthesizer & enable on user gesture
+  // Initialize sound synthesizer & PWA Service Worker on mount
   useEffect(() => {
     soundRef.current = new SoundSynthesizer();
+
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
 
     const handleUnlock = () => {
       soundRef.current?.unlock();
@@ -348,6 +360,11 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("order:consent_updated", { detail: data }));
       }
+      notifyConsent(
+        data.title || "📞 Call Consent Requested",
+        data.message || "A party requested communication permission for this order.",
+        data.orderId
+      );
       toast({
         title: data.title || "Call Consent Requested",
         description: data.message || "A party requested communication permission for this order.",
@@ -359,6 +376,11 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("order:consent_updated", { detail: data }));
       }
+      notifyConsent(
+        data.title || "🟢 Call Permission Active",
+        data.message || "Both parties have granted consent. You can now place in-app voice calls.",
+        data.orderId
+      );
       toast({
         title: data.title || "Call Permission Active",
         description: data.message || "Both parties have granted consent. You can now place in-app voice calls.",
@@ -366,12 +388,50 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       });
     });
 
+    // Realtime Booking Status Updates on System Notification Bar
+    socket.on("order:status_update", (data: any) => {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("order:status_updated", { detail: data }));
+      }
+      if (data?.status) {
+        notifyBookingUpdate(
+          data.orderRef || data.orderId?.slice(-6) || "Update",
+          data.status,
+          data.message,
+          data.orderId
+        );
+      }
+    });
+
+    // Realtime Worker Incoming Job Requests on System Notification Bar
+    socket.on("order:incoming", (data: any) => {
+      notifyBookingRequest(
+        data.problemTitle || data.category || "Service Job",
+        data.consumer?.name || data.consumerName,
+        data.id || data.orderId
+      );
+    });
+
+    socket.on("worker_update", (data: any) => {
+      if (data?.type === "NEW_REQUEST" || data?.problemTitle || data?.orderId) {
+        notifyBookingRequest(
+          data.problemTitle || data.category || "Service Job",
+          data.consumer?.name || data.consumerName,
+          data.id || data.orderId
+        );
+      }
+    });
+
     // Incoming Call Event
     socket.on("call:incoming", (data: IncomingCallData) => {
       console.log("WebRTC received incoming call:", data.callId, "from", data.callerName);
+      currentCallIdRef.current = data.callId;
       setIncomingCall(data);
       setCallState("INCOMING");
       soundRef.current?.playIncomingRing();
+
+      // Show real OS / system notification bar alert
+      notifyIncomingCall(data.callerName, data.callId, data.orderId);
 
       // Immediately acknowledge to server and caller that this recipient device is actively ringing!
       socket.emit("call:ringing", {
@@ -384,6 +444,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       clearTimers();
       timeoutTimerRef.current = setTimeout(() => {
         soundRef.current?.stopRing();
+        closeSystemNotification(`call-${data.callId}`);
         setIncomingCall(null);
         setCallState("IDLE");
         toast({
@@ -397,12 +458,15 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
     // Caller: server acknowledged call initiation (state: CALLING, recipient device has not answered or rung yet)
     socket.on("call:initiated", (data: { callId: string; orderId: string }) => {
       console.log("WebRTC call initiated on server:", data.callId);
+      currentCallIdRef.current = data.callId;
       setCallState("CALLING");
+      setActiveCall((prev) => (prev ? { ...prev, callId: data.callId } : prev));
     });
 
     // Caller: recipient acknowledged receiving call and is ringing!
     socket.on("call:ringing", (data: { callId: string }) => {
       console.log("WebRTC recipient device is ringing! Playing ringback tone:", data.callId);
+      if (data.callId) currentCallIdRef.current = data.callId;
       setCallState("RINGING");
       soundRef.current?.playRingback();
     });
@@ -412,6 +476,7 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       "call:answered",
       async (data: { callId: string; sdp: RTCSessionDescriptionInit; responderId: string }) => {
         try {
+          if (data.callId) currentCallIdRef.current = data.callId;
           soundRef.current?.stopRing();
           if (timeoutTimerRef.current) {
             clearTimeout(timeoutTimerRef.current);
@@ -472,10 +537,17 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Caller: callee rejected
+    // Caller/Callee: call rejected or cancelled by other party
     socket.on("call:rejected", (data: { callId: string; reason?: string }) => {
+      console.log("WebRTC call rejected received:", data.callId);
+      closeSystemNotification(`call-${data.callId}`);
+      if (currentCallIdRef.current) {
+        closeSystemNotification(`call-${currentCallIdRef.current}`);
+      }
+      soundRef.current?.stopRing();
       soundRef.current?.playEndChime();
       cleanupMedia();
+      setIncomingCall(null);
       setCallState("ENDED");
       toast({
         title: "Call Declined",
@@ -485,13 +557,20 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       setTimeout(() => {
         setActiveCall(null);
         setCallState("IDLE");
-      }, 2500);
+      }, 1500);
     });
 
-    // Call ended by either party
+    // Call ended by either party mid-call or during ringing
     socket.on("call:ended", (data: { callId: string; reason?: string; durationSec?: number }) => {
+      console.log("WebRTC call ended received:", data.callId);
+      closeSystemNotification(`call-${data.callId}`);
+      if (currentCallIdRef.current) {
+        closeSystemNotification(`call-${currentCallIdRef.current}`);
+      }
+      soundRef.current?.stopRing();
       soundRef.current?.playEndChime();
       cleanupMedia();
+      setIncomingCall(null);
       setCallState("ENDED");
       toast({
         title: "Call Ended",
@@ -500,9 +579,8 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
       });
       setTimeout(() => {
         setActiveCall(null);
-        setIncomingCall(null);
         setCallState("IDLE");
-      }, 2500);
+      }, 1500);
     });
 
     // Call failed (e.g. not authorized, database error)
@@ -880,6 +958,8 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
         durationSec: 0,
       });
 
+      closeSystemNotification(`call-${incomingCall.callId}`);
+      currentCallIdRef.current = incomingCall.callId;
       setIncomingCall(null);
       setCallState("CONNECTED");
       startDurationTimer();
@@ -899,43 +979,57 @@ export function VoiceCallProvider({ children }: { children: React.ReactNode }) {
   // Reject incoming call
   const rejectCall = useCallback(() => {
     if (!incomingCall) return;
+    const callId = incomingCall.callId;
+    closeSystemNotification(`call-${callId}`);
+    if (currentCallIdRef.current) {
+      closeSystemNotification(`call-${currentCallIdRef.current}`);
+    }
+
     soundRef.current?.stopRing();
     clearTimers();
 
     socketRef.current?.emit("call:reject", {
-      callId: incomingCall.callId,
+      callId,
       targetUserId: incomingCall.callerId,
       orderId: incomingCall.orderId,
       reason: "Call declined by user.",
     });
 
+    cleanupMedia();
     setIncomingCall(null);
     setCallState("IDLE");
-  }, [clearTimers, incomingCall]);
+  }, [clearTimers, cleanupMedia, incomingCall]);
 
-  // End active call
+  // End active call or cancel outgoing call
   const endCall = useCallback(() => {
-    if (!activeCall) return;
-
+    soundRef.current?.stopRing();
     soundRef.current?.playEndChime();
-    const duration = activeCall.durationSec;
 
-    socketRef.current?.emit("call:end", {
-      callId: activeCall.callId,
-      targetUserId: activeCall.participant.userId,
-      orderId: activeCall.orderId,
-      durationSec: duration,
-      reason: "user_ended",
-    });
+    const callIdToUse = activeCall?.callId || incomingCall?.callId || currentCallIdRef.current;
+    const targetUserId = activeCall?.participant?.userId || incomingCall?.callerId;
+    const orderId = activeCall?.orderId || incomingCall?.orderId;
+    const duration = activeCall?.durationSec || 0;
+
+    if (callIdToUse) {
+      closeSystemNotification(`call-${callIdToUse}`);
+      socketRef.current?.emit("call:end", {
+        callId: callIdToUse,
+        targetUserId,
+        orderId,
+        durationSec: duration,
+        reason: "user_ended",
+      });
+    }
 
     cleanupMedia();
+    setIncomingCall(null);
     setCallState("ENDED");
 
     setTimeout(() => {
       setActiveCall(null);
       setCallState("IDLE");
-    }, 2000);
-  }, [activeCall, cleanupMedia]);
+    }, 1500);
+  }, [activeCall, cleanupMedia, incomingCall]);
 
   // Toggle Mute
   const toggleMute = useCallback(() => {
