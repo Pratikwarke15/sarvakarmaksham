@@ -58,8 +58,26 @@ export default function HomePage() {
   const [customCityInput, setCustomCityInput] = useState("");
   const [locationNotice, setLocationNotice] = useState<string | null>(null);
 
-  // Authenticated redirect: if already logged in (e.g. reopened PWA or active session), don't show landing page
+  // Standalone PWA detection: installed PWA app skips website landing page completely
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const isStandalone =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (window.navigator as any).standalone === true ||
+        document.referrer.includes("android-app://");
+
+      if (isStandalone) {
+        if (isAuthenticated && user?.role) {
+          const target = user.role === "WORKER" ? "/worker/dashboard" : "/consumer/dashboard";
+          router.replace(target);
+        } else {
+          router.replace("/login");
+        }
+        return;
+      }
+    }
+
+    // Authenticated redirect for regular website
     if (isAuthenticated && user?.role) {
       const target =
         user.role === "WORKER"

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -15,6 +16,13 @@ import {
   ArrowRight,
   Briefcase,
   Home,
+  Phone,
+  Lock,
+  KeyRound,
+  CheckCircle2,
+  MapPin,
+  Bell,
+  Loader2,
 } from "lucide-react";
 import { OtpInput } from "./OtpInput";
 import { LegalModal } from "@/components/legal/LegalModal";
@@ -28,10 +36,38 @@ export interface EnhancedLoginFormProps {
   initialRole?: "WORKER" | "CONSUMER";
 }
 
+// Top hero images for the dynamic half-screen display
+const HERO_SLIDES = [
+  {
+    image: "/images/gig_workers_hero.jpg",
+    title: "BHARAT'S #1 COOPERATIVE GIG APP",
+    subtitle: "Fair Earnings • 100% Escrow Protection • Dignified Work",
+  },
+  {
+    image: "/images/food_delivery_tech.jpg",
+    title: "DELIVERY & TECH FREELANCERS",
+    subtitle: "Instant daily payouts and mutual support groups",
+  },
+  {
+    image: "/images/artisan_electrician_home.jpg",
+    title: "EXPERT ARTISANS & TRADESPEOPLE",
+    subtitle: "Certified electricians, carpenters & home service partners",
+  },
+];
+
 export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) {
   const router = useRouter();
   const login = useAuthStore((s) => s.login);
   const { toast } = useToast();
+
+  // 1. Splash Screen State (Maroon screen with Logo)
+  const [showSplash, setShowSplash] = useState(true);
+  const [splashFading, setSplashFading] = useState(false);
+
+  // 2. Multi-step Zomato Flow: "role_select" -> "phone" -> "password" -> "otp"
+  const [flowStep, setFlowStep] = useState<"role_select" | "phone" | "password" | "otp">(
+    initialRole ? "phone" : "role_select"
+  );
 
   const [activeRole, setActiveRole] = useState<"WORKER" | "CONSUMER">(() => {
     if (initialRole) return initialRole;
@@ -43,14 +79,22 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
     return "CONSUMER";
   });
 
-  const [step, setStep] = useState<"credentials" | "otp">("credentials");
-  const [identifier, setIdentifier] = useState("");
+  const [heroIndex, setHeroIndex] = useState(0);
+
+  // Input states
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp] = useState("");
-  const [userPhone, setUserPhone] = useState("");
+  const [rememberLogin, setRememberLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Zomato Quick "Continue with" phone number prompt modal
+  const [showPhoneSelector, setShowPhoneSelector] = useState(false);
+
+  // Sending OTP loading dialog
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
 
   // Role Mismatch Error State for Cross-Login Prevention
   const [roleMismatch, setRoleMismatch] = useState<{
@@ -62,37 +106,63 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
   const [legalModalOpen, setLegalModalOpen] = useState(false);
   const [legalModalTab, setLegalModalTab] = useState<"terms" | "privacy">("terms");
 
-  // Demo Push Notification State
+  // Push Notification state
   const [serverOtpNotification, setServerOtpNotification] = useState<string | null>(null);
   const [showNotification, setShowNotification] = useState(false);
   const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Resend countdown
-  const [countdown, setCountdown] = useState(30);
+  const [countdown, setCountdown] = useState(17);
 
+  // Splash Screen Timer: 1.2s maroon screen, then fade into app
+  useEffect(() => {
+    const fadeTimer = setTimeout(() => {
+      setSplashFading(true);
+    }, 1100);
+
+    const removeTimer = setTimeout(() => {
+      setShowSplash(false);
+    }, 1500);
+
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(removeTimer);
+    };
+  }, []);
+
+  // Top hero carousel auto-advance
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHeroIndex((prev) => (prev + 1) % HERO_SLIDES.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, []);
+
+  // OTP Countdown timer
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (step === "otp" && countdown > 0) {
+    if (flowStep === "otp" && countdown > 0) {
       interval = setInterval(() => setCountdown((c) => c - 1), 1000);
     }
     return () => clearInterval(interval);
-  }, [step, countdown]);
+  }, [flowStep, countdown]);
 
-  const handleRoleChange = (newRole: "WORKER" | "CONSUMER") => {
-    setActiveRole(newRole);
+  const handleRoleSelection = (role: "WORKER" | "CONSUMER") => {
+    setActiveRole(role);
     setErrorMessage(null);
     setRoleMismatch(null);
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      url.searchParams.set("role", newRole);
-      window.history.replaceState({}, "", url.toString());
-    }
+    setHeroIndex(role === "WORKER" ? 0 : 2);
+    setFlowStep("phone");
+
+    // Show quick continue with suggestion for easy login
+    setTimeout(() => {
+      setShowPhoneSelector(true);
+    }, 300);
   };
 
   const triggerPushNotification = (receivedOtp: string) => {
     setServerOtpNotification(receivedOtp);
     setShowNotification(true);
-    // Display on real device notification bar / OS notification shade
     notifyOtp(receivedOtp, "Login");
     if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
     notificationTimeoutRef.current = setTimeout(() => {
@@ -110,43 +180,56 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
     return getRoleDashboardPath(role);
   };
 
-  // Quick Seed Credentials
-  const fillSeedUser = (userPhone: string, userPass: string, label: string) => {
-    setIdentifier(userPhone);
-    setPassword(userPass);
-    setErrorMessage(null);
-    setRoleMismatch(null);
-    toast({ title: `Loaded ${label}`, variant: "default" });
+  const checkCrossRoleError = (msg: string) => {
+    if (msg.includes("registered as a Consumer") || msg.includes("Consumer Login page")) {
+      setRoleMismatch({
+        targetRole: "CONSUMER",
+        message: "This mobile number is registered as a Consumer. Please switch to the Consumer portal.",
+      });
+    } else if (msg.includes("registered as a Worker") || msg.includes("Worker Login page")) {
+      setRoleMismatch({
+        targetRole: "WORKER",
+        message: "This mobile number is registered as a Worker. Please switch to the Worker portal.",
+      });
+    } else {
+      setErrorMessage(msg);
+    }
   };
 
-  // Step 1: Validate Credentials
-  const handleCredentialsSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-    setRoleMismatch(null);
-
-    const clean = identifier.trim();
-    if (!clean) {
-      setErrorMessage("Please enter your mobile number or email");
+  // Step 1: Submit Phone Number -> Advance to Password
+  const handlePhoneSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.length < 10) {
+      setErrorMessage("Please enter a valid 10-digit mobile number");
       return;
     }
-    if (!password || password.length < 6) {
-      setErrorMessage("Password must be at least 6 characters");
+    setErrorMessage(null);
+    setRoleMismatch(null);
+    setHeroIndex(1);
+    setFlowStep("password");
+  };
+
+  // Step 2: Submit Password -> Validate credentials & Request Server OTP
+  const handlePasswordSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!password) {
+      setErrorMessage("Please enter your password");
       return;
     }
 
     setLoading(true);
+    setIsSendingOtp(true);
+    setErrorMessage(null);
+    setRoleMismatch(null);
+
     try {
       const { apiPost } = await import("@/lib/api");
+      const clean = phone.replace(/\D/g, "").slice(-10);
+
       const res = await apiPost<{
         success: boolean;
-        data?: {
-          requiresOtp: boolean;
-          phone: string;
-          role?: string;
-          otp?: string;
-          expiresAt?: string;
-        };
+        data?: { requiresOtp: boolean; phone: string; otp?: string; expiresAt: string };
         error?: string;
         message?: string;
       }>("/auth/login-step1", {
@@ -156,11 +239,9 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
       });
 
       if (res.success && res.data) {
-        setStep("otp");
-        setCountdown(30);
-        if (res.data.phone) {
-          setUserPhone(res.data.phone);
-        }
+        setCountdown(17);
+        setHeroIndex(2);
+        setFlowStep("otp");
         if (res.data.otp) {
           triggerPushNotification(res.data.otp);
         }
@@ -178,26 +259,11 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
       checkCrossRoleError(msg);
     } finally {
       setLoading(false);
+      setIsSendingOtp(false);
     }
   };
 
-  const checkCrossRoleError = (msg: string) => {
-    if (msg.includes("registered as a Consumer") || msg.includes("Consumer Login page")) {
-      setRoleMismatch({
-        targetRole: "CONSUMER",
-        message: "This account is registered as a Consumer. Consumers cannot log in through the Worker Portal.",
-      });
-    } else if (msg.includes("registered as a Worker") || msg.includes("Worker Login page")) {
-      setRoleMismatch({
-        targetRole: "WORKER",
-        message: "This account is registered as a Worker. Workers cannot log in through the Consumer Portal.",
-      });
-    } else {
-      setErrorMessage(msg);
-    }
-  };
-
-  // Step 2: Verify OTP
+  // Step 3: Verify OTP -> Complete Login
   const verifyingOtpRef = useRef(false);
   const handleOtpVerify = async (codeToVerify: string) => {
     if (!codeToVerify || codeToVerify.length !== 6) {
@@ -213,7 +279,7 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
 
     try {
       const { apiPost } = await import("@/lib/api");
-      const targetPhone = userPhone || identifier.replace(/\D/g, "").slice(-10);
+      const targetPhone = phone.replace(/\D/g, "").slice(-10);
       const res = await apiPost<{
         success: boolean;
         data?: { user: any; token: string };
@@ -229,7 +295,7 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
         login(res.data.user, res.data.token);
         setShowNotification(false);
         toast({
-          title: `Welcome back, ${res.data.user.name || "Member"}!`,
+          title: `Welcome, ${res.data.user.name || "Member"}!`,
           variant: "success",
         });
         const target = getRedirectTarget(res.data.user.role);
@@ -255,7 +321,7 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
     setOtp("");
     try {
       const { apiPost } = await import("@/lib/api");
-      const clean = identifier.trim();
+      const clean = phone.replace(/\D/g, "").slice(-10);
       const res = await apiPost<{
         success: boolean;
         data?: { otp?: string; expiresAt?: string };
@@ -267,7 +333,7 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
       });
 
       if (res.success && res.data) {
-        setCountdown(30);
+        setCountdown(17);
         if (res.data.otp) {
           triggerPushNotification(res.data.otp);
         }
@@ -289,471 +355,568 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
     handleOtpVerify(code);
   };
 
+  const selectSuggestedPhone = (num: string) => {
+    setPhone(num);
+    setShowPhoneSelector(false);
+    setPassword("password123");
+  };
+
   return (
-    <div className="w-full">
-      {/* Demo Mode Push Notification Popup */}
-      {showNotification && serverOtpNotification && (
+    <div className="relative w-full min-h-screen bg-slate-900 flex flex-col items-center justify-center overflow-hidden">
+      {/* ======================================================== */}
+      {/* 1. MAROON SPLASH SCREEN (ZOMATO STYLE WITH LOGO)         */}
+      {/* ======================================================== */}
+      {showSplash && (
         <div
-          role="alert"
-          aria-live="assertive"
-          className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-[94%] max-w-md animate-in slide-in-from-top-6 duration-300 transition-all pointer-events-auto"
+          className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#800020] transition-opacity duration-400 ease-out ${
+            splashFading ? "opacity-0 pointer-events-none" : "opacity-100"
+          }`}
         >
-          <div className="flex flex-col gap-2 rounded-2xl border border-[#800020]/30 bg-[#0F172A]/95 p-4 text-white shadow-2xl backdrop-blur-md ring-1 ring-white/10">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#800020] text-white">
-                  <ShieldCheck className="h-4 w-4" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-xs font-bold text-white">Verification Code</p>
-                    <span className="rounded-full bg-rose-950 px-1.5 py-0.2 text-[9px] font-bold text-rose-300 uppercase">
-                      Demo
+          <div className="flex flex-col items-center gap-4 animate-scale-up">
+            <div className="h-28 w-28 rounded-3xl bg-white p-3 shadow-2xl flex items-center justify-center border-2 border-white/20">
+              <img
+                src="/images/logo.png"
+                alt="सर्वकर्मक्षमः"
+                className="h-full w-full object-contain"
+              />
+            </div>
+            <div className="text-center text-white mt-1">
+              <h1 className="text-3xl font-black tracking-tight font-heading">
+                सर्वकर्मक्षमः<span className="text-amber-300">.</span>
+              </h1>
+              <p className="text-xs uppercase tracking-widest text-rose-200 mt-1 font-semibold">
+                Bharat&apos;s Cooperative Gig Platform
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MAIN CONTAINER: HALF-SCREEN SPLIT (TOP HERO + BOTTOM UI) */}
+      {/* ======================================================== */}
+      <div className="w-full max-w-md min-h-screen bg-white shadow-2xl flex flex-col justify-between overflow-hidden relative">
+        {/* ----------------- TOP HALF: HERO IMAGE ----------------- */}
+        <div className="relative h-[44vh] sm:h-[48vh] w-full bg-slate-950 overflow-hidden shrink-0 select-none">
+          <Image
+            src={HERO_SLIDES[heroIndex].image}
+            alt="Sarvakarmakshamah Gig Workers"
+            fill
+            priority
+            className="object-cover object-center transition-all duration-700 brightness-[0.78]"
+          />
+          {/* Subtle gradient vignette to blend with content */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+
+          {/* Top Floating App Branding */}
+          <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
+            {flowStep !== "role_select" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (flowStep === "otp") setFlowStep("password");
+                  else if (flowStep === "password") setFlowStep("phone");
+                  else if (flowStep === "phone") setFlowStep("role_select");
+                  setErrorMessage(null);
+                  setRoleMismatch(null);
+                }}
+                className="h-9 w-9 rounded-full bg-white/20 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/30 transition shadow-sm"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            ) : (
+              <Link
+                href="/"
+                className="h-9 w-9 rounded-full bg-white/20 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/30 transition shadow-sm"
+                title="Back to Landing Page"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Link>
+            )}
+
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white text-[11px] font-bold">
+              <span>{activeRole === "WORKER" ? "👷 Worker Mode" : "🏡 Consumer Mode"}</span>
+            </div>
+          </div>
+
+          {/* Hero Slide Titles */}
+          <div className="absolute bottom-5 left-5 right-5 z-10 text-white">
+            <span className="inline-block px-2.5 py-0.5 rounded-full bg-[#800020] text-[10px] font-extrabold uppercase tracking-wider mb-1.5 shadow-sm">
+              सर्वकर्मक्षमः
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight leading-tight uppercase font-heading drop-shadow-md">
+              {HERO_SLIDES[heroIndex].title}
+            </h2>
+            <p className="text-xs text-slate-200 mt-1 line-clamp-1 drop-shadow-sm font-medium">
+              {HERO_SLIDES[heroIndex].subtitle}
+            </p>
+          </div>
+        </div>
+
+        {/* ----------------- BOTTOM HALF: DYNAMIC FLOW ----------------- */}
+        <div className="flex-1 bg-white p-5 sm:p-6 flex flex-col justify-between -mt-3 rounded-t-3xl relative z-20 shadow-[0_-8px_25px_rgba(0,0,0,0.12)]">
+          {/* STEP 1: INITIAL ROLE SELECTION ("Worker" below "Consumer" or vice versa) */}
+          {flowStep === "role_select" && (
+            <div className="flex-1 flex flex-col justify-center space-y-4 py-2 animate-fade-in">
+              <div className="text-center mb-1">
+                <h3 className="text-lg font-black text-slate-900 font-heading">
+                  Welcome to सर्वकर्मक्षमः
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                  Please choose your portal to continue
+                </p>
+              </div>
+
+              {/* Option 1: Worker Button */}
+              <button
+                type="button"
+                id="select-worker-btn"
+                onClick={() => handleRoleSelection("WORKER")}
+                className="w-full py-4 px-5 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white font-black text-sm shadow-md shadow-[#800020]/25 transition-all flex items-center justify-between active:scale-[0.99] group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center text-xl">
+                    👷
+                  </div>
+                  <div className="text-left">
+                    <span className="block text-sm font-black tracking-wide">I AM A WORKER</span>
+                    <span className="block text-[11px] text-rose-200 font-normal">
+                      Delivery, Electrician, Technician, Freelancer
                     </span>
                   </div>
                 </div>
-              </div>
+                <ArrowRight className="h-5 w-5 text-white/80 group-hover:translate-x-1 transition-transform" />
+              </button>
+
+              {/* Option 2: Consumer Button below Worker */}
               <button
                 type="button"
-                onClick={() => setShowNotification(false)}
-                className="rounded-lg p-1 text-slate-400 hover:text-white transition"
+                id="select-consumer-btn"
+                onClick={() => handleRoleSelection("CONSUMER")}
+                className="w-full py-4 px-5 rounded-2xl bg-white border-2 border-[#800020] text-[#800020] hover:bg-rose-50 font-black text-sm shadow-sm transition-all flex items-center justify-between active:scale-[0.99] group cursor-pointer"
               >
-                <X className="h-4 w-4" />
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-xl">
+                    🏡
+                  </div>
+                  <div className="text-left">
+                    <span className="block text-sm font-black tracking-wide">I AM A CONSUMER</span>
+                    <span className="block text-[11px] text-slate-500 font-normal">
+                      Hire verified artisans & home services
+                    </span>
+                  </div>
+                </div>
+                <ArrowRight className="h-5 w-5 text-[#800020] group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
+          )}
 
-            <div className="flex items-center justify-between rounded-xl bg-slate-800/80 px-3.5 py-2.5 border border-slate-700/60">
+          {/* STEP 2: PHONE NUMBER ENTRY (ZOMATO STYLE) */}
+          {flowStep === "phone" && (
+            <div className="flex-1 flex flex-col justify-between py-1 animate-fade-in">
               <div>
-                <p className="text-[11px] text-slate-300">Your Login Code:</p>
-                <p className="text-xl font-mono font-black tracking-widest text-amber-300">
-                  {serverOtpNotification}
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Log in or sign up
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFlowStep("role_select")}
+                    className="text-[11px] font-bold text-[#800020] hover:underline"
+                  >
+                    Change ({activeRole})
+                  </button>
+                </div>
+
+                {roleMismatch && (
+                  <div className="mb-3 p-3 rounded-2xl border border-rose-200 bg-rose-50 text-xs text-rose-900 flex items-start gap-2">
+                    <ShieldAlert className="h-4 w-4 text-[#800020] shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block">Role Mismatch</span>
+                      <span>{roleMismatch.message}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRoleSelection(roleMismatch.targetRole)}
+                        className="mt-1.5 block font-bold text-[#800020] underline"
+                      >
+                        Switch to {roleMismatch.targetRole} Portal
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {errorMessage && (
+                  <div className="mb-3 p-3 rounded-xl border border-red-200 bg-red-50 text-xs text-red-800 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+                    <span>{errorMessage}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handlePhoneSubmit} className="space-y-3.5">
+                  <div className="flex rounded-2xl border border-slate-300 focus-within:border-[#800020] focus-within:ring-2 focus-within:ring-[#800020]/15 overflow-hidden transition bg-[#FBFBFC]">
+                    <div className="flex items-center gap-1.5 px-3 border-r border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 shrink-0 select-none">
+                      <span className="text-base">🇮🇳</span>
+                      <span>+91</span>
+                    </div>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value.replace(/\D/g, "").slice(0, 10));
+                        if (errorMessage) setErrorMessage(null);
+                        if (roleMismatch) setRoleMismatch(null);
+                      }}
+                      placeholder="Enter Phone Number"
+                      className="w-full py-3.5 px-3 text-sm font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none bg-transparent"
+                      autoFocus
+                    />
+                    {phone && (
+                      <button
+                        type="button"
+                        onClick={() => setPhone("")}
+                        className="p-3 text-slate-400 hover:text-slate-700 transition"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Remember my login for faster sign-in checkbox (Zomato Style) */}
+                  <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberLogin}
+                      onChange={(e) => setRememberLogin(e.target.checked)}
+                      className="h-4 w-4 rounded accent-[#800020] cursor-pointer"
+                    />
+                    <span>Remember my login for faster sign-in</span>
+                  </label>
+
+                  {/* Primary Continue Button */}
+                  <button
+                    type="submit"
+                    id="phone-continue-btn"
+                    disabled={phone.length < 10}
+                    className="w-full py-3.5 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white font-extrabold text-sm shadow-md shadow-[#800020]/25 transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    Continue
+                  </button>
+                </form>
+
+                {/* Quick Test Numbers Suggestion Bar */}
+                <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Need test login?</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowPhoneSelector(true)}
+                    className="text-[#800020] font-bold hover:underline"
+                  >
+                    Quick Test Numbers ⌵
+                  </button>
+                </div>
+              </div>
+
+              {/* Bottom Sign-up Redirect */}
+              <div className="pt-3 border-t border-slate-100 text-center">
+                <p className="text-xs text-slate-600">
+                  Don&apos;t have an account?{" "}
+                  <Link
+                    href={activeRole === "WORKER" ? "/register?role=WORKER" : "/register?role=CONSUMER"}
+                    className="font-bold text-[#800020] hover:underline"
+                  >
+                    Sign up as {activeRole === "WORKER" ? "Worker" : "Consumer"}
+                  </Link>
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => autoFillOtp(serverOtpNotification)}
-                className="flex items-center gap-1 rounded-xl bg-[#800020] hover:bg-[#9a0026] text-white px-3 py-1.5 text-xs font-bold shadow-md transition transform active:scale-95"
-              >
-                <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-                Auto-Fill
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {step === "credentials" ? (
-        <div>
-          {/* Back Button */}
-          <Link
-            href="/"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition mb-4 shadow-xs"
-            aria-label="Back to home"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Link>
-
-          {/* DEDICATED PORTAL TABS: WORKER vs CONSUMER */}
-          <div className="mb-5 p-1 rounded-2xl bg-slate-100 border border-slate-200/80 flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => handleRoleChange("WORKER")}
-              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                activeRole === "WORKER"
-                  ? "bg-[#800020] text-white shadow-md shadow-[#800020]/20"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
-              }`}
-            >
-              <Briefcase className="h-3.5 w-3.5" />
-              <span>Worker Login</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleRoleChange("CONSUMER")}
-              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                activeRole === "CONSUMER"
-                  ? "bg-[#800020] text-white shadow-md shadow-[#800020]/20"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
-              }`}
-            >
-              <Home className="h-3.5 w-3.5" />
-              <span>Consumer Login</span>
-            </button>
-          </div>
-
-          {/* Role Header Badge & Subtitles */}
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-2">
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider border ${
-                  activeRole === "WORKER"
-                    ? "bg-amber-100 text-amber-900 border-amber-300"
-                    : "bg-emerald-100 text-emerald-900 border-emerald-300"
-                }`}
-              >
-                {activeRole === "WORKER" ? "👷 Worker & Co-op Portal" : "🏡 Consumer & Household Portal"}
-              </span>
-            </div>
-
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
-              {activeRole === "WORKER" ? "Worker Log in" : "Consumer Log in"}
-            </h1>
-
-            <p className="text-xs text-slate-500 mt-2 font-medium leading-relaxed">
-              {activeRole === "WORKER"
-                ? "Access gig assignments, daily earnings, dividends & social security."
-                : "Book verified fair-trade workers for household repairs & services."}
-            </p>
-
-            <p className="text-[11px] text-slate-400 mt-1">
-              By logging in, you agree to our{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setLegalModalTab("terms");
-                  setLegalModalOpen(true);
-                }}
-                className="text-[#800020] font-bold hover:underline cursor-pointer"
-              >
-                Terms of Use
-              </button>{" "}
-              and{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setLegalModalTab("privacy");
-                  setLegalModalOpen(true);
-                }}
-                className="text-[#800020] font-bold hover:underline cursor-pointer"
-              >
-                Privacy Policy
-              </button>
-              .
-            </p>
-          </div>
-
-          {/* CROSS-ROLE MISMATCH ALERT BANNER */}
-          {roleMismatch ? (
-            <div className="mb-5 rounded-2xl border-2 border-[#800020]/20 bg-rose-50/90 p-4 text-xs text-rose-950 shadow-sm animate-in fade-in duration-200">
-              <div className="flex items-start gap-3">
-                <div className="h-8 w-8 rounded-xl bg-[#800020] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <ShieldAlert className="h-5 w-5" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-bold text-sm text-[#800020] font-heading">
-                    Account Role Mismatch
-                  </h4>
-                  <p className="mt-1 text-slate-700 leading-relaxed font-medium">
-                    {roleMismatch.message}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => handleRoleChange(roleMismatch.targetRole)}
-                    className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#800020] hover:bg-[#66001a] text-white px-3.5 py-2 font-bold text-xs shadow-md transition active:scale-95"
-                  >
-                    <span>
-                      Switch to {roleMismatch.targetRole === "WORKER" ? "Worker Login" : "Consumer Login"} Now
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : errorMessage && (
-            <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50/90 p-3.5 text-xs text-red-800">
-              <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <span className="font-medium">{errorMessage}</span>
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleCredentialsSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                {activeRole === "WORKER" ? "Worker Mobile Number or Email" : "Consumer Mobile Number or Email"}
-              </label>
-              <input
-                type="text"
-                value={identifier}
-                onChange={(e) => {
-                  setIdentifier(e.target.value);
-                  if (errorMessage) setErrorMessage(null);
-                  if (roleMismatch) setRoleMismatch(null);
-                }}
-                placeholder={activeRole === "WORKER" ? "e.g. 9876543201 or worker@email.com" : "e.g. 9812345601 or consumer@email.com"}
-                className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200/90 py-3.5 px-4 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 outline-none transition"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-slate-700">
-                  Password
-                </label>
-                <Link
-                  href="/forgot-password"
-                  className="text-xs font-semibold text-[#800020] hover:underline"
-                >
-                  Forgot?
-                </Link>
-              </div>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (errorMessage) setErrorMessage(null);
-                    if (roleMismatch) setRoleMismatch(null);
-                  }}
-                  placeholder="Your password"
-                  className="w-full rounded-2xl bg-[#F8F9FA] border border-slate-200/90 py-3.5 pl-4 pr-11 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 outline-none transition"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition"
-                  title={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-500 pt-1">
-              We will generate a 6-digit verification code for {activeRole === "WORKER" ? "Worker" : "Consumer"} authentication.
-            </p>
-
-            {/* Connect Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed mt-2"
-            >
-              {loading ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  <span>Verifying {activeRole === "WORKER" ? "Worker" : "Consumer"} Account...</span>
-                </div>
-              ) : (
-                `Connect as ${activeRole === "WORKER" ? "Worker" : "Consumer"}`
-              )}
-            </button>
-          </form>
-
-          {/* Quick Demo Sign In Options tailored by role */}
-          <div className="my-6 flex items-center">
-            <div className="flex-1 border-t border-slate-200" />
-            <span className="px-3 text-xs font-medium text-slate-400">Quick Test Logins</span>
-            <div className="flex-1 border-t border-slate-200" />
-          </div>
-
-          <div className="space-y-2.5">
-            {activeRole === "WORKER" ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => fillSeedUser("9876543201", "password123", "Demo Worker Rajesh")}
-                  className="w-full rounded-2xl border-2 border-amber-300 bg-amber-50/50 py-3 px-4 flex items-center justify-between text-xs font-semibold text-amber-950 hover:bg-amber-100/60 transition shadow-xs"
-                >
-                  <span className="flex items-center gap-2 font-bold">
-                    <span>👷</span>
-                    <span>Demo Worker (Rajesh - 9876543201)</span>
-                  </span>
-                  <span className="text-[10px] bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-md font-bold">
-                    Ready
-                  </span>
-                </button>
-                <div className="text-center pt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleRoleChange("CONSUMER")}
-                    className="text-xs text-slate-500 hover:text-[#800020] font-medium"
-                  >
-                    Need household services? Switch to Consumer Login →
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => fillSeedUser("9812345601", "password123", "Demo Consumer Priya")}
-                  className="w-full rounded-2xl border-2 border-emerald-300 bg-emerald-50/50 py-3 px-4 flex items-center justify-between text-xs font-semibold text-emerald-950 hover:bg-emerald-100/60 transition shadow-xs"
-                >
-                  <span className="flex items-center gap-2 font-bold">
-                    <span>🏡</span>
-                    <span>Demo Consumer (Priya - 9812345601)</span>
-                  </span>
-                  <span className="text-[10px] bg-emerald-200/80 text-emerald-900 px-2 py-0.5 rounded-md font-bold">
-                    Ready
-                  </span>
-                </button>
-                <div className="text-center pt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleRoleChange("WORKER")}
-                    className="text-xs text-slate-500 hover:text-[#800020] font-medium"
-                  >
-                    Looking for gig jobs? Switch to Worker Login →
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Privacy Note & Sign Up Link */}
-          <div className="mt-8 text-center space-y-2">
-            <p className="text-xs text-slate-500 font-medium">
-              Don&apos;t have an account?{" "}
-              <Link
-                href={activeRole === "WORKER" ? "/register?role=WORKER" : "/register?role=CONSUMER"}
-                className="font-bold text-[#800020] hover:underline"
-              >
-                Sign up as {activeRole === "WORKER" ? "Worker" : "Consumer"}
-              </Link>
-            </p>
-            <p className="text-[11px] text-slate-400">
-              For more information, please see our{" "}
-              <Link href="/privacy" className="text-slate-600 font-bold hover:underline">
-                Privacy policy
-              </Link>
-              .
-            </p>
-          </div>
-        </div>
-      ) : (
-        /* Step 2: OTP Verification */
-        <div>
-          {/* Back Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setStep("credentials");
-              setErrorMessage(null);
-              setRoleMismatch(null);
-            }}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition mb-6 shadow-xs"
-            aria-label="Back to credentials"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-
-          {/* Heading & Subtitle */}
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-2">
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider border ${
-                  activeRole === "WORKER"
-                    ? "bg-amber-100 text-amber-900 border-amber-300"
-                    : "bg-emerald-100 text-emerald-900 border-emerald-300"
-                }`}
-              >
-                {activeRole === "WORKER" ? "👷 Worker Verification" : "🏡 Consumer Verification"}
-              </span>
-            </div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
-              Verify code
-            </h1>
-            <p className="text-xs text-slate-500 mt-2 font-medium leading-relaxed">
-              Enter the 6-digit code sent to{" "}
-              <span className="font-bold text-slate-800">{identifier}</span>.
-            </p>
-          </div>
-
-          {/* Error Message */}
-          {roleMismatch ? (
-            <div className="mb-5 rounded-2xl border-2 border-[#800020]/20 bg-rose-50/90 p-4 text-xs text-rose-950 shadow-sm animate-in fade-in duration-200">
-              <div className="flex items-start gap-3">
-                <div className="h-8 w-8 rounded-xl bg-[#800020] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <ShieldAlert className="h-5 w-5" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-bold text-sm text-[#800020] font-heading">
-                    Account Role Mismatch
-                  </h4>
-                  <p className="mt-1 text-slate-700 leading-relaxed font-medium">
-                    {roleMismatch.message}
+          {/* STEP 3: PASSWORD ENTRY */}
+          {flowStep === "password" && (
+            <div className="flex-1 flex flex-col justify-between py-1 animate-fade-in">
+              <div>
+                <div className="mb-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-black text-slate-900 font-heading">
+                      Enter Password
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setFlowStep("phone")}
+                      className="text-xs font-bold text-[#800020] hover:underline"
+                    >
+                      Edit Mobile
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Logging in with mobile: <strong className="text-slate-800 font-mono">+91 {phone}</strong>
                   </p>
+                </div>
+
+                {errorMessage && (
+                  <div className="mb-3 p-3 rounded-xl border border-red-200 bg-red-50 text-xs text-red-800 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+                    <span>{errorMessage}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handlePasswordSubmit} className="space-y-3.5">
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (errorMessage) setErrorMessage(null);
+                      }}
+                      placeholder="Enter account password"
+                      className="w-full py-3.5 pl-4 pr-11 rounded-2xl border border-slate-300 focus:border-[#800020] focus:ring-2 focus:ring-[#800020]/15 text-sm font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none bg-[#FBFBFC]"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Default demo password: <code>password123</code></span>
+                    <Link href="/forgot-password" className="text-[#800020] font-bold hover:underline">
+                      Forgot?
+                    </Link>
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={() => {
-                      setStep("credentials");
-                      handleRoleChange(roleMismatch.targetRole);
+                    type="submit"
+                    id="password-submit-btn"
+                    disabled={loading || !password}
+                    className="w-full py-3.5 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white font-extrabold text-sm shadow-md shadow-[#800020]/25 transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                        <span>Verifying Credentials...</span>
+                      </>
+                    ) : (
+                      <span>Proceed to OTP Verification</span>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {/* Bottom Sign-up Redirect */}
+              <div className="pt-3 border-t border-slate-100 text-center">
+                <p className="text-xs text-slate-600">
+                  New to सर्वकर्मक्षमः?{" "}
+                  <Link
+                    href={activeRole === "WORKER" ? "/register?role=WORKER" : "/register?role=CONSUMER"}
+                    className="font-bold text-[#800020] hover:underline"
+                  >
+                    Create a new account
+                  </Link>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: OTP VERIFICATION (ZOMATO STYLE NUMERIC DISPLAY) */}
+          {flowStep === "otp" && (
+            <div className="flex-1 flex flex-col justify-between py-1 animate-fade-in">
+              <div>
+                <div className="mb-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-black text-slate-900 font-heading">
+                      Enter Verification OTP
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setFlowStep("phone")}
+                      className="text-xs font-bold text-[#800020] hover:underline"
+                    >
+                      Change Number
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    We have sent a verification code to{" "}
+                    <strong className="text-slate-800 font-mono">+91 {phone}</strong>
+                  </p>
+                </div>
+
+                {/* Live Demo OTP Banner */}
+                {serverOtpNotification && (
+                  <div className="mb-3 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 flex items-center justify-between shadow-2xs">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">
+                        Server OTP Code:
+                      </span>
+                      <span className="font-mono text-base font-black tracking-widest text-[#800020]">
+                        {serverOtpNotification}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => autoFillOtp(serverOtpNotification)}
+                      className="px-3 py-1.5 rounded-xl bg-[#800020] text-white text-xs font-bold hover:bg-[#68001a] transition"
+                    >
+                      Auto-Fill
+                    </button>
+                  </div>
+                )}
+
+                {errorMessage && (
+                  <div className="mb-3 p-3 rounded-xl border border-red-200 bg-red-50 text-xs text-red-800 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+                    <span>{errorMessage}</span>
+                  </div>
+                )}
+
+                {/* 6-box OTP Input */}
+                <div className="py-2">
+                  <OtpInput
+                    length={6}
+                    value={otp}
+                    onComplete={(code) => {
+                      setOtp(code);
+                      handleOtpVerify(code);
                     }}
-                    className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#800020] hover:bg-[#66001a] text-white px-3.5 py-2 font-bold text-xs shadow-md transition active:scale-95"
-                  >
-                    <span>
-                      Switch to {roleMismatch.targetRole === "WORKER" ? "Worker Login" : "Consumer Login"} Now
-                    </span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </button>
+                    onResend={handleResendOtp}
+                    loading={loading}
+                  />
                 </div>
-              </div>
-            </div>
-          ) : errorMessage && (
-            <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50/90 p-3.5 text-xs text-red-800">
-              <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <span className="font-medium">{errorMessage}</span>
-            </div>
-          )}
 
-          {/* Demo OTP Banner */}
-          {serverOtpNotification && (
-            <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/90 p-3.5 text-amber-900">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-bold text-amber-900">Demo Code:</p>
-                  <p className="text-lg font-mono font-black text-amber-950">
-                    {serverOtpNotification}
+                {/* Resend Countdown */}
+                <div className="text-center mt-3">
+                  <p className="text-xs text-slate-500">
+                    Didn&apos;t get the OTP?{" "}
+                    {countdown > 0 ? (
+                      <span className="font-bold text-slate-700">Resend SMS in {countdown}s</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResendOtp}
+                        className="font-bold text-[#800020] hover:underline"
+                      >
+                        Resend SMS Now
+                      </button>
+                    )}
                   </p>
                 </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 text-center">
                 <button
                   type="button"
-                  onClick={() => autoFillOtp(serverOtpNotification)}
-                  className="rounded-xl bg-[#800020] text-white px-3 py-1.5 text-xs font-bold hover:bg-[#68001a] transition"
+                  onClick={() => setFlowStep("phone")}
+                  className="text-xs font-bold text-slate-500 hover:text-[#800020] transition"
                 >
-                  Auto-Fill
+                  Go back to login methods
                 </button>
               </div>
             </div>
           )}
 
-          {/* 6-Digit OTP Input */}
-          <div className="py-2">
-            <OtpInput
-              length={6}
-              value={otp}
-              onComplete={(code) => {
-                setOtp(code);
-                handleOtpVerify(code);
+          {/* Legal Footer (Terms of Service / Privacy Policy) */}
+          <div className="pt-3 text-center text-[10px] text-slate-400">
+            <span>By continuing, you agree to our </span>
+            <button
+              type="button"
+              onClick={() => {
+                setLegalModalTab("terms");
+                setLegalModalOpen(true);
               }}
-              onResend={handleResendOtp}
-              loading={loading}
-            />
+              className="text-slate-600 font-semibold hover:underline"
+            >
+              Terms of Service
+            </button>
+            <span> • </span>
+            <button
+              type="button"
+              onClick={() => {
+                setLegalModalTab("privacy");
+                setLegalModalOpen(true);
+              }}
+              className="text-slate-600 font-semibold hover:underline"
+            >
+              Privacy Policy
+            </button>
           </div>
+        </div>
+      </div>
 
-          {/* Resend Footer */}
-          <div className="mt-8 text-center">
-            <p className="text-xs text-slate-500">
-              Didn&apos;t receive code?{" "}
-              {countdown > 0 ? (
-                <span className="font-semibold text-slate-400">Resend in {countdown}s</span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleResendOtp}
-                  className="font-bold text-[#800020] hover:underline"
-                >
-                  Resend now
-                </button>
-              )}
-            </p>
+      {/* ======================================================== */}
+      {/* ZOMATO QUICK "CONTINUE WITH" PHONE NUMBER MODAL          */}
+      {/* ======================================================== */}
+      {showPhoneSelector && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-2xs animate-fade-in">
+          <div className="w-full max-w-xs rounded-2xl bg-white p-5 shadow-2xl space-y-4 animate-scale-up">
+            <h4 className="text-sm font-bold text-slate-700">Continue with</h4>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => selectSuggestedPhone(activeRole === "WORKER" ? "9876543201" : "9812345601")}
+                className="w-full p-3 rounded-xl border border-slate-200 hover:border-[#800020] hover:bg-rose-50/50 flex items-center gap-3 transition text-left"
+              >
+                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
+                  <Phone className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="block text-sm font-bold text-slate-900 font-mono">
+                    {activeRole === "WORKER" ? "098765 43201" : "098123 45601"}
+                  </span>
+                  <span className="block text-[10px] text-slate-400">
+                    {activeRole === "WORKER" ? "Demo Worker (Rajesh)" : "Demo Consumer (Priya)"}
+                  </span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => selectSuggestedPhone(activeRole === "WORKER" ? "9823456701" : "9898765401")}
+                className="w-full p-3 rounded-xl border border-slate-200 hover:border-[#800020] hover:bg-rose-50/50 flex items-center gap-3 transition text-left"
+              >
+                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
+                  <Phone className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="block text-sm font-bold text-slate-900 font-mono">
+                    {activeRole === "WORKER" ? "098234 56701" : "098987 65401"}
+                  </span>
+                  <span className="block text-[10px] text-slate-400">
+                    {activeRole === "WORKER" ? "Demo Worker (Sunil)" : "Demo Consumer (Amit)"}
+                  </span>
+                </div>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowPhoneSelector(false)}
+              className="w-full py-2.5 text-center text-xs font-bold text-[#800020] uppercase tracking-wider hover:underline"
+            >
+              NONE OF THE ABOVE
+            </button>
           </div>
         </div>
       )}
 
-      {/* Terms & Privacy Popup Modal */}
+      {/* ======================================================== */}
+      {/* "SENDING OTP" DIALOG (MATCHING ZOMATO SCREENSHOT)        */}
+      {/* ======================================================== */}
+      {isSendingOtp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-2xs animate-fade-in">
+          <div className="rounded-2xl bg-white py-5 px-8 shadow-2xl flex items-center gap-3 border border-slate-100">
+            <div className="h-4 w-4 rounded-full border-2 border-[#800020] border-t-transparent animate-spin" />
+            <span className="text-sm font-bold text-slate-800">Sending OTP</span>
+          </div>
+        </div>
+      )}
+
+      {/* Legal Modal */}
       <LegalModal
         isOpen={legalModalOpen}
         onClose={() => setLegalModalOpen(false)}

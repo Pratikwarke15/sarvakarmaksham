@@ -9,8 +9,11 @@ import { useAuthStore } from "@/store/authStore";
 import { getRoleDashboardPath } from "@/lib/utils";
 import { VoiceAccessModal } from "@/components/auth/VoiceAccessModal";
 
+import { usePathname } from "next/navigation";
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { isAuthenticated, sessionValidated, user } = useAuthStore();
   const { t } = useI18n();
 
@@ -22,8 +25,21 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
   if (sessionValidated && isAuthenticated && user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FBF8F5]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#800020] border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-[#800020]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent" />
+      </div>
+    );
+  }
+
+  const isLoginRoute = pathname === "/login" || pathname === "/login/consumer" || pathname === "/login/worker";
+
+  if (isLoginRoute) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col justify-center text-slate-900 selection:bg-[#800020] selection:text-white">
+        <VoiceAccessModal />
+        <main className="w-full flex-1 flex flex-col items-center justify-center">
+          {children}
+        </main>
       </div>
     );
   }
