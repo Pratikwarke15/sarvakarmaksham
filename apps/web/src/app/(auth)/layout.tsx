@@ -31,9 +31,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     );
   }
 
-  const isLoginRoute = pathname === "/login" || pathname === "/login/consumer" || pathname === "/login/worker";
+  const isAuthRoute =
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/forgot-password");
 
-  if (isLoginRoute) {
+  if (isAuthRoute) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col justify-center text-slate-900 selection:bg-[#800020] selection:text-white">
         <VoiceAccessModal />

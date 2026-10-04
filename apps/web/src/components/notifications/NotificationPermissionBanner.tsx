@@ -6,41 +6,54 @@ import {
   getNotificationPermission,
   requestSystemNotificationPermission,
 } from "@/lib/notifications";
-import { Bell, X, CheckCircle, ShieldAlert } from "lucide-react";
+import { Bell, X, CheckCircle } from "lucide-react";
 
 export function NotificationPermissionBanner() {
   const [permission, setPermission] = useState<NotificationPermission>("default");
-  const [isDismissed, setIsDismissed] = useState(false);
+  // Default to dismissed true to avoid notch flicker on first paint
+  const [isDismissed, setIsDismissed] = useState(true);
   const [isRequesting, setIsRequesting] = useState(false);
   const [justGranted, setJustGranted] = useState(false);
 
   useEffect(() => {
     if (!isNotificationSupported()) {
-      setIsDismissed(true);
       return;
     }
 
     const current = getNotificationPermission();
     setPermission(current);
 
-    const dismissed = sessionStorage.getItem("sarva_notif_banner_dismissed");
-    if (dismissed || current === "granted") {
+    // If handled once on this device, or if already granted/denied by browser, never show again
+    const handled = localStorage.getItem("sarva_notif_prompt_handled");
+    if (handled || current !== "default") {
       setIsDismissed(true);
+      return;
     }
+
+    // Delay 1.5s after page load so it doesn't clash with onboarding
+    const timer = setTimeout(() => {
+      setIsDismissed(false);
+    }, 1500);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const handleRequest = async () => {
     setIsRequesting(true);
     try {
       const granted = await requestSystemNotificationPermission();
+      try {
+        localStorage.setItem("sarva_notif_prompt_handled", "true");
+      } catch (e) {}
+
       if (granted) {
         setPermission("granted");
         setJustGranted(true);
         setTimeout(() => {
           setIsDismissed(true);
-        }, 3000);
+        }, 2400);
       } else {
-        setPermission(getNotificationPermission());
+        setIsDismissed(true);
       }
     } finally {
       setIsRequesting(false);
@@ -50,65 +63,66 @@ export function NotificationPermissionBanner() {
   const handleDismiss = () => {
     setIsDismissed(true);
     try {
-      sessionStorage.setItem("sarva_notif_banner_dismissed", "true");
+      localStorage.setItem("sarva_notif_prompt_handled", "true");
     } catch (e) {}
   };
 
-  if (isDismissed || permission === "granted" && !justGranted) {
+  if (isDismissed && !justGranted) {
     return null;
   }
 
   return (
-    <div className="relative z-40 bg-gradient-to-r from-burgundy-900 via-rose-950 to-burgundy-900 text-white px-4 py-3 shadow-md border-b border-rose-800/40 animate-in slide-in-from-top duration-300">
-      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="p-2 rounded-full bg-white/10 shrink-0 text-amber-300">
+    <div className="fixed bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-sm z-50 animate-in slide-in-from-bottom-6 duration-300">
+      <div className="relative overflow-hidden rounded-2xl bg-[#24080F]/95 backdrop-blur-xl border border-rose-500/30 p-4 shadow-[0_12px_36px_rgba(0,0,0,0.4)] text-white">
+        <button
+          type="button"
+          onClick={handleDismiss}
+          aria-label="Close notification prompt"
+          className="absolute top-3 right-3 p-1.5 rounded-full text-rose-300/70 hover:text-white hover:bg-white/10 transition"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        <div className="flex items-start gap-3.5 pr-6">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#800020] to-rose-600 border border-rose-400/30 flex items-center justify-center shrink-0 shadow-md">
             {justGranted ? (
-              <CheckCircle className="w-5 h-5 text-emerald-400" />
-            ) : permission === "denied" ? (
-              <ShieldAlert className="w-5 h-5 text-rose-300" />
+              <CheckCircle className="w-5 h-5 text-emerald-300" />
             ) : (
-              <Bell className="w-5 h-5 animate-pulse" />
+              <Bell className="w-5 h-5 text-amber-300 animate-pulse" />
             )}
           </div>
-          <div className="text-sm">
-            {justGranted ? (
-              <p className="font-semibold text-emerald-300">
-                System Notifications Active! Real-time alerts will appear on your device bar.
-              </p>
-            ) : permission === "denied" ? (
-              <p className="text-rose-200">
-                Notifications blocked in your browser. Unblock in browser settings for live call alerts.
-              </p>
-            ) : (
-              <p className="text-white/90">
-                <span className="font-semibold text-white">Enable Real-Time Alerts:</span> Get
-                system notification bar alerts for incoming calls, verification OTPs, and booking updates.
-              </p>
-            )}
+          <div>
+            <h4 className="text-sm font-black tracking-tight font-heading text-white">
+              {justGranted ? "Alerts Enabled!" : "Enable Live Notifications"}
+            </h4>
+            <p className="text-xs text-rose-100/80 mt-0.5 leading-relaxed font-normal">
+              {justGranted
+                ? "You will now receive incoming call rings, booking updates, and OTPs on your device."
+                : "Get instant call ringers, worker dispatches, and secure OTPs directly on this device."}
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-          {permission === "default" && (
+        {!justGranted && (
+          <div className="mt-3.5 flex items-center gap-2 justify-end">
             <button
+              type="button"
+              onClick={handleDismiss}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-rose-200 hover:text-white hover:bg-white/10 transition"
+            >
+              Not now
+            </button>
+            <button
+              type="button"
               onClick={handleRequest}
               disabled={isRequesting}
-              className="w-full sm:w-auto px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-semibold shadow transition flex items-center justify-center gap-1.5"
+              className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-[#800020] to-rose-700 hover:from-[#6b001b] hover:to-rose-800 active:scale-95 text-xs font-bold text-white shadow-md shadow-rose-950/40 transition flex items-center gap-1.5 disabled:opacity-50"
             >
-              <Bell className="w-3.5 h-3.5" />
-              {isRequesting ? "Requesting..." : "Enable Alerts"}
+              <Bell className="w-3.5 h-3.5 text-amber-300" />
+              <span>{isRequesting ? "Connecting..." : "Enable Access"}</span>
             </button>
-          )}
-
-          <button
-            onClick={handleDismiss}
-            aria-label="Dismiss banner"
-            className="p-1 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -163,14 +163,34 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
     }, 20000);
   };
 
-  const handleRoleSelect = (selectedRole: "CONSUMER" | "WORKER") => {
-    setRole(selectedRole);
+  const [selectedRole, setSelectedRole] = useState<"CONSUMER" | "WORKER" | null>(() => {
+    if (initialRole) return initialRole;
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search).get("role");
+      if (p?.toUpperCase() === "WORKER") return "WORKER";
+      if (p?.toUpperCase() === "CONSUMER") return "CONSUMER";
+    }
+    return null;
+  });
+
+  const handleRoleCardClick = (chosenRole: "CONSUMER" | "WORKER") => {
+    setSelectedRole(chosenRole);
+    setRole(chosenRole);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
-      url.searchParams.set("role", selectedRole);
+      url.searchParams.set("role", chosenRole);
       window.history.replaceState({}, "", url.toString());
     }
+  };
+
+  const confirmRoleAndProceed = () => {
+    if (!selectedRole) return;
+    setRole(selectedRole);
     setStep("name");
+  };
+
+  const handleRoleSelect = (chosenRole: "CONSUMER" | "WORKER") => {
+    handleRoleCardClick(chosenRole);
   };
 
   const handleNameSubmit = (e: React.FormEvent) => {
@@ -558,7 +578,7 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full max-w-md min-h-screen bg-white shadow-2xl flex flex-col justify-between overflow-hidden relative">
       {/* Demo Notification Banner */}
       {demoOtpNotification && (
         <div
@@ -593,171 +613,200 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
         </div>
       )}
 
-      {/* Error Message */}
-      {errorMessage && (
-        <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50/90 p-3.5 text-xs text-red-800">
-          <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-          <span className="font-medium">{errorMessage}</span>
-        </div>
-      )}
-
-      {/* STEP 1: ROLE */}
-      {step === "role" && (
-        <div>
-          {/* Back Button */}
-          <Link
-            href="/"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-slate-100 transition mb-4 shadow-xs"
-            aria-label="Back to home"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Link>
-
-          {/* Top Portal Switcher Tabs */}
-          <div className="mb-5 p-1 rounded-2xl bg-slate-100 border border-slate-200/80 flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => {
-                setRole("WORKER");
-                if (typeof window !== "undefined") {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set("role", "WORKER");
-                  window.history.replaceState({}, "", url.toString());
-                }
-              }}
-              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                role === "WORKER"
-                  ? "bg-[#800020] text-white shadow-md shadow-[#800020]/20"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
-              }`}
+      {/* Top Hero Image Header (Half-screen in role step, top banner in subsequent steps) */}
+      {step === "role" ? (
+        <div className="relative h-[44vh] sm:h-[48vh] w-full bg-slate-950 overflow-hidden shrink-0 select-none">
+          <img
+            src="/images/gig_workers_hero.jpg"
+            alt="Sarvakarmakshamah Gig Workers"
+            className="h-full w-full object-cover object-center brightness-[0.80]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+          <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
+            <Link
+              href="/"
+              className="h-9 w-9 rounded-full bg-white/20 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/30 transition shadow-sm"
+              title="Back to Landing Page"
             >
-              <span>👷</span>
-              <span>Worker Portal</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRole("CONSUMER");
-                if (typeof window !== "undefined") {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set("role", "CONSUMER");
-                  window.history.replaceState({}, "", url.toString());
-                }
-              }}
-              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                role === "CONSUMER"
-                  ? "bg-[#800020] text-white shadow-md shadow-[#800020]/20"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-white/60"
-              }`}
-            >
-              <span>🏡</span>
-              <span>Consumer Portal</span>
-            </button>
+              <ChevronLeft className="h-5 w-5" />
+            </Link>
+            <div />
           </div>
-
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-2">
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider border ${
-                  role === "WORKER"
-                    ? "bg-amber-100 text-amber-900 border-amber-300"
-                    : "bg-emerald-100 text-emerald-900 border-emerald-300"
-                }`}
-              >
-                {role === "WORKER" ? "👷 Worker Registration" : "🏡 Consumer Registration"}
-              </span>
-            </div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight font-heading">
-              {role === "WORKER" ? "Join as Worker" : "Join as Consumer"}
-            </h1>
-            <p className="text-xs text-slate-500 mt-2 font-medium leading-relaxed">
-              By signing up, you agree to our{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setLegalModalTab("terms");
-                  setLegalModalOpen(true);
-                }}
-                className="text-[#800020] font-bold hover:underline cursor-pointer"
-              >
-                Terms of Use
-              </button>{" "}
-              and{" "}
-              <button
-                type="button"
-                onClick={() => {
-                  setLegalModalTab("privacy");
-                  setLegalModalOpen(true);
-                }}
-                className="text-[#800020] font-bold hover:underline cursor-pointer"
-              >
-                Privacy Policy
-              </button>
-              .
+          <div className="absolute bottom-5 left-5 right-5 z-10 text-white">
+            <span className="inline-block px-2.5 py-0.5 rounded-full bg-[#800020] text-[10px] font-extrabold uppercase tracking-wider mb-1.5 shadow-sm">
+              सर्वकर्मक्षमः
+            </span>
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight leading-tight uppercase font-heading drop-shadow-md">
+              JOIN BHARAT&apos;S COOPERATIVE
+            </h2>
+            <p className="text-xs text-slate-200 mt-1 line-clamp-1 drop-shadow-sm font-medium">
+              Fair Earnings • 100% Escrow Protection • Dignified Work
             </p>
           </div>
-
-          <div className="space-y-3 mb-6">
+        </div>
+      ) : (
+        <div className="relative h-28 sm:h-32 w-full bg-slate-950 overflow-hidden shrink-0 select-none">
+          <img
+            src={role === "WORKER" ? "/images/food_delivery_tech.jpg" : "/images/artisan_electrician_home.jpg"}
+            alt="Sarvakarmakshamah"
+            className="h-full w-full object-cover object-center brightness-[0.70]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent" />
+          <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
             <button
               type="button"
-              onClick={() => handleRoleSelect("CONSUMER")}
-              className={`w-full flex items-center justify-between rounded-2xl border p-4 text-left transition-all ${
-                role === "CONSUMER"
-                  ? "border-[#800020] bg-rose-50/40 ring-1 ring-[#800020]"
-                  : "border-slate-200/90 bg-[#F8F9FA] hover:border-slate-300"
-              }`}
+              onClick={() => {
+                if (step === "name") setStep("role");
+                else if (step === "mobile") setStep("name");
+                else if (step === "mobile_otp") setStep("mobile");
+                else if (step === "email") setStep("mobile");
+                else if (step === "email_otp") setStep("email");
+                else if (step === "password") setStep("email");
+                else if (step === "location") setStep("password");
+                else if (step === "profile_photo") setStep("location");
+                else if (step === "identity") setStep("profile_photo");
+                setErrorMessage(null);
+              }}
+              className="h-9 w-9 rounded-full bg-white/20 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/30 transition shadow-sm cursor-pointer"
             >
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Service Consumer</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Book certified local co-op gig workers</p>
-              </div>
-              {role === "CONSUMER" && (
-                <div className="h-6 w-6 rounded-full bg-[#800020] text-white flex items-center justify-center">
-                  <Check className="h-3.5 w-3.5" />
-                </div>
-              )}
+              <ChevronLeft className="h-5 w-5" />
             </button>
-
-            <button
-              type="button"
-              onClick={() => handleRoleSelect("WORKER")}
-              className={`w-full flex items-center justify-between rounded-2xl border p-4 text-left transition-all ${
-                role === "WORKER"
-                  ? "border-[#800020] bg-rose-50/40 ring-1 ring-[#800020]"
-                  : "border-slate-200/90 bg-[#F8F9FA] hover:border-slate-300"
-              }`}
-            >
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Cooperative Worker</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Earn with capped ≤5% commission & dividends</p>
-              </div>
-              {role === "WORKER" && (
-                <div className="h-6 w-6 rounded-full bg-[#800020] text-white flex items-center justify-center">
-                  <Check className="h-3.5 w-3.5" />
-                </div>
-              )}
-            </button>
+            <div className="px-3 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white text-[11px] font-bold">
+              <span>{role === "WORKER" ? "👷 Worker Portal" : "🏡 Consumer Portal"}</span>
+            </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setStep("name")}
-            className="w-full rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white py-3.5 text-base font-bold shadow-md shadow-[#800020]/20 hover:shadow-lg transition-all"
-          >
-            Join as {role === "WORKER" ? "Worker" : "Consumer"}
-          </button>
-
-          <p className="mt-8 text-center text-xs text-slate-500 font-medium">
-            Already have an account?{" "}
-            <Link
-              href={role === "WORKER" ? "/login?role=WORKER" : "/login?role=CONSUMER"}
-              className="font-bold text-[#800020] hover:underline"
-            >
-              Log in as {role === "WORKER" ? "Worker" : "Consumer"}
-            </Link>
-          </p>
+          <div className="absolute bottom-3 left-5 right-5 z-10 text-white">
+            <span className="text-xs font-bold uppercase tracking-wider text-rose-200">
+              {step === "name" && "Step 1 of 8 • Legal Full Name"}
+              {step === "mobile" && "Step 2 of 8 • Mobile Number"}
+              {step === "mobile_otp" && "Step 3 of 8 • Verify Mobile OTP"}
+              {step === "email" && "Step 4 of 8 • Email Address"}
+              {step === "email_otp" && "Step 5 of 8 • Verify Email OTP"}
+              {step === "password" && "Step 6 of 8 • Account Password"}
+              {step === "location" && "Step 7 of 8 • Operating Area & Location"}
+              {step === "profile_photo" && "Step 8 of 8 • Face Photo"}
+              {step === "identity" && "Step 8 of 8 • DigiLocker e-KYC"}
+              {step === "complete" && "Registration Complete"}
+            </span>
+          </div>
         </div>
       )}
+
+      {/* Main Form Content Area */}
+      <div className="flex-1 bg-white p-5 sm:p-6 flex flex-col justify-between overflow-y-auto -mt-3 rounded-t-3xl relative z-20 shadow-[0_-8px_25px_rgba(0,0,0,0.12)]">
+        {errorMessage && (
+          <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50/90 p-3.5 text-xs text-red-800">
+            <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <span className="font-medium">{errorMessage}</span>
+          </div>
+        )}
+
+        {/* STEP 1: ROLE (Two choices + explicit GO button) */}
+        {step === "role" && (
+          <div className="flex-1 flex flex-col justify-between py-1 animate-fade-in">
+            <div className="space-y-3.5">
+              <div className="text-center mb-1">
+                <h3 className="text-lg font-black text-slate-900 font-heading">
+                  Join सर्वकर्मक्षमः
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                  Please choose your portal to register
+                </p>
+              </div>
+
+              {/* Worker Card */}
+              <button
+                type="button"
+                id="register-select-worker-btn"
+                onClick={() => handleRoleCardClick("WORKER")}
+                className={`w-full py-4 px-4 sm:px-5 rounded-2xl border-2 transition-all flex items-center justify-between active:scale-[0.99] cursor-pointer ${
+                  selectedRole === "WORKER"
+                    ? "border-[#800020] bg-rose-50/60 shadow-md ring-2 ring-[#800020]/20"
+                    : "border-slate-200 bg-[#FBFBFC] hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-rose-100/70 border border-rose-200/60 flex items-center justify-center text-xl shrink-0">
+                    👷
+                  </div>
+                  <div className="text-left">
+                    <span className="block text-sm font-black tracking-wide text-slate-900">I AM A WORKER</span>
+                    <span className="block text-[11px] text-slate-500 font-normal">
+                      Delivery, Electrician, Technician, Freelancer
+                    </span>
+                  </div>
+                </div>
+                {selectedRole === "WORKER" ? (
+                  <div className="h-6 w-6 rounded-full bg-[#800020] text-white flex items-center justify-center shadow-xs shrink-0">
+                    <Check className="h-3.5 w-3.5" />
+                  </div>
+                ) : (
+                  <div className="h-5 w-5 rounded-full border-2 border-slate-300 shrink-0" />
+                )}
+              </button>
+
+              {/* Consumer Card */}
+              <button
+                type="button"
+                id="register-select-consumer-btn"
+                onClick={() => handleRoleCardClick("CONSUMER")}
+                className={`w-full py-4 px-4 sm:px-5 rounded-2xl border-2 transition-all flex items-center justify-between active:scale-[0.99] cursor-pointer ${
+                  selectedRole === "CONSUMER"
+                    ? "border-[#800020] bg-rose-50/60 shadow-md ring-2 ring-[#800020]/20"
+                    : "border-slate-200 bg-[#FBFBFC] hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-rose-100/70 border border-rose-200/60 flex items-center justify-center text-xl shrink-0">
+                    🏡
+                  </div>
+                  <div className="text-left">
+                    <span className="block text-sm font-black tracking-wide text-slate-900">I AM A CONSUMER</span>
+                    <span className="block text-[11px] text-slate-500 font-normal">
+                      Hire verified artisans & home services
+                    </span>
+                  </div>
+                </div>
+                {selectedRole === "CONSUMER" ? (
+                  <div className="h-6 w-6 rounded-full bg-[#800020] text-white flex items-center justify-center shadow-xs shrink-0">
+                    <Check className="h-3.5 w-3.5" />
+                  </div>
+                ) : (
+                  <div className="h-5 w-5 rounded-full border-2 border-slate-300 shrink-0" />
+                )}
+              </button>
+            </div>
+
+            {/* Bottom GO Button that arrives upon selection */}
+            <div className="pt-4">
+              {selectedRole ? (
+                <button
+                  type="button"
+                  id="register-go-btn"
+                  onClick={confirmRoleAndProceed}
+                  className="w-full py-4 px-5 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white font-black text-sm shadow-md shadow-[#800020]/25 transition-all flex items-center justify-center gap-2 active:scale-[0.99] cursor-pointer animate-in slide-in-from-bottom-2 duration-200"
+                >
+                  <span>GO as {selectedRole === "WORKER" ? "Worker" : "Consumer"}</span>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              ) : (
+                <div className="py-3.5 text-center text-xs text-slate-400 font-medium">
+                  Tap Worker or Consumer above to proceed
+                </div>
+              )}
+
+              <p className="mt-4 text-center text-xs text-slate-500 font-medium">
+                Already have an account?{" "}
+                <Link
+                  href={selectedRole === "WORKER" ? "/login?role=WORKER" : "/login?role=CONSUMER"}
+                  className="font-bold text-[#800020] hover:underline"
+                >
+                  Log in as {selectedRole === "WORKER" ? "Worker" : "Consumer"}
+                </Link>
+              </p>
+            </div>
+          </div>
+        )}
 
       {/* STEP 2: NAME */}
       {step === "name" && (
@@ -1550,6 +1599,7 @@ export function EnhancedRegisterFlow({ initialRole }: EnhancedRegisterFlowProps 
           </p>
         </div>
       )}
+      </div>
 
       {/* AUTHENTIC DIGILOCKER GATEWAY MODAL */}
       {digilockerModalOpen && (

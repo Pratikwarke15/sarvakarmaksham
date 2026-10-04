@@ -69,6 +69,10 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
     initialRole ? "phone" : "role_select"
   );
 
+  const [selectedRole, setSelectedRole] = useState<"WORKER" | "CONSUMER" | null>(
+    initialRole || null
+  );
+
   const [activeRole, setActiveRole] = useState<"WORKER" | "CONSUMER">(() => {
     if (initialRole) return initialRole;
     if (typeof window !== "undefined") {
@@ -89,9 +93,6 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
   const [rememberLogin, setRememberLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Zomato Quick "Continue with" phone number prompt modal
-  const [showPhoneSelector, setShowPhoneSelector] = useState(false);
 
   // Sending OTP loading dialog
   const [isSendingOtp, setIsSendingOtp] = useState(false);
@@ -149,15 +150,20 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
 
   const handleRoleSelection = (role: "WORKER" | "CONSUMER") => {
     setActiveRole(role);
+    setSelectedRole(role);
     setErrorMessage(null);
     setRoleMismatch(null);
     setHeroIndex(role === "WORKER" ? 0 : 2);
     setFlowStep("phone");
+  };
 
-    // Show quick continue with suggestion for easy login
-    setTimeout(() => {
-      setShowPhoneSelector(true);
-    }, 300);
+  const confirmRoleAndProceed = () => {
+    if (!selectedRole) return;
+    setActiveRole(selectedRole);
+    setErrorMessage(null);
+    setRoleMismatch(null);
+    setHeroIndex(selectedRole === "WORKER" ? 0 : 2);
+    setFlowStep("phone");
   };
 
   const triggerPushNotification = (receivedOtp: string) => {
@@ -355,12 +361,6 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
     handleOtpVerify(code);
   };
 
-  const selectSuggestedPhone = (num: string) => {
-    setPhone(num);
-    setShowPhoneSelector(false);
-    setPassword("password123");
-  };
-
   return (
     <div className="relative w-full min-h-screen bg-slate-900 flex flex-col items-center justify-center overflow-hidden">
       {/* ======================================================== */}
@@ -403,12 +403,12 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
             alt="Sarvakarmakshamah Gig Workers"
             fill
             priority
-            className="object-cover object-center transition-all duration-700 brightness-[0.78]"
+            className="object-cover object-center transition-all duration-700 brightness-[0.80]"
           />
           {/* Subtle gradient vignette to blend with content */}
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
 
-          {/* Top Floating App Branding */}
+          {/* Top Floating Navigation */}
           <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
             {flowStep !== "role_select" ? (
               <button
@@ -433,10 +433,7 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
                 <ChevronLeft className="h-5 w-5" />
               </Link>
             )}
-
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white text-[11px] font-bold">
-              <span>{activeRole === "WORKER" ? "👷 Worker Mode" : "🏡 Consumer Mode"}</span>
-            </div>
+            <div />
           </div>
 
           {/* Hero Slide Titles */}
@@ -455,77 +452,111 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
 
         {/* ----------------- BOTTOM HALF: DYNAMIC FLOW ----------------- */}
         <div className="flex-1 bg-white p-5 sm:p-6 flex flex-col justify-between -mt-3 rounded-t-3xl relative z-20 shadow-[0_-8px_25px_rgba(0,0,0,0.12)]">
-          {/* STEP 1: INITIAL ROLE SELECTION ("Worker" below "Consumer" or vice versa) */}
+          {/* STEP 1: INITIAL ROLE SELECTION (Explicit GO button on selection) */}
           {flowStep === "role_select" && (
-            <div className="flex-1 flex flex-col justify-center space-y-4 py-2 animate-fade-in">
-              <div className="text-center mb-1">
-                <h3 className="text-lg font-black text-slate-900 font-heading">
-                  Welcome to सर्वकर्मक्षमः
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                  Please choose your portal to continue
-                </p>
+            <div className="flex-1 flex flex-col justify-between py-2 animate-fade-in">
+              <div className="space-y-3.5">
+                <div className="text-center mb-1">
+                  <h3 className="text-lg font-black text-slate-900 font-heading">
+                    Welcome to सर्वकर्मक्षमः
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                    Please choose your portal to continue
+                  </p>
+                </div>
+
+                {/* Option 1: Worker Card */}
+                <button
+                  type="button"
+                  id="select-worker-btn"
+                  onClick={() => setSelectedRole("WORKER")}
+                  className={`w-full py-4 px-4 sm:px-5 rounded-2xl border-2 transition-all flex items-center justify-between active:scale-[0.99] cursor-pointer ${
+                    selectedRole === "WORKER"
+                      ? "border-[#800020] bg-rose-50/60 shadow-md ring-2 ring-[#800020]/20"
+                      : "border-slate-200 bg-[#FBFBFC] hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-rose-100/70 border border-rose-200/60 flex items-center justify-center text-xl shrink-0">
+                      👷
+                    </div>
+                    <div className="text-left">
+                      <span className="block text-sm font-black tracking-wide text-slate-900">I AM A WORKER</span>
+                      <span className="block text-[11px] text-slate-500 font-normal">
+                        Delivery, Electrician, Technician, Freelancer
+                      </span>
+                    </div>
+                  </div>
+                  {selectedRole === "WORKER" ? (
+                    <div className="h-6 w-6 rounded-full bg-[#800020] text-white flex items-center justify-center shadow-xs shrink-0">
+                      <CheckCircle2 className="h-4 w-4" />
+                    </div>
+                  ) : (
+                    <div className="h-5 w-5 rounded-full border-2 border-slate-300 shrink-0" />
+                  )}
+                </button>
+
+                {/* Option 2: Consumer Card below Worker */}
+                <button
+                  type="button"
+                  id="select-consumer-btn"
+                  onClick={() => setSelectedRole("CONSUMER")}
+                  className={`w-full py-4 px-4 sm:px-5 rounded-2xl border-2 transition-all flex items-center justify-between active:scale-[0.99] cursor-pointer ${
+                    selectedRole === "CONSUMER"
+                      ? "border-[#800020] bg-rose-50/60 shadow-md ring-2 ring-[#800020]/20"
+                      : "border-slate-200 bg-[#FBFBFC] hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-rose-100/70 border border-rose-200/60 flex items-center justify-center text-xl shrink-0">
+                      🏡
+                    </div>
+                    <div className="text-left">
+                      <span className="block text-sm font-black tracking-wide text-slate-900">I AM A CONSUMER</span>
+                      <span className="block text-[11px] text-slate-500 font-normal">
+                        Hire verified artisans & home services
+                      </span>
+                    </div>
+                  </div>
+                  {selectedRole === "CONSUMER" ? (
+                    <div className="h-6 w-6 rounded-full bg-[#800020] text-white flex items-center justify-center shadow-xs shrink-0">
+                      <CheckCircle2 className="h-4 w-4" />
+                    </div>
+                  ) : (
+                    <div className="h-5 w-5 rounded-full border-2 border-slate-300 shrink-0" />
+                  )}
+                </button>
               </div>
 
-              {/* Option 1: Worker Button */}
-              <button
-                type="button"
-                id="select-worker-btn"
-                onClick={() => handleRoleSelection("WORKER")}
-                className="w-full py-4 px-5 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white font-black text-sm shadow-md shadow-[#800020]/25 transition-all flex items-center justify-between active:scale-[0.99] group cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center text-xl">
-                    👷
+              {/* Bottom GO Button that arrives upon selection */}
+              <div className="pt-4">
+                {selectedRole ? (
+                  <button
+                    type="button"
+                    id="go-role-btn"
+                    onClick={confirmRoleAndProceed}
+                    className="w-full py-4 px-5 rounded-2xl bg-[#800020] hover:bg-[#68001a] text-white font-black text-sm shadow-md shadow-[#800020]/25 transition-all flex items-center justify-center gap-2 active:scale-[0.99] cursor-pointer animate-in slide-in-from-bottom-2 duration-200"
+                  >
+                    <span>GO as {selectedRole === "WORKER" ? "Worker" : "Consumer"}</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <div className="py-3.5 text-center text-xs text-slate-400 font-medium">
+                    Tap Worker or Consumer above to proceed
                   </div>
-                  <div className="text-left">
-                    <span className="block text-sm font-black tracking-wide">I AM A WORKER</span>
-                    <span className="block text-[11px] text-rose-200 font-normal">
-                      Delivery, Electrician, Technician, Freelancer
-                    </span>
-                  </div>
-                </div>
-                <ArrowRight className="h-5 w-5 text-white/80 group-hover:translate-x-1 transition-transform" />
-              </button>
-
-              {/* Option 2: Consumer Button below Worker */}
-              <button
-                type="button"
-                id="select-consumer-btn"
-                onClick={() => handleRoleSelection("CONSUMER")}
-                className="w-full py-4 px-5 rounded-2xl bg-white border-2 border-[#800020] text-[#800020] hover:bg-rose-50 font-black text-sm shadow-sm transition-all flex items-center justify-between active:scale-[0.99] group cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-xl">
-                    🏡
-                  </div>
-                  <div className="text-left">
-                    <span className="block text-sm font-black tracking-wide">I AM A CONSUMER</span>
-                    <span className="block text-[11px] text-slate-500 font-normal">
-                      Hire verified artisans & home services
-                    </span>
-                  </div>
-                </div>
-                <ArrowRight className="h-5 w-5 text-[#800020] group-hover:translate-x-1 transition-transform" />
-              </button>
+                )}
+              </div>
             </div>
           )}
 
-          {/* STEP 2: PHONE NUMBER ENTRY (ZOMATO STYLE) */}
+          {/* STEP 2: PHONE NUMBER ENTRY */}
           {flowStep === "phone" && (
             <div className="flex-1 flex flex-col justify-between py-1 animate-fade-in">
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <div className="mb-3.5">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
                     Log in or sign up
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setFlowStep("role_select")}
-                    className="text-[11px] font-bold text-[#800020] hover:underline"
-                  >
-                    Change ({activeRole})
-                  </button>
                 </div>
 
                 {roleMismatch && (
@@ -582,7 +613,7 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
                     )}
                   </div>
 
-                  {/* Remember my login for faster sign-in checkbox (Zomato Style) */}
+                  {/* Remember my login for faster sign-in checkbox */}
                   <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -603,18 +634,6 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
                     Continue
                   </button>
                 </form>
-
-                {/* Quick Test Numbers Suggestion Bar */}
-                <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Need test login?</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowPhoneSelector(true)}
-                    className="text-[#800020] font-bold hover:underline"
-                  >
-                    Quick Test Numbers ⌵
-                  </button>
-                </div>
               </div>
 
               {/* Bottom Sign-up Redirect */}
@@ -847,62 +866,6 @@ export function EnhancedLoginForm({ initialRole }: EnhancedLoginFormProps = {}) 
         </div>
       </div>
 
-      {/* ======================================================== */}
-      {/* ZOMATO QUICK "CONTINUE WITH" PHONE NUMBER MODAL          */}
-      {/* ======================================================== */}
-      {showPhoneSelector && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-2xs animate-fade-in">
-          <div className="w-full max-w-xs rounded-2xl bg-white p-5 shadow-2xl space-y-4 animate-scale-up">
-            <h4 className="text-sm font-bold text-slate-700">Continue with</h4>
-
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => selectSuggestedPhone(activeRole === "WORKER" ? "9876543201" : "9812345601")}
-                className="w-full p-3 rounded-xl border border-slate-200 hover:border-[#800020] hover:bg-rose-50/50 flex items-center gap-3 transition text-left"
-              >
-                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
-                  <Phone className="h-4 w-4" />
-                </div>
-                <div>
-                  <span className="block text-sm font-bold text-slate-900 font-mono">
-                    {activeRole === "WORKER" ? "098765 43201" : "098123 45601"}
-                  </span>
-                  <span className="block text-[10px] text-slate-400">
-                    {activeRole === "WORKER" ? "Demo Worker (Rajesh)" : "Demo Consumer (Priya)"}
-                  </span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => selectSuggestedPhone(activeRole === "WORKER" ? "9823456701" : "9898765401")}
-                className="w-full p-3 rounded-xl border border-slate-200 hover:border-[#800020] hover:bg-rose-50/50 flex items-center gap-3 transition text-left"
-              >
-                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
-                  <Phone className="h-4 w-4" />
-                </div>
-                <div>
-                  <span className="block text-sm font-bold text-slate-900 font-mono">
-                    {activeRole === "WORKER" ? "098234 56701" : "098987 65401"}
-                  </span>
-                  <span className="block text-[10px] text-slate-400">
-                    {activeRole === "WORKER" ? "Demo Worker (Sunil)" : "Demo Consumer (Amit)"}
-                  </span>
-                </div>
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowPhoneSelector(false)}
-              className="w-full py-2.5 text-center text-xs font-bold text-[#800020] uppercase tracking-wider hover:underline"
-            >
-              NONE OF THE ABOVE
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ======================================================== */}
       {/* "SENDING OTP" DIALOG (MATCHING ZOMATO SCREENSHOT)        */}
